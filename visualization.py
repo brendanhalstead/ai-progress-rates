@@ -6,6 +6,10 @@ Provides modular, clean visualization functionality for analyzing AI progress tr
 automation fractions, component contributions, and parameter sensitivity.
 """
 
+# Set matplotlib backend before any imports to prevent GUI errors on headless servers
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates

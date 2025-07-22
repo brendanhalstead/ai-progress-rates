@@ -6,6 +6,10 @@ Models AI progress over time using nested CES production functions with
 feedback loops between automation fraction and cumulative progress.
 """
 
+# Set matplotlib backend before any imports to prevent GUI errors on headless servers
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any

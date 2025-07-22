@@ -6,6 +6,10 @@ Flask-based web application providing interactive interface for exploring
 AI progress trajectories with real-time parameter adjustment and visualization.
 """
 
+# Set matplotlib backend before any other imports to prevent GUI errors on headless servers
+import matplotlib
+matplotlib.use('Agg')
+
 from flask import Flask, request, jsonify, render_template, send_file
 import json
 import numpy as np
@@ -833,13 +837,20 @@ def get_default_data():
         }
     })
 
-if __name__ == '__main__':
-    # Initialize with default data
+# Initialize app data when module loads (for both direct run and gunicorn)
+import os
+try:
     session_data['time_series'] = create_default_time_series()
     session_data['current_params'] = create_default_parameters()
-    
+    logger.info("Application initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize application data: {e}")
+    # Set minimal defaults to prevent complete failure
+    session_data['time_series'] = None
+    session_data['current_params'] = None
+
+if __name__ == '__main__':
     # Get port from environment variable for deployment platforms
-    import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
