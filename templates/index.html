@@ -100,25 +100,25 @@
                                 
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">Progress at 2025: <span id="progress_at_2025_val">10.0</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_2025" min="1" max="100" step="1" value="10">
+                                        <label class="param-label">Max Automation: <span id="automation_fraction_at_superhuman_coder_val">90%</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" min="0.1" max="0.99" step="0.01" value="0.9">
+                                        <small class="text-muted">Upper limit of automation fraction</small>
                                     </div>
                                     <div class="col-6">
-                                        <label class="param-label">Automation at 2025: <span id="automation_fraction_at_2025_val">1%</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_fraction_at_2025" min="-4" max="3" step="0.1" value="-2">
-                                        <small class="text-muted">Logit scale: 1/(1+e^-value)</small>
+                                        <label class="param-label">Half-Max Progress: <span id="progress_at_half_sc_automation_val">50.0</span></label>
+                                        <input type="range" class="range-input form-range" id="progress_at_half_sc_automation" min="1" max="200" step="1" value="50">
+                                        <small class="text-muted">Progress where automation = half of maximum</small>
                                     </div>
                                 </div>
                                 
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">Progress at Superhuman: <span id="progress_at_superhuman_coder_val">100.0</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_superhuman_coder" min="10" max="1000" step="10" value="100">
+                                        <label class="param-label">Automation Slope: <span id="automation_slope_val">2.0</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_slope" min="0.1" max="10" step="0.1" value="2.0">
+                                        <small class="text-muted">Steepness of automation transition</small>
                                     </div>
                                     <div class="col-6">
-                                        <label class="param-label">Automation at Superhuman: <span id="automation_fraction_at_superhuman_coder_val">90%</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" min="-4" max="3" step="0.1" value="2.2">
-                                        <small class="text-muted">Logit scale: 1/(1+e^-value)</small>
+                                        <!-- Placeholder for balance, could add another parameter later -->
                                     </div>
                                 </div>
                             </div>
@@ -293,11 +293,10 @@
             
             console.log('Updating slider:', input.id, 'to value:', value);
             
-            if (input.id.includes('automation_fraction')) {
-                // Convert logit scale value to percentage
-                const actualValue = 1 / (1 + Math.exp(-value));
-                displayValue = (actualValue * 100).toFixed(1) + '%';
-            } else if (input.id.includes('progress')) {
+            if (input.id === 'automation_fraction_at_superhuman_coder') {
+                // Direct percentage display (no logit transformation)
+                displayValue = (value * 100).toFixed(1) + '%';
+            } else if (input.id.includes('progress') || input.id === 'automation_slope') {
                 displayValue = value.toFixed(1);
             } else if (input.id === 'cognitive_output_normalization') {
                 // Convert log scale value to actual value
@@ -327,10 +326,9 @@
                 rho_progress: parseFloat($('#rho_progress').val()),
                 alpha: parseFloat($('#alpha').val()),
                 software_progress_share: parseFloat($('#software_progress_share').val()),
-                progress_at_2025: parseFloat($('#progress_at_2025').val()),
-                automation_fraction_at_2025: 1 / (1 + Math.exp(-parseFloat($('#automation_fraction_at_2025').val()))),
-                progress_at_superhuman_coder: parseFloat($('#progress_at_superhuman_coder').val()),
-                automation_fraction_at_superhuman_coder: 1 / (1 + Math.exp(-parseFloat($('#automation_fraction_at_superhuman_coder').val()))),
+                                 automation_fraction_at_superhuman_coder: parseFloat($('#automation_fraction_at_superhuman_coder').val()),
+                progress_at_half_sc_automation: parseFloat($('#progress_at_half_sc_automation').val()),
+                automation_slope: parseFloat($('#automation_slope').val()),
                 cognitive_output_normalization: Math.pow(10, parseFloat($('#cognitive_output_normalization').val()))
             };
             console.log('Collected parameters:', params);
@@ -396,14 +394,12 @@
                         if (element.length) {
                             let value = response.parameters[key];
                             
-                            // Convert automation fractions to logit scale for display
-                            if (key.includes('automation_fraction')) {
-                                // Convert fraction to logit: logit(p) = log(p / (1-p))
-                                value = Math.log(value / (1 - value));
-                            } else if (key === 'cognitive_output_normalization') {
+                            // Only convert cognitive output normalization to log scale for display
+                            if (key === 'cognitive_output_normalization') {
                                 // Convert to log scale for display
                                 value = Math.log10(value);
                             }
+                            // automation_fraction_at_superhuman_coder is now handled as direct value (no logit conversion)
                             
                             element.val(value);
                             updateDisplayValue(element[0]);
@@ -508,27 +504,25 @@
                                 let newValue = response.estimated_parameters[key];
                                 
                                 // Apply bounds checking and inverse transformation for UI controls
-                                if (key === 'automation_fraction_at_2025' || key === 'automation_fraction_at_superhuman_coder') {
-                                    // Convert from sigmoid value back to logit (slider value)
-                                    // sigmoid: y = 1/(1+exp(-x)) -> logit: x = ln(y/(1-y))
-                                    if (newValue <= 0 || newValue >= 1) {
-                                        // Handle edge cases where sigmoid value is at boundaries
-                                        newValue = newValue <= 0 ? -4 : 3;
-                                    } else {
-                                        newValue = Math.log(newValue / (1 - newValue));
-                                        newValue = Math.max(-4, Math.min(3, newValue)); // Clamp to slider bounds
-                                    }
+                                                                 if (key === 'automation_fraction_at_superhuman_coder') {
+                                     // Direct value handling (no logit transformation needed)
+                                     newValue = Math.max(0.1, Math.min(0.99, newValue)); // Clamp to slider bounds
+                                } else if (key === 'progress_at_half_sc_automation') {
+                                    // Ensure progress values are within reasonable UI bounds
+                                    const minVal = parseFloat($('#' + key).attr('min')) || 1;
+                                    const maxVal = parseFloat($('#' + key).attr('max')) || 200;
+                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
+                                } else if (key === 'automation_slope') {
+                                    // Ensure slope is within reasonable UI bounds
+                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
+                                    const maxVal = parseFloat($('#' + key).attr('max')) || 10;
+                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
                                 } else if (key === 'rho_cognitive' || key === 'rho_progress') {
                                     // Ensure elasticity values are within UI bounds [-1, 1]
                                     newValue = Math.max(-1, Math.min(1, newValue));
                                 } else if (key === 'alpha' || key === 'software_progress_share') {
                                     // Ensure weight parameters are within UI bounds [0.05, 0.95]
                                     newValue = Math.max(0.05, Math.min(0.95, newValue));
-                                } else if (key === 'progress_at_2025' || key === 'progress_at_superhuman_coder') {
-                                    // Ensure progress values are within reasonable UI bounds
-                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.5;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 500;
-                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
                                 } else if (key === 'cognitive_output_normalization') {
                                     // Ensure normalization is within reasonable bounds
                                     const minVal = parseFloat($('#' + key).attr('min')) || 0.00001;

@@ -172,11 +172,11 @@ Compute model trajectory with given parameters.
         "rho_progress": 0.5,
         "alpha": 0.5,
         "software_progress_share": 0.7,
-        "progress_at_2025": 10.0,
-        "automation_fraction_at_2025": 0.1,
-        "progress_at_superhuman_coder": 100.0,
-        "automation_fraction_at_superhuman_coder": 0.9,
-        "progress_rate_normalization": 1.0
+        "automation_fraction_at_superhuman_coder": 0.9,  // Maximum automation fraction (upper asymptote)
+        "progress_at_half_sc_automation": 50.0,  // Progress level where automation = half of maximum
+        "automation_slope": 2.0,  // Slope parameter controlling transition steepness
+        "progress_rate_normalization": 1.0,
+        "cognitive_output_normalization": 1e-3
     },
     "time_range": [2019, 2030],
     "initial_progress": 1.0

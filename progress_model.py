@@ -321,6 +321,12 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
     Sigmoid function for automation fraction based on cumulative progress.
     Uses a standard sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
     
+    This replaces the previous confusing approach that used 2025-based anchor points.
+    The new parameters are more intuitive:
+    - automation_fraction_at_superhuman_coder: Maximum automation level (L)
+    - progress_at_half_sc_automation: Progress where automation = L/2 (x0) 
+    - automation_slope: Controls transition steepness (k)
+    
     Args:
         cumulative_progress: Current cumulative progress.
         params: Model parameters containing sigmoid parameters.
