@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Progress Modeling - Interactive Dashboard</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .control-panel { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .plot-container { height: 800px; border: 1px solid #dee2e6; border-radius: 8px; }
+        .param-group { margin-bottom: 20px; }
+        .param-label { font-weight: 600; margin-bottom: 5px; }
+        .range-input { width: 100%; }
+        .summary-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .loading-spinner { display: none; text-align: center; padding: 20px; }
+        .error-alert { display: none; }
+        .nav-tabs .nav-link.active { background-color: #667eea; color: white; border-color: #667eea; }
+        .btn-primary { background-color: #667eea; border-color: #667eea; }
+        .btn-primary:hover { background-color: #5a6fd8; border-color: #5a6fd8; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Header -->
+            <div class="col-12">
+                <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+                    <div class="container-fluid">
+                        <span class="navbar-brand mb-0 h1">AI Progress Model</span>
+                        <div class="navbar-nav ms-auto">
+                            <button class="btn btn-outline-light me-2" onclick="loadDefaultData()">Reset to Default</button>
+                            <button class="btn btn-outline-light" onclick="exportResults()">Export CSV</button>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Left Panel: Controls -->
+            <div class="col-lg-4">
+                <div class="control-panel">
+                    <!-- Navigation Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="controlTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="params-tab" data-bs-toggle="tab" data-bs-target="#params-panel">Parameters</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-panel">Data</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="estimation-tab" data-bs-toggle="tab" data-bs-target="#estimation-panel">Estimation</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Parameters Panel -->
+                        <div class="tab-pane fade show active" id="params-panel">
+                            <h5>Model Parameters</h5>
+                            
+                            <!-- Production Function Parameters -->
+                            <div class="param-group">
+                                <h6 class="text-muted">Production Functions</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Cognitive Elasticity (ρ_cognitive): <span id="rho_cognitive_val">-0.2</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_cognitive" min="-1" max="1" step="0.1" value="-0.2">
+                                    <small class="text-muted">Range: [-1, 1] for numerical stability</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Progress Elasticity (ρ_progress): <span id="rho_progress_val">-0.2</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_progress" min="-1" max="1" step="0.1" value="-0.2">
+                                    <small class="text-muted">Range: [-1, 1] for numerical stability</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Compute Weight (α): <span id="alpha_val">0.5</span></label>
+                                    <input type="range" class="range-input form-range" id="alpha" min="0.05" max="0.95" step="0.05" value="0.5">
+                                    <small class="text-muted">Higher values favor compute over cognitive work</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Software Share: <span id="software_progress_share_val">0.7</span></label>
+                                    <input type="range" class="range-input form-range" id="software_progress_share" min="0.05" max="0.95" step="0.05" value="0.7">
+                                    <small class="text-muted">Range: [0.05, 0.95] to avoid edge cases</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Automation Anchors -->
+                            <div class="param-group">
+                                <h6 class="text-muted">Automation Anchors</h6>
+                                
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="param-label">Progress at 2025: <span id="progress_at_2025_val">10.0</span></label>
+                                        <input type="range" class="range-input form-range" id="progress_at_2025" min="1" max="100" step="1" value="10">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="param-label">Automation at 2025: <span id="automation_fraction_at_2025_val">1%</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_2025" min="-4" max="3" step="0.1" value="-2">
+                                        <small class="text-muted">Logit scale: 1/(1+e^-value)</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="param-label">Progress at Superhuman: <span id="progress_at_superhuman_coder_val">100.0</span></label>
+                                        <input type="range" class="range-input form-range" id="progress_at_superhuman_coder" min="10" max="1000" step="10" value="100">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="param-label">Automation at Superhuman: <span id="automation_fraction_at_superhuman_coder_val">90%</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" min="-4" max="3" step="0.1" value="2.2">
+                                        <small class="text-muted">Logit scale: 1/(1+e^-value)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Normalization Parameters -->
+                            <div class="param-group">
+                                <h6 class="text-muted">Normalization Constants</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
+                                    <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">1.0</span></label>
+                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" min="-5" max="1" step="0.1" value="0">
+                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Simulation Settings -->
+                            <div class="param-group">
+                                <h6 class="text-muted">Simulation Settings</h6>
+                                
+                                <div class="row">
+                                    <div class="col-4">
+                                        <label class="param-label">Start Year</label>
+                                        <input type="number" class="form-control form-control-sm" id="start_year" value="2019" min="2000" max="2050">
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="param-label">End Year</label>
+                                        <input type="number" class="form-control form-control-sm" id="end_year" value="2030" min="2020" max="2100">
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="param-label">Initial Progress</label>
+                                        <input type="number" class="form-control form-control-sm" id="initial_progress" value="1.0" min="0.1" max="100" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-2">
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="autoUpdate" checked>
+                                        <label class="form-check-label" for="autoUpdate">Auto-update on slider change</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <button class="btn btn-primary w-100" onclick="computeModel()">Update Model</button>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-secondary w-100" onclick="resetToDefaults()">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Data Panel -->
+                        <div class="tab-pane fade" id="data-panel">
+                            <h5>Time Series Data</h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Upload Custom CSV Data</label>
+                                <input type="file" class="form-control" id="csvFile" accept=".csv" onchange="uploadData()">
+                                <div class="form-text">CSV should have columns: time, L_HUMAN, L_AI, experiment_compute, training_compute</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <button class="btn btn-secondary w-100" onclick="loadDefaultData()">Load Default Data</button>
+                            </div>
+                            
+                            <div id="dataPreview" class="mt-3" style="display: none;">
+                                <h6>Data Summary</h6>
+                                <div id="dataSummary"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Parameter Estimation Panel -->
+                        <div class="tab-pane fade" id="estimation-panel">
+                            <h5>Parameter Estimation</h5>
+                            <p class="text-muted">Define anchor constraints to estimate optimal parameters</p>
+                            
+                            <div id="anchorConstraints">
+                                <!-- Dynamic constraints will be added here -->
+                            </div>
+                            
+                            <button class="btn btn-sm btn-success mb-3" onclick="addAnchorConstraint()">
+                                <i class="fas fa-plus"></i> Add Constraint
+                            </button>
+                            
+                            <div id="constraintValidation" class="alert alert-info" style="display: none;">
+                                <h6>Constraint Validation</h6>
+                                <div id="validationResults"></div>
+                            </div>
+                            
+                            <button class="btn btn-warning w-100" onclick="estimateParameters()" disabled id="estimateBtn">
+                                Estimate Parameters (Add constraints first)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results Summary -->
+                <div class="summary-card">
+                    <h6>Model Results</h6>
+                    <div id="resultsSummary">
+                        <div>Run model to see results</div>
+                    </div>
+                    <div class="mt-2" id="parameterImpact" style="display: none;">
+                        <small class="text-light">
+                            <strong>Parameter Impact:</strong><br>
+                            <span id="impactText"></span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Visualization -->
+            <div class="col-lg-8">
+                <div class="plot-container" style="height: 1500px;">
+                    <div id="plotDiv" style="width: 100%; height: 100%;"></div>
+                    <div class="loading-spinner" id="loadingSpinner">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Computing...</span>
+                        </div>
+                        <div class="mt-2">Computing model trajectory...</div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-danger error-alert mt-3" id="errorAlert">
+                    <strong>Error:</strong> <span id="errorMessage"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize app
+        $(document).ready(function() {
+            initializeControls();
+            loadDefaultData();
+        });
+        
+        function initializeControls() {
+            // Add event listeners to all range inputs
+            $('input[type="range"]').on('input', function() {
+                updateDisplayValue(this);
+                
+                // Auto-update if enabled
+                if ($('#autoUpdate').is(':checked')) {
+                    clearTimeout(window.updateTimer);
+                    window.updateTimer = setTimeout(computeModel, 300);
+                }
+            });
+            
+            // Add event listeners to number inputs  
+            $('input[type="number"]').on('change', function() {
+                computeModel();
+            });
+            
+            // Initialize display values
+            $('input[type="range"]').each(function() {
+                updateDisplayValue(this);
+            });
+        }
+        
+        function updateDisplayValue(input) {
+            const value = parseFloat(input.value);
+            const displayId = input.id + '_val';
+            let displayValue;
+            
+            console.log('Updating slider:', input.id, 'to value:', value);
+            
+            if (input.id.includes('automation_fraction')) {
+                // Convert logit scale value to percentage
+                const actualValue = 1 / (1 + Math.exp(-value));
+                displayValue = (actualValue * 100).toFixed(1) + '%';
+            } else if (input.id.includes('progress')) {
+                displayValue = value.toFixed(1);
+            } else if (input.id === 'cognitive_output_normalization') {
+                // Convert log scale value to actual value
+                const actualValue = Math.pow(10, value);
+                displayValue = actualValue.toExponential(2);
+            } else if (input.id.includes('normalization')) {
+                if (value < 0.001) {
+                    displayValue = value.toExponential(2);
+                } else {
+                    displayValue = value.toFixed(3);
+                }
+            } else {
+                displayValue = value.toFixed(2);
+            }
+            
+            const displayElement = document.getElementById(displayId);
+            if (displayElement) {
+                displayElement.textContent = displayValue;
+            } else {
+                console.error('Display element not found:', displayId);
+            }
+        }
+        
+        function collectParameters() {
+            const params = {
+                rho_cognitive: parseFloat($('#rho_cognitive').val()),
+                rho_progress: parseFloat($('#rho_progress').val()),
+                alpha: parseFloat($('#alpha').val()),
+                software_progress_share: parseFloat($('#software_progress_share').val()),
+                progress_at_2025: parseFloat($('#progress_at_2025').val()),
+                automation_fraction_at_2025: 1 / (1 + Math.exp(-parseFloat($('#automation_fraction_at_2025').val()))),
+                progress_at_superhuman_coder: parseFloat($('#progress_at_superhuman_coder').val()),
+                automation_fraction_at_superhuman_coder: 1 / (1 + Math.exp(-parseFloat($('#automation_fraction_at_superhuman_coder').val()))),
+                cognitive_output_normalization: Math.pow(10, parseFloat($('#cognitive_output_normalization').val()))
+            };
+            console.log('Collected parameters:', params);
+            return params;
+        }
+        
+        function computeModel() {
+            const parameters = collectParameters();
+            const timeRange = [
+                parseInt($('#start_year').val()),
+                parseInt($('#end_year').val())
+            ];
+            const initialProgress = parseFloat($('#initial_progress').val());
+            
+            console.log('Computing model with parameters:', parameters);
+            showLoading(true);
+            hideError();
+            
+            $.ajax({
+                url: '/api/compute',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    parameters: parameters,
+                    time_range: timeRange,
+                    initial_progress: initialProgress
+                }),
+                success: function(response) {
+                    console.log('Model response:', response);
+                    if (response.success) {
+                        // Clear any existing plot first
+                        Plotly.purge('plotDiv');
+                        // Create new plot with proper configuration
+                        Plotly.newPlot('plotDiv', response.plot.data, response.plot.layout, {
+                            responsive: true,
+                            displayModeBar: true,
+                            modeBarButtonsToRemove: ['pan2d', 'lasso2d']
+                        });
+                        updateResultsSummary(response.summary);
+                    } else {
+                        showError(response.error);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('AJAX error:', xhr);
+                    const error = xhr.responseJSON ? xhr.responseJSON.error : 'Unknown error occurred';
+                    showError(error);
+                },
+                complete: function() {
+                    showLoading(false);
+                }
+            });
+        }
+        
+        function loadDefaultData() {
+            $.ajax({
+                url: '/api/default-data',
+                method: 'GET',
+                success: function(response) {
+                    // Update parameter controls
+                    Object.keys(response.parameters).forEach(key => {
+                        const element = $('#' + key);
+                        if (element.length) {
+                            let value = response.parameters[key];
+                            
+                            // Convert automation fractions to logit scale for display
+                            if (key.includes('automation_fraction')) {
+                                // Convert fraction to logit: logit(p) = log(p / (1-p))
+                                value = Math.log(value / (1 - value));
+                            } else if (key === 'cognitive_output_normalization') {
+                                // Convert to log scale for display
+                                value = Math.log10(value);
+                            }
+                            
+                            element.val(value);
+                            updateDisplayValue(element[0]);
+                        }
+                    });
+                    
+                    // Compute initial model
+                    computeModel();
+                },
+                error: function(xhr) {
+                    showError('Failed to load default data');
+                }
+            });
+        }
+        
+        function uploadData() {
+            const fileInput = $('#csvFile')[0];
+            if (!fileInput.files.length) return;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            showLoading(true);
+            
+            $.ajax({
+                url: '/api/upload-data',
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        $('#dataPreview').show();
+                        $('#dataSummary').html(
+                            `<div>Time range: ${response.data_summary.time_range[0]} - ${response.data_summary.time_range[1]}</div>` +
+                            `<div>Data points: ${response.data_summary.data_points}</div>`
+                        );
+                        
+                        // Update time range inputs
+                        $('#start_year').val(Math.floor(response.data_summary.time_range[0]));
+                        $('#end_year').val(Math.ceil(response.data_summary.time_range[1]));
+                        
+                        computeModel();
+                    } else {
+                        showError(response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON ? xhr.responseJSON.error : 'Failed to upload file';
+                    showError(error);
+                },
+                complete: function() {
+                    showLoading(false);
+                }
+            });
+        }
+        
+        function estimateParameters() {
+            const anchors = collectConstraints();
+            
+            if (anchors.length === 0) {
+                alert('Please add at least one constraint before estimating parameters.');
+                return;
+            }
+            
+            // Show validation results
+            const validationDiv = document.getElementById('constraintValidation');
+            const validationResults = document.getElementById('validationResults');
+            validationResults.innerHTML = `
+                <p><strong>Found ${anchors.length} constraint${anchors.length > 1 ? 's' : ''}:</strong></p>
+                <ul>
+                    ${anchors.map((anchor, i) => `
+                        <li>Constraint ${i+1}: When ${Object.entries(anchor.conditions).map(([k,v]) => `${k}=${v}`).join(', ')}, 
+                        expect ${anchor.target_variable} = ${anchor.target_value} (weight: ${anchor.weight})</li>
+                    `).join('')}
+                </ul>
+            `;
+            validationDiv.style.display = 'block';
+            
+            const initialParameters = collectParameters();
+            const initialProgress = parseFloat($('#initial_progress').val());
+            
+            showLoading(true);
+            
+            $.ajax({
+                url: '/api/estimate-parameters',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    anchors: anchors,
+                    initial_parameters: initialParameters,
+                    initial_progress: initialProgress
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        // Update parameter controls with estimated values
+                        let updatedParams = [];
+                        Object.keys(response.estimated_parameters).forEach(key => {
+                            const element = $('#' + key);
+                            if (element.length) {
+                                const oldValue = element.val();
+                                let newValue = response.estimated_parameters[key];
+                                
+                                // Apply bounds checking and inverse transformation for UI controls
+                                if (key === 'automation_fraction_at_2025' || key === 'automation_fraction_at_superhuman_coder') {
+                                    // Convert from sigmoid value back to logit (slider value)
+                                    // sigmoid: y = 1/(1+exp(-x)) -> logit: x = ln(y/(1-y))
+                                    if (newValue <= 0 || newValue >= 1) {
+                                        // Handle edge cases where sigmoid value is at boundaries
+                                        newValue = newValue <= 0 ? -4 : 3;
+                                    } else {
+                                        newValue = Math.log(newValue / (1 - newValue));
+                                        newValue = Math.max(-4, Math.min(3, newValue)); // Clamp to slider bounds
+                                    }
+                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
+                                    // Ensure elasticity values are within UI bounds [-1, 1]
+                                    newValue = Math.max(-1, Math.min(1, newValue));
+                                } else if (key === 'alpha' || key === 'software_progress_share') {
+                                    // Ensure weight parameters are within UI bounds [0.05, 0.95]
+                                    newValue = Math.max(0.05, Math.min(0.95, newValue));
+                                } else if (key === 'progress_at_2025' || key === 'progress_at_superhuman_coder') {
+                                    // Ensure progress values are within reasonable UI bounds
+                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.5;
+                                    const maxVal = parseFloat($('#' + key).attr('max')) || 500;
+                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
+                                } else if (key === 'cognitive_output_normalization') {
+                                    // Ensure normalization is within reasonable bounds
+                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.00001;
+                                    const maxVal = parseFloat($('#' + key).attr('max')) || 0.1;
+                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
+                                }
+                                
+                                element.val(newValue);
+                                updateDisplayValue(element[0]);
+                                updatedParams.push(`${key}: ${parseFloat(oldValue).toFixed(4)} → ${parseFloat(newValue).toFixed(4)}`);
+                                console.log(`Updated parameter ${key}: ${oldValue} → ${newValue}`);
+                            } else {
+                                console.warn(`UI element not found for parameter: ${key}`);
+                                updatedParams.push(`${key}: ?? → ${response.estimated_parameters[key].toFixed(4)} (no UI control)`);
+                            }
+                        });
+                        
+                        // Show parameter changes in validation area
+                        const validationResults = document.getElementById('validationResults');
+                        validationResults.innerHTML += `
+                            <div class="mt-3">
+                                <p><strong>Parameter Updates:</strong></p>
+                                <div style="font-family: monospace; font-size: 0.9em;">
+                                    ${updatedParams.map(param => {
+                                        const [name, change] = param.split(': ');
+                                        const [oldVal, newVal] = change.split(' → ');
+                                        const oldNum = parseFloat(oldVal);
+                                        const newNum = parseFloat(newVal);
+                                        const changePercent = oldNum !== 0 ? ((newNum - oldNum) / Math.abs(oldNum) * 100).toFixed(1) : 'N/A';
+                                        const changeColor = newNum > oldNum ? 'text-success' : newNum < oldNum ? 'text-warning' : 'text-muted';
+                                        return `<div>${name}: ${oldVal} → <span class="${changeColor}">${newVal}</span> <small class="text-muted">(${changePercent}%)</small></div>`;
+                                    }).join('')}
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <p><strong>Constraint Satisfaction Analysis:</strong></p>
+                                    <div class="progress-container">
+                                        ${response.constraint_evaluations.map((eval, i) => {
+                                            const satisfactionPercent = (eval.satisfaction * 100).toFixed(1);
+                                            const barColor = eval.satisfaction > 0.9 ? 'bg-success' : eval.satisfaction > 0.7 ? 'bg-warning' : 'bg-danger';
+                                            const errorText = eval.error !== undefined ? ` (error: ${eval.error.toFixed(3)})` : '';
+                                            return `
+                                                <div class="mb-2">
+                                                    <small>Constraint ${i+1}: ${eval.target_variable} = ${eval.target_value}${errorText}</small>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar ${barColor}" style="width: ${satisfactionPercent}%">
+                                                            ${satisfactionPercent}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <p><strong>Optimization Results:</strong></p>
+                                    <div style="font-family: monospace; font-size: 0.9em;">
+                                        <div>Initial objective: ${response.optimization_info.initial_objective ? response.optimization_info.initial_objective.toFixed(6) : 'N/A'}</div>
+                                        <div>Final objective: ${response.optimization_info.final_objective ? response.optimization_info.final_objective.toFixed(6) : 'N/A'}</div>
+                                        <div class="text-success">Improvement: ${response.optimization_info.improvement ? response.optimization_info.improvement.toFixed(6) : 'N/A'}</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-success mt-2">
+                                    ✓ Parameters estimated successfully! The model will now run with the new values.
+                                </div>
+                            </div>
+                        `;
+                        
+                        computeModel();
+                    } else {
+                        const validationResults = document.getElementById('validationResults');
+                        validationResults.innerHTML += `
+                            <div class="alert alert-danger mt-2">
+                                ✗ Parameter estimation failed: ${response.error}
+                            </div>
+                        `;
+                        showError(response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON ? xhr.responseJSON.error : 'Parameter estimation failed';
+                    showError(error);
+                },
+                complete: function() {
+                    showLoading(false);
+                }
+            });
+        }
+        
+        function exportResults() {
+            window.location.href = '/api/export-csv';
+        }
+        
+        // Store previous results for comparison
+        let previousResults = null;
+        
+        function updateResultsSummary(summary) {
+            $('#resultsSummary').html(
+                `<div><strong>Final Progress:</strong> ${summary.final_progress.toExponential(2)}</div>` +
+                `<div><strong>Final Automation:</strong> ${(summary.final_automation * 100).toFixed(1)}%</div>` +
+                `<div><strong>Avg Progress Rate:</strong> ${summary.avg_progress_rate.toExponential(2)}</div>` +
+                `<div><strong>Time Range:</strong> ${summary.time_range[0]} - ${summary.time_range[1]}</div>`
+            );
+            
+            // Show change from previous results
+            if (previousResults) {
+                const progressChange = ((summary.final_progress - previousResults.final_progress) / previousResults.final_progress * 100);
+                const rateChange = ((summary.avg_progress_rate - previousResults.avg_progress_rate) / previousResults.avg_progress_rate * 100);
+                
+                let changeText = '';
+                if (Math.abs(progressChange) > 1) {
+                    changeText += `Progress: ${progressChange > 0 ? '+' : ''}${progressChange.toFixed(1)}%<br>`;
+                }
+                if (Math.abs(rateChange) > 1) {
+                    changeText += `Rate: ${rateChange > 0 ? '+' : ''}${rateChange.toFixed(1)}%`;
+                }
+                
+                if (changeText) {
+                    $('#impactText').html(changeText);
+                    $('#parameterImpact').show();
+                } else {
+                    $('#parameterImpact').hide();
+                }
+            }
+            
+            previousResults = summary;
+        }
+        
+        function showLoading(show) {
+            if (show) {
+                $('#loadingSpinner').show();
+                $('#plotDiv').hide();
+            } else {
+                $('#loadingSpinner').hide();
+                $('#plotDiv').show();
+            }
+        }
+        
+        function showError(message) {
+            $('#errorMessage').text(message);
+            $('#errorAlert').show();
+        }
+        
+        function hideError() {
+            $('#errorAlert').hide();
+        }
+        
+        function resetToDefaults() {
+            loadDefaultData();
+        }
+        
+        let constraintCounter = 0;
+        
+        function addAnchorConstraint() {
+            constraintCounter++;
+            const constraintId = `constraint_${constraintCounter}`;
+            
+            const constraintHtml = `
+                <div class="card mb-3" id="${constraintId}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Constraint ${constraintCounter}</h6>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeConstraint('${constraintId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Conditions</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Time</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="time" placeholder="e.g., 2030" step="0.1">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Automation Fraction</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="automation_fraction" placeholder="0.0-1.0" step="0.01" min="0" max="1">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">AI Labor</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="L_AI" placeholder="e.g., 1e9" step="any">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Human Labor</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="L_HUMAN" placeholder="e.g., 1e8" step="any">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Target</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Target Variable</label>
+                                    <select class="form-select form-select-sm" name="target_variable">
+                                        <option value="progress_rate">Progress Rate</option>
+                                        <option value="automation_fraction">Automation Fraction</option>
+                                        <option value="cognitive_output">Cognitive Output</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Target Value</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="target_value" placeholder="Expected value" step="any" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Weight</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="weight" value="1.0" step="0.1" min="0.1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                Preview: When <span class="constraint-preview" data-constraint="${constraintId}">conditions are met</span>, 
+                                expect <span class="target-preview" data-constraint="${constraintId}">target variable</span> = 
+                                <span class="value-preview" data-constraint="${constraintId}">value</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('anchorConstraints').insertAdjacentHTML('beforeend', constraintHtml);
+            updateConstraintPreview(constraintId);
+            updateEstimateButton();
+            
+            // Add event listeners for preview updates
+            const constraintCard = document.getElementById(constraintId);
+            constraintCard.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('input', () => updateConstraintPreview(constraintId));
+            });
+        }
+        
+        function removeConstraint(constraintId) {
+            document.getElementById(constraintId).remove();
+            updateEstimateButton();
+        }
+        
+        function updateConstraintPreview(constraintId) {
+            const card = document.getElementById(constraintId);
+            const inputs = card.querySelectorAll('input, select');
+            
+            let conditions = [];
+            let targetVar = '';
+            let targetVal = '';
+            
+            inputs.forEach(input => {
+                const value = input.value;
+                if (value && input.name !== 'target_value' && input.name !== 'weight') {
+                    if (input.name === 'target_variable') {
+                        targetVar = value;
+                    } else {
+                        conditions.push(`${input.name}=${value}`);
+                    }
+                } else if (input.name === 'target_value') {
+                    targetVal = value;
+                }
+            });
+            
+            const conditionText = conditions.length > 0 ? conditions.join(', ') : 'conditions are met';
+            card.querySelector('.constraint-preview').textContent = conditionText;
+            card.querySelector('.target-preview').textContent = targetVar || 'target variable';
+            card.querySelector('.value-preview').textContent = targetVal || 'value';
+        }
+        
+        function updateEstimateButton() {
+            const constraintCount = document.querySelectorAll('#anchorConstraints .card').length;
+            const estimateBtn = document.getElementById('estimateBtn');
+            
+            if (constraintCount > 0) {
+                estimateBtn.disabled = false;
+                estimateBtn.textContent = `Estimate Parameters (${constraintCount} constraint${constraintCount > 1 ? 's' : ''})`;
+            } else {
+                estimateBtn.disabled = true;
+                estimateBtn.textContent = 'Estimate Parameters (Add constraints first)';
+            }
+        }
+        
+        function collectConstraints() {
+            const constraints = [];
+            const constraintCards = document.querySelectorAll('#anchorConstraints .card');
+            
+            constraintCards.forEach(card => {
+                const inputs = card.querySelectorAll('input, select');
+                const constraint = {
+                    conditions: {},
+                    target_variable: '',
+                    target_value: 0,
+                    weight: 1.0
+                };
+                
+                inputs.forEach(input => {
+                    const value = input.value;
+                    if (value) {
+                        if (input.name === 'target_variable') {
+                            constraint.target_variable = value;
+                        } else if (input.name === 'target_value') {
+                            constraint.target_value = parseFloat(value);
+                        } else if (input.name === 'weight') {
+                            constraint.weight = parseFloat(value);
+                        } else {
+                            constraint.conditions[input.name] = parseFloat(value);
+                        }
+                    }
+                });
+                
+                if (constraint.target_variable && constraint.target_value && Object.keys(constraint.conditions).length > 0) {
+                    constraints.push(constraint);
+                }
+            });
+            
+            return constraints;
+        }
+    </script>
+</body>
+</html>
