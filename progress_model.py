@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 from scipy import optimize, integrate, interpolate
 import logging
+import model_config as cfg
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class Parameters:
         else:
             # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
             # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_cognitive = np.clip(self.rho_cognitive, -50.0, 1.0)
+            self.rho_cognitive = np.clip(self.rho_cognitive, cfg.RHO_CLIP_MIN, 1.0)
         
         if not np.isfinite(self.rho_progress):
             logger.warning(f"Non-finite rho_progress: {self.rho_progress}, setting to 0")
@@ -68,60 +69,60 @@ class Parameters:
         else:
             # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
             # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_progress = np.clip(self.rho_progress, -50.0, 1.0)
+            self.rho_progress = np.clip(self.rho_progress, cfg.RHO_CLIP_MIN, 1.0)
         
         # Sanitize weights
         if not np.isfinite(self.alpha):
             logger.warning(f"Non-finite alpha: {self.alpha}, setting to 0.5")
             self.alpha = 0.5
         else:
-            self.alpha = np.clip(self.alpha, 1e-6, 1.0 - 1e-6)
+            self.alpha = np.clip(self.alpha, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         if not np.isfinite(self.software_progress_share):
             logger.warning(f"Non-finite software_progress_share: {self.software_progress_share}, setting to 0.5")
             self.software_progress_share = 0.5
         else:
-            self.software_progress_share = np.clip(self.software_progress_share, 1e-6, 1.0 - 1e-6)
+            self.software_progress_share = np.clip(self.software_progress_share, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
             logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to 0.9")
             self.automation_fraction_at_superhuman_coder = 0.9
         else:
-            self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, 1e-6, 1.0 - 1e-6)
+            self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         if not np.isfinite(self.progress_at_half_sc_automation) or self.progress_at_half_sc_automation <= 0:
             logger.warning(f"Invalid progress_at_half_sc_automation: {self.progress_at_half_sc_automation}, setting to 10.0")
             self.progress_at_half_sc_automation = 10.0
         else:
-            self.progress_at_half_sc_automation = max(1e-6, self.progress_at_half_sc_automation)
+            self.progress_at_half_sc_automation = max(cfg.PARAM_CLIP_MIN, self.progress_at_half_sc_automation)
         
         if not np.isfinite(self.automation_slope):
             logger.warning(f"Non-finite automation_slope: {self.automation_slope}, setting to 1.0")
             self.automation_slope = 1.0
         else:
             # Clamp slope to reasonable range to prevent numerical instability
-            self.automation_slope = np.clip(self.automation_slope, 0.1, 10.0)
+            self.automation_slope = np.clip(self.automation_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
         
         # Sanitize research stock parameters
         if not np.isfinite(self.research_stock_at_simulation_start) or self.research_stock_at_simulation_start <= 0:
             logger.warning(f"Invalid research_stock_at_simulation_start: {self.research_stock_at_simulation_start}, setting to 1.0")
             self.research_stock_at_simulation_start = 1.0
         else:
-            self.research_stock_at_simulation_start = max(1e-10, self.research_stock_at_simulation_start)
+            self.research_stock_at_simulation_start = max(cfg.RESEARCH_STOCK_START_MIN, self.research_stock_at_simulation_start)
         
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
             logger.warning(f"Invalid progress_rate_normalization: {self.progress_rate_normalization}, setting to 1.0")
             self.progress_rate_normalization = 1.0
         else:
-            self.progress_rate_normalization = max(1e-10, self.progress_rate_normalization)
+            self.progress_rate_normalization = max(cfg.NORMALIZATION_MIN, self.progress_rate_normalization)
         
         if not np.isfinite(self.cognitive_output_normalization) or self.cognitive_output_normalization <= 0:
             logger.warning(f"Invalid cognitive_output_normalization: {self.cognitive_output_normalization}, setting to 1.0")
             self.cognitive_output_normalization = 1.0
         else:
-            self.cognitive_output_normalization = max(1e-10, self.cognitive_output_normalization)
+            self.cognitive_output_normalization = max(cfg.NORMALIZATION_MIN, self.cognitive_output_normalization)
 
 
 @dataclass
@@ -153,7 +154,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
     w2 = 1 - w1
 
     # Handle edge cases for rho
-    if abs(rho) < 1e-9:  # Cobb-Douglas case (limit of CES as rho -> 0)
+    if abs(rho) < cfg.RHO_COBB_DOUGLAS_THRESHOLD:  # Cobb-Douglas case (limit of CES as rho -> 0)
         if X1 > 0 and X2 > 0:
             try:
                 # Use log to prevent overflow
@@ -169,7 +170,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
     if rho == 1.0:  # Perfect substitutes
         return w1 * X1 + w2 * X2
 
-    if rho < -50:  # Nearly perfect complements (limit as rho -> -inf)
+    if rho < cfg.RHO_LEONTIEF_THRESHOLD:  # Nearly perfect complements (limit as rho -> -inf)
         return min(X1, X2)
 
     # Handle edge cases for weights
@@ -234,10 +235,10 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
         return 0.0
     
     # Clamp automation fraction to valid range, avoiding 0 and 1 for division.
-    a = np.clip(automation_fraction, 1e-9, 1.0 - 1e-9)
+    a = np.clip(automation_fraction, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)
 
     # Handle edge cases for rho
-    if abs(rho) < 1e-9:  # Cobb-Douglas case
+    if abs(rho) < cfg.RHO_COBB_DOUGLAS_THRESHOLD:  # Cobb-Douglas case
         if L_AI > 0 and L_HUMAN > 0:
             try:
                 # Effective inputs are L_AI/a and L_HUMAN/(1-a)
@@ -256,7 +257,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
         # Formula simplifies to L_AI + L_HUMAN
         result = L_AI + L_HUMAN
 
-    elif rho < -50:  # Nearly perfect complements (Leontief)
+    elif rho < cfg.RHO_LEONTIEF_THRESHOLD:  # Nearly perfect complements (Leontief)
         # Limit is min(L_AI/a, L_HUMAN/(1-a))
         result = min(L_AI / a, L_HUMAN / (1 - a))
 
@@ -316,9 +317,9 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
     rate = _ces_function(experiment_compute, cognitive_output, alpha, rho)
     
     # Cap extremely large rates to prevent numerical issues
-    if rate > 1e3:
-        logger.warning(f"Very large research stock rate {rate}, capping to 1000")
-        rate = 1e3
+    if rate > cfg.MAX_RESEARCH_STOCK_RATE:
+        logger.warning(f"Very large research stock rate {rate}, capping to {cfg.MAX_RESEARCH_STOCK_RATE}")
+        rate = cfg.MAX_RESEARCH_STOCK_RATE
         
     return rate
 
@@ -421,9 +422,9 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
         exponent = -k * (cumulative_progress - x0)
         
         # Handle extreme exponents to prevent overflow/underflow
-        if exponent > 100:  # e^100 is very large, sigmoid ≈ 0
+        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:  # e^100 is very large, sigmoid ≈ 0
             automation_fraction = 0.0
-        elif exponent < -100:  # e^(-100) is very small, sigmoid ≈ L
+        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ L
             automation_fraction = L
         else:
             automation_fraction = L / (1 + np.exp(exponent))
@@ -469,15 +470,15 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
     
     if not np.isfinite(cumulative_progress) or cumulative_progress < 0:
         logger.warning(f"Invalid cumulative progress: {cumulative_progress}")
-        cumulative_progress = max(0.0, 1e-6)  # Use small positive value
+        cumulative_progress = max(0.0, cfg.PARAM_CLIP_MIN)  # Use small positive value
     
     if not np.isfinite(research_stock) or research_stock <= 0:
         logger.warning(f"Invalid research stock: {research_stock}")
-        research_stock = max(1e-6, params.research_stock_at_simulation_start)
+        research_stock = max(cfg.PARAM_CLIP_MIN, params.research_stock_at_simulation_start)
     
     # Validate time is within reasonable bounds
     time_min, time_max = time_series_data.time.min(), time_series_data.time.max()
-    if t < time_min - 10 or t > time_max + 10:  # Allow some extrapolation
+    if t < time_min - cfg.TIME_EXTRAPOLATION_WINDOW or t > time_max + cfg.TIME_EXTRAPOLATION_WINDOW:  # Allow some extrapolation
         logger.warning(f"Time {t} far outside data range [{time_min}, {time_max}]")
     
     try:
@@ -576,9 +577,9 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             return [0.0, 0.0]
         
         # Cap extremely large rates to prevent numerical issues
-        if normalized_progress_rate > 1e3:
-            logger.warning(f"Very large progress rate {normalized_progress_rate}, capping to 1000")
-            normalized_progress_rate = 1e3
+        if normalized_progress_rate > cfg.MAX_NORMALIZED_PROGRESS_RATE:
+            logger.warning(f"Very large progress rate {normalized_progress_rate}, capping to {cfg.MAX_NORMALIZED_PROGRESS_RATE}")
+            normalized_progress_rate = cfg.MAX_NORMALIZED_PROGRESS_RATE
         
         logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
                     f"automation={automation_fraction:.3f}, dP/dt={normalized_progress_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
@@ -645,16 +646,16 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             # Prevent progress from going negative or becoming extremely large
             if y[0] < 0:
                 y[0] = 1e-6
-            elif y[0] > 1e6:
+            elif y[0] > cfg.PROGRESS_ODE_CLAMP_MAX:
                 logger.warning(f"Progress {y[0]} too large at time {t}, clamping")
-                y[0] = 1e6
+                y[0] = cfg.PROGRESS_ODE_CLAMP_MAX
             
             # Prevent research stock from going negative or becoming extremely large
             if y[1] <= 0:
                 y[1] = max(1e-6, params.research_stock_at_simulation_start)
-            elif y[1] > 1e10:
+            elif y[1] > cfg.RESEARCH_STOCK_ODE_CLAMP_MAX:
                 logger.warning(f"Research stock {y[1]} too large at time {t}, clamping")
-                y[1] = 1e10
+                y[1] = cfg.RESEARCH_STOCK_ODE_CLAMP_MAX
             
             rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate)
             
@@ -704,7 +705,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                 method=method,
                 dense_output=True,
                 **tolerances,
-                max_step=1.0  # Limit step size for stability
+                max_step=cfg.ODE_MAX_STEP  # Limit step size for stability
             )
             
             if sol.success:
@@ -722,7 +723,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         logger.warning("All scipy integration methods failed, using simple Euler fallback")
         try:
             # Simple Euler integration as last resort
-            n_steps = max(100, int(abs(t_end - t_start) * 10))  # Adaptive step count
+            n_steps = max(cfg.EULER_FALLBACK_MIN_STEPS, int(abs(t_end - t_start) * cfg.EULER_FALLBACK_STEPS_PER_YEAR))  # Adaptive step count
             times = np.linspace(t_start, t_end, n_steps)
             dt = (t_end - t_start) / (n_steps - 1)
             
@@ -747,13 +748,13 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                     # Ensure values don't go negative or become too large
                     if progress_values[i] < 0:
                         progress_values[i] = progress_values[i-1]
-                    elif progress_values[i] > 1e6:
-                        progress_values[i] = 1e6
+                    elif progress_values[i] > cfg.PROGRESS_ODE_CLAMP_MAX:
+                        progress_values[i] = cfg.PROGRESS_ODE_CLAMP_MAX
                     
                     if research_stock_values[i] <= 0:
                         research_stock_values[i] = max(research_stock_values[i-1], 1e-6)
-                    elif research_stock_values[i] > 1e10:
-                        research_stock_values[i] = 1e10
+                    elif research_stock_values[i] > cfg.RESEARCH_STOCK_ODE_CLAMP_MAX:
+                        research_stock_values[i] = cfg.RESEARCH_STOCK_ODE_CLAMP_MAX
                         
                 except Exception as e:
                     logger.warning(f"Euler step failed at i={i}: {e}")
@@ -761,7 +762,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                     research_stock_values[i] = research_stock_values[i-1]
             
             # Convert back to original time range
-            final_times = np.linspace(min(time_range), max(time_range), 100)
+            final_times = np.linspace(min(time_range), max(time_range), cfg.DENSE_OUTPUT_POINTS)
             final_progress = np.interp(final_times, times, progress_values)
             final_research_stock = np.interp(final_times, times, research_stock_values)
             
@@ -773,7 +774,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     
     # Create dense output over time range
     try:
-        times = np.linspace(min(time_range), max(time_range), 100)
+        times = np.linspace(min(time_range), max(time_range), cfg.DENSE_OUTPUT_POINTS)
         solution_values = sol.sol(times)
         progress_values = solution_values[0]
         research_stock_values = solution_values[1]
@@ -911,7 +912,7 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
         # Relative error: (model - target) / target
         error = (model_value - constraint.target_value) / abs(constraint.target_value)
         # Cap the relative error to prevent numerical issues
-        error = np.clip(error, -100, 100)
+        error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
     else:
         # Absolute error if target is zero to avoid division by zero
         error = model_value - constraint.target_value
@@ -939,49 +940,39 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         fixed_params = []
     
     # Parameter bounds - tight bounds for numerical stability and physical constraints
-    bounds = {
-        'rho_cognitive': (-1, 1),  # Tighter elasticity bounds to prevent extreme CES behavior
-        'rho_progress': (-1, 1),   # Tighter elasticity bounds to prevent extreme CES behavior
-        'alpha': (0.05, 0.95),     # More conservative bounds to avoid edge cases
-        'software_progress_share': (0.05, 0.95),  # More conservative bounds to avoid edge cases
-        'automation_fraction_at_superhuman_coder': (0.1, 0.95),  # High but not extreme automation
-        'progress_at_half_sc_automation': (1.0, 500),  # Reasonable progress values for sigmoid midpoint
-        'automation_slope': (0.1, 10.0),  # Reasonable slope parameters for sigmoid steepness
-        'research_stock_at_simulation_start': (0.1, 100),  # Reasonable initial research stock values
-        'cognitive_output_normalization': (0.00001, 0.1)  # Reasonable normalization range
-    }
+    bounds = cfg.PARAMETER_BOUNDS
     
     def validate_parameter_combination(params_dict: Dict[str, float]) -> bool:
         """Validate that parameter combinations are physically meaningful and numerically stable"""
         try:
             # Check automation fraction is reasonable
             if 'automation_fraction_at_superhuman_coder' in params_dict:
-                if params_dict['automation_fraction_at_superhuman_coder'] <= 0.05 or params_dict['automation_fraction_at_superhuman_coder'] >= 0.99:
-                    logger.warning("automation_fraction_at_superhuman_coder should be in reasonable range (0.05, 0.99)")
+                if params_dict['automation_fraction_at_superhuman_coder'] <= cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_min'] or params_dict['automation_fraction_at_superhuman_coder'] >= cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_max']:
+                    logger.warning(f"automation_fraction_at_superhuman_coder should be in reasonable range ({cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_min']}, {cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_max']})")
                     return False
             
             # Check that progress at half automation is positive
             if 'progress_at_half_sc_automation' in params_dict:
-                if params_dict['progress_at_half_sc_automation'] <= 0:
+                if params_dict['progress_at_half_sc_automation'] <= cfg.PARAM_VALIDATION_THRESHOLDS['progress_at_half_automation_min']:
                     logger.warning("progress_at_half_sc_automation must be positive")
                     return False
             
             # Check automation slope is reasonable
             if 'automation_slope' in params_dict:
-                if params_dict['automation_slope'] <= 0 or params_dict['automation_slope'] > 20:
-                    logger.warning("automation_slope should be in reasonable range (0, 20)")
+                if params_dict['automation_slope'] <= cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_min'] or params_dict['automation_slope'] > cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_max']:
+                    logger.warning(f"automation_slope should be in reasonable range ({cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_min']}, {cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_max']})")
                     return False
             
             # Check for extreme elasticity combinations that cause numerical instability
             if 'rho_cognitive' in params_dict and 'rho_progress' in params_dict:
-                if abs(params_dict['rho_cognitive']) > 0.8 and abs(params_dict['rho_progress']) > 0.8:
-                    if params_dict['rho_cognitive'] * params_dict['rho_progress'] > 0.5:
+                if abs(params_dict['rho_cognitive']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs'] and abs(params_dict['rho_progress']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs']:
+                    if params_dict['rho_cognitive'] * params_dict['rho_progress'] > cfg.PARAM_VALIDATION_THRESHOLDS['rho_product_max']:
                         logger.warning("Extreme elasticity combination may cause numerical instability")
                         return False
             
             # Check normalization values are reasonable
             if 'cognitive_output_normalization' in params_dict:
-                if params_dict['cognitive_output_normalization'] > 0.01:
+                if params_dict['cognitive_output_normalization'] > cfg.PARAM_VALIDATION_THRESHOLDS['cognitive_output_normalization_max']:
                     logger.warning("Cognitive output normalization too large, may cause instability")
                     return False
             
@@ -1045,7 +1036,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
             
             # Check if target values are reasonable
             if constraint.target_variable == 'progress_rate':
-                if constraint.target_value <= 0 or constraint.target_value > 1000:
+                if constraint.target_value <= 0 or constraint.target_value > cfg.FEASIBILITY_CHECK_THRESHOLDS['progress_rate_target_max']:
                     logger.warning(f"Unreasonable progress rate target: {constraint.target_value}")
                     return False
             elif constraint.target_variable == 'automation_fraction':
@@ -1104,7 +1095,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         
         # Validate parameter combination before proceeding
         if not validate_parameter_combination(params_dict):
-            return 1e6  # High penalty for invalid combinations
+            return cfg.OBJECTIVE_FUNCTION_CONFIG['high_penalty']  # High penalty for invalid combinations
         
         params = Parameters(**params_dict)
         
@@ -1118,19 +1109,19 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                 logger.debug(f"Constraint {i+1}: error={error:.6f}, weighted_error={weighted_error:.6f}")
             except Exception as e:
                 logger.warning(f"Error evaluating constraint {i+1}: {e}")
-                return 1e6  # High penalty for constraint evaluation failures
+                return cfg.OBJECTIVE_FUNCTION_CONFIG['high_penalty']  # High penalty for constraint evaluation failures
         
         # Add regularization to prevent extreme parameter values
         regularization = 0.0
         for i, (name, value) in enumerate(zip(param_names, x)):
             if name in ['rho_cognitive', 'rho_progress']:
                 # Penalize extreme elasticity values more strongly
-                regularization += 0.001 * (value ** 4)  # Quartic penalty for elasticities
+                regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['elasticity_regularization_weight'] * (value ** 4)  # Quartic penalty for elasticities
             elif name in ['alpha', 'software_progress_share']:
                 # Penalize values near boundaries (0 or 1)
                 distance_from_center = abs(value - 0.5)
-                if distance_from_center > 0.35:  # Tighter boundary avoidance
-                    regularization += 0.001 * ((distance_from_center - 0.35) ** 2)
+                if distance_from_center > cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']:  # Tighter boundary avoidance
+                    regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_regularization_weight'] * ((distance_from_center - cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']) ** 2)
         
         return total_error + regularization
     
@@ -1159,19 +1150,19 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         # 2. Parameter space extremes (conservative)
         for param_idx in range(len(param_names)):
             # Try min and max for each parameter individually
-            for factor in [0.1, 0.9]:  # Near min and max
+            for factor in [cfg.STRATEGIC_STARTING_POINTS_CONFIG['extreme_factor_min'], cfg.STRATEGIC_STARTING_POINTS_CONFIG['extreme_factor_max']]:  # Near min and max
                 extreme_point = x0.copy()
                 min_bound, max_bound = opt_bounds[param_idx]
                 extreme_point[param_idx] = min_bound + factor * (max_bound - min_bound)
                 points.append(extreme_point)
         
         # 3. Random Latin hypercube sampling for better space coverage
-        for i in range(5):
+        for i in range(cfg.STRATEGIC_STARTING_POINTS_CONFIG['lhs_points']):
             lhs_point = []
             for j, (param_name, bound) in enumerate(zip(param_names, opt_bounds)):
                 min_bound, max_bound = bound
                 # Use Latin hypercube sampling
-                segment = (i + np.random.random()) / 5  # Divide [0,1] into 5 segments
+                segment = (i + np.random.random()) / cfg.STRATEGIC_STARTING_POINTS_CONFIG['lhs_points']  # Divide [0,1] into 5 segments
                 value = min_bound + segment * (max_bound - min_bound)
                 lhs_point.append(value)
             points.append(lhs_point)
@@ -1183,34 +1174,34 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                 constraint_point = x0.copy()
                 # Adjust parameters based on constraint type
                 if constraint.target_variable == 'progress_rate':
-                    if constraint.target_value > 2:  # High progress rate desired
+                    if constraint.target_value > cfg.STRATEGIC_STARTING_POINTS_CONFIG['high_progress_rate_threshold']:  # High progress rate desired
                         # Favor less negative elasticities
                         for j, name in enumerate(param_names):
                             if name in ['rho_cognitive', 'rho_progress']:
                                 min_bound, max_bound = opt_bounds[j]
-                                constraint_point[j] = max_bound * 0.8  # Near positive end
+                                constraint_point[j] = max_bound * cfg.STRATEGIC_STARTING_POINTS_CONFIG['rho_adjustment_factor']  # Near positive end
                 elif constraint.target_variable == 'automation_fraction':
-                    if constraint.target_value > 0.5:  # High automation desired
+                    if constraint.target_value > cfg.STRATEGIC_STARTING_POINTS_CONFIG['high_automation_threshold']:  # High automation desired
                         # This requires higher progress values
                         for j, name in enumerate(param_names):
                             if 'progress_at' in name:
                                 min_bound, max_bound = opt_bounds[j]
-                                constraint_point[j] = max_bound * 0.7
+                                constraint_point[j] = max_bound * cfg.STRATEGIC_STARTING_POINTS_CONFIG['progress_at_half_automation_adjustment_factor']
                 points.append(constraint_point)
             except Exception as e:
                 logger.debug(f"Skipping constraint-informed point: {e}")
         
         # 5. Perturbed versions of the original point
-        for i in range(3):
+        for i in range(cfg.STRATEGIC_STARTING_POINTS_CONFIG['perturbed_points']):
             perturbed = []
             for j, (param_name, bound) in enumerate(zip(param_names, opt_bounds)):
                 val = x0[j]
                 min_bound, max_bound = bound
                 # Smaller perturbations for critical parameters
                 if param_name in ['rho_cognitive', 'rho_progress']:
-                    perturbation_factor = 0.1  # 10% of range
+                    perturbation_factor = cfg.STRATEGIC_STARTING_POINTS_CONFIG['critical_param_perturbation_factor']  # 10% of range
                 else:
-                    perturbation_factor = 0.2  # 20% of range
+                    perturbation_factor = cfg.STRATEGIC_STARTING_POINTS_CONFIG['other_param_perturbation_factor']  # 20% of range
                 
                 range_size = max_bound - min_bound
                 perturbation = np.random.uniform(-perturbation_factor * range_size, 
@@ -1259,8 +1250,8 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                     logger.info(f"Better solution found with {method_name} from point {i+1}: objective = {result.fun:.6f}")
                     
                 # Early termination if we find a very good solution
-                if result.fun < 1e-6:
-                    logger.info(f"Found excellent solution (objective < 1e-6), stopping search")
+                if result.fun < cfg.OPTIMIZATION_CONFIG['early_termination_fun_threshold_excellent']:
+                    logger.info(f"Found excellent solution (objective < {cfg.OPTIMIZATION_CONFIG['early_termination_fun_threshold_excellent']}), stopping search")
                     break
                     
             except Exception as e:
@@ -1268,7 +1259,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                 continue
         
         # If we found a good solution, no need to try other methods
-        if best_objective < 1e-3:
+        if best_objective < cfg.OPTIMIZATION_CONFIG['early_termination_fun_threshold_good']:
             logger.info(f"Good solution found with {method_name}, skipping remaining methods")
             break
     
