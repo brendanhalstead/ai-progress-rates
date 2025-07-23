@@ -411,8 +411,8 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     fig.update_xaxes(title_text="Time", row=4, col=1, gridcolor='lightgray')
     fig.update_xaxes(title_text="Time", row=4, col=2, gridcolor='lightgray')
     
-    # Always use log scale for progress plots since they typically span many orders of magnitude
-    fig.update_yaxes(title_text="Progress (log scale)", type="log", row=1, col=1, gridcolor='lightgray')
+    # Use linear scale for progress plots.
+    fig.update_yaxes(title_text="Progress", row=1, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Automation (%)", row=1, col=2, gridcolor='lightgray')
     
     # Use log scale for rates if they span multiple orders of magnitude
