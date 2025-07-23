@@ -4,18 +4,20 @@ This document provides a detailed explanation of the AI progress model implement
 
 ## 1. Model Overview
 
-The model is built around a core differential equation that describes the rate of AI progress over time. This rate is not constant; it dynamically changes based on several factors, creating a feedback loop:
+The model is built around a core system of coupled ordinary differential equations (ODEs) that describe the trajectory of AI development. The model's dynamics emerge from several interconnected feedback loops:
 
 1.  **Inputs**: The model takes time-series data for human labor, AI labor (in human-equivalents), and compute resources (for experiments and training).
-2.  **Production Functions**: A series of nested Constant Elasticity of Substitution (CES) production functions combine these inputs to produce an overall "progress rate".
-3.  **Feedback Loop**: As AI progress accumulates, it enables greater automation of cognitive tasks. This increased automation, in turn, amplifies the effective labor input, which can accelerate the rate of future progress.
-4.  **Integration**: The model integrates the instantaneous progress rate over time to calculate the cumulative AI progress, which then feeds back into the automation level.
+2.  **Production Functions**: A series of nested Constant Elasticity of Substitution (CES) production functions combine these inputs to produce rates of change.
+3.  **Research Stock**: A new state variable, "research stock," represents the accumulated knowledge and algorithmic sophistication. This stock grows based on research inputs (cognitive labor and experiment compute).
+4.  **Software Progress**: The rate of "software progress" is no longer a direct output of a production function. Instead, it is derived from the growth of the research stock, modeling progress as the rate of *improvement relative to* the existing knowledge base.
+5.  **Automation Feedback Loop**: As cumulative AI progress (`P`) accumulates, it enables greater automation of cognitive tasks. This increased automation, in turn, amplifies the effective labor input, which accelerates the growth of both research stock and overall progress.
+6.  **Integration**: The model integrates the instantaneous rates over time to calculate the two core state variables: cumulative AI progress (`P`) and cumulative research stock (`RS`).
 
-The model's dynamics are governed by a set of parameters that define the relationships between its components (e.g., how easily AI can substitute for human labor). These parameters can be estimated by constraining the model to match certain "anchor points"—plausible real-world observations or expert judgments.
+The model's dynamics are governed by a set of parameters that define the relationships between its components. These parameters can be estimated by constraining the model to match certain "anchor points"—plausible real-world observations or expert judgments.
 
 ## 2. Core Components and Equations
 
-The model is composed of four main computational steps that lead to the overall progress rate.
+The model is composed of several computational steps that lead to the overall progress rate.
 
 ### 2.1. Cognitive Output (C)
 
@@ -29,7 +31,7 @@ This formulation can be interpreted as a standard CES function applied to *effec
 
 Where:
 -   \( C \): Total cognitive output.
--   \( a \): The fraction of cognitive work that is automated (see Section 2.4).
+-   \( a \): The fraction of cognitive work that is automated (see Section 2.5).
 -   \( L_{AI} \): The supply of AI labor (in human-equivalent units).
 -   \( L_{human} \): The supply of human labor.
 -   \( \rho_{cog} \): The elasticity of substitution parameter for cognitive work.
@@ -38,22 +40,36 @@ Where:
     -   If \( \rho_{cog} \to -\infty \), they are perfect complements (Leontief): \( C \propto \min\left(\frac{L_{AI}}{a}, \frac{L_{human}}{1-a}\right) \).
 -   \( N_{cognitive} \): A normalization constant (`cognitive_output_normalization`).
 
-### 2.2. Software Progress Rate (S)
+### 2.2. Research Stock Growth Rate (RS')
 
-The cognitive output is then combined with compute dedicated to experiments (e.g., running simulations, testing new algorithms) to generate "software progress." This represents advances in AI algorithms, techniques, and software systems. This relationship is also modeled with a CES function.
+The cognitive output is then combined with compute dedicated to experiments (e.g., running simulations, testing new algorithms) to generate the growth rate of the "research stock." This stock represents the accumulation of scientific and technical knowledge.
 
 \[
-S = \left( \alpha \cdot E^{\rho_{prog}} + (1 - \alpha) \cdot C^{\rho_{prog}} \right)^{1/\rho_{prog}}
+RS' = \left( \alpha \cdot E^{\rho_{prog}} + (1 - \alpha) \cdot C^{\rho_{prog}} \right)^{1/\rho_{prog}}
 \]
 
 Where:
--   \( S \): The rate of software progress.
+-   \( RS' \): The instantaneous rate of change of the research stock.
 -   \( E \): The amount of compute used for experiments (`experiment_compute`).
 -   \( C \): The cognitive output from the previous step.
 -   \( \alpha \): A parameter determining the relative importance of experiment compute vs. cognitive output.
--   \( \rho_{prog} \): The elasticity of substitution between compute and cognitive work for software development.
+-   \( \rho_{prog} \): The elasticity of substitution between compute and cognitive work for research.
 
-### 2.3. Overall Progress Rate (R)
+### 2.3. Software Progress Rate (S)
+
+The software progress rate is now dynamically calculated based on the state of the research stock. It is defined as the growth rate of the stock, normalized by the stock itself and the initial conditions. This formulation captures the idea that as the knowledge base (`RS`) grows, a larger absolute increase in knowledge (`RS'`) is required to achieve the same relative improvement.
+
+\[
+S(t) = \frac{RS(0) \cdot RS'(t)}{RS'(0) \cdot RS(t)}
+\]
+
+Where:
+-   \( S(t) \): The software progress rate at time \(t\).
+-   \( RS(t) \): The research stock at time \(t\).
+-   \( RS'(t) \): The growth rate of research stock at time \(t\).
+-   \( RS(0), RS'(0) \): The initial values of the research stock and its growth rate, used for normalization.
+
+### 2.4. Overall Progress Rate (R)
 
 The overall rate of AI progress is a weighted combination of the software progress rate and the amount of compute dedicated to training models. This captures the two primary drivers of AI advancement: better algorithms (software) and larger models trained on more data (training).
 
@@ -68,7 +84,7 @@ Where:
 -   \( s \): The share parameter (`software_progress_share`) that weights the contribution of software progress relative to training compute.
 -   \( N_{rate} \): A normalization constant (`progress_rate_normalization`) calibrated to set the initial progress rate to 1.0.
 
-### 2.4. Automation-Progress Feedback Loop
+### 2.5. Automation-Progress Feedback Loop
 
 This is the critical feedback mechanism in the model. The fraction of cognitive work that can be automated is not fixed; it increases as cumulative AI progress grows. This is modeled using a generalized sigmoid function, which ensures the automation fraction (`a`) smoothly increases from a low base to an upper limit.
 
@@ -80,18 +96,25 @@ Where:
 -   \( a(P) \): The automation fraction as a function of cumulative progress \( P \).
 -   \( P \): The cumulative AI progress (the integral of \( R \) over time).
 -   \( L \): The maximum automation fraction achievable (`automation_fraction_at_superhuman_coder`).
--   \( P_{mid} \): The level of cumulative progress at which the sigmoid curve is steepest (`progress_at_superhuman_coder`).
--   \( k \): The growth rate of the sigmoid, which is calculated internally to ensure the curve passes through a specified anchor point (e.g., a defined automation fraction at the year 2025).
+-   \( P_{mid} \): The level of cumulative progress at which automation reaches half of its maximum value, L/2 (`progress_at_half_sc_automation`).
+-   \( k \): The growth rate or steepness of the sigmoid curve (`automation_slope`).
 
 ## 3. Integration and System Dynamics
 
-The core of the model is the ordinary differential equation (ODE) that ties everything together. The cumulative progress \( P \) is the integral of the overall progress rate \( R \) over time.
+The core of the model is a system of coupled ordinary differential equations (ODEs) that tie all the components together. The state of the system is defined by two variables: cumulative progress \( P \) and research stock \( RS \).
 
 \[
-\frac{dP}{dt} = R(t, P)
+\frac{dP}{dt} = R(t, P, RS)
+\]
+\[
+\frac{dRS}{dt} = RS'(t, P)
 \]
 
-This equation is solved numerically. The rate \( R \) depends on \( t \) because the input time series for labor and compute are functions of time. It depends on \( P \) because \( P \) determines the automation fraction \( a \), which in turn affects the cognitive output \( C \) and thus the final rate \( R \). This circular dependency creates the model's rich dynamics.
+These equations are solved numerically.
+- The progress rate \( \frac{dP}{dt} \) depends on time \( t \) (via inputs), cumulative progress \( P \) (via the automation fraction in cognitive output), and the research stock \( RS \) (via the software progress rate).
+- The research stock rate \( \frac{dRS}{dt} \) depends on time \( t \) (via inputs) and cumulative progress \( P \) (via the automation fraction).
+
+This system of coupled equations creates the model's rich, non-linear dynamics, where progress in one area feeds back to accelerate others.
 
 ## 4. Parameter Estimation
 

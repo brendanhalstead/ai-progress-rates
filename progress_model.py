@@ -44,6 +44,9 @@ class Parameters:
     progress_at_half_sc_automation: float  # Progress level where automation = half of superhuman level
     automation_slope: float  # Slope parameter controlling steepness of automation transition
     
+    # Research stock parameters
+    research_stock_at_simulation_start: float = 1.0  # Initial research stock RS(0)
+    
     # Normalization
     progress_rate_normalization: float = 1.0  # Auto-calculated to ensure initial progress rate = 1
     cognitive_output_normalization: float = 1.0
@@ -99,6 +102,13 @@ class Parameters:
         else:
             # Clamp slope to reasonable range to prevent numerical instability
             self.automation_slope = np.clip(self.automation_slope, 0.1, 10.0)
+        
+        # Sanitize research stock parameters
+        if not np.isfinite(self.research_stock_at_simulation_start) or self.research_stock_at_simulation_start <= 0:
+            logger.warning(f"Invalid research_stock_at_simulation_start: {self.research_stock_at_simulation_start}, setting to 1.0")
+            self.research_stock_at_simulation_start = 1.0
+        else:
+            self.research_stock_at_simulation_start = max(1e-10, self.research_stock_at_simulation_start)
         
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
@@ -273,9 +283,10 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     return result * cognitive_normalization
 
 
-def compute_software_progress_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float) -> float:
+def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float) -> float:
     """
-    CES combination of compute and cognitive work using the standard substitution parameter rho.
+    CES combination of compute and cognitive work to determine research stock growth rate.
+    This replaces the previous direct software progress calculation.
     
     Args:
         experiment_compute: Experiment compute budget
@@ -287,15 +298,15 @@ def compute_software_progress_rate(experiment_compute: float, cognitive_output: 
              rho -> -inf: perfect complements
     
     Returns:
-        Software progress rate
+        Research stock growth rate RS'(t)
     """
     # Input validation
     if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho])):
-        logger.warning("Non-finite inputs to compute_software_progress_rate")
+        logger.warning("Non-finite inputs to compute_research_stock_rate")
         return 0.0
     
     if experiment_compute < 0 or cognitive_output < 0:
-        logger.warning("Negative inputs to compute_software_progress_rate")
+        logger.warning("Negative inputs to compute_research_stock_rate")
         return 0.0
     
     # Clamp alpha to valid range
@@ -303,6 +314,56 @@ def compute_software_progress_rate(experiment_compute: float, cognitive_output: 
     
     # Use the generic CES function for computation
     return _ces_function(experiment_compute, cognitive_output, alpha, rho)
+
+
+def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
+                                 initial_research_stock: float, initial_research_stock_rate: float) -> float:
+    """
+    Compute software progress rate using research stock formulation:
+    S(t) = RS(0) * RS'(t) / (RS'(0) * RS(t))
+    
+    Args:
+        research_stock: Current research stock RS(t)
+        research_stock_rate: Current research stock rate RS'(t)
+        initial_research_stock: Initial research stock RS(0)
+        initial_research_stock_rate: Initial research stock rate RS'(0)
+    
+    Returns:
+        Software progress rate
+    """
+    # Input validation
+    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate])):
+        logger.warning("Non-finite inputs to compute_software_progress_rate")
+        return 0.0
+    
+    if research_stock <= 0 or initial_research_stock <= 0:
+        logger.warning("Non-positive research stock values")
+        return 0.0
+    
+    if initial_research_stock_rate <= 0:
+        logger.warning("Non-positive initial research stock rate")
+        return 0.0
+    
+    # Compute software progress rate using research stock ratio formula
+    try:
+        numerator = initial_research_stock * research_stock_rate
+        denominator = initial_research_stock_rate * research_stock
+        
+        if denominator == 0:
+            logger.warning("Zero denominator in software progress rate calculation")
+            return 0.0
+        
+        software_progress_rate = numerator / denominator
+        
+        if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
+            logger.warning(f"Invalid software progress rate: {software_progress_rate}")
+            return 0.0
+        
+        return software_progress_rate
+        
+    except (ZeroDivisionError, OverflowError) as e:
+        logger.warning(f"Error computing software progress rate: {e}")
+        return 0.0
 
 
 def compute_overall_progress_rate(software_progress_rate: float, training_compute: float, software_share: float) -> float:
@@ -372,28 +433,40 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
     return np.clip(automation_fraction, 0.0, 1.0)
 
 
-def progress_rate_at_time(t: float, cumulative_progress: float, time_series_data: TimeSeriesData, params: Parameters) -> float:
+def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSeriesData, params: Parameters, 
+                         initial_research_stock_rate: Optional[float] = None) -> List[float]:
     """
-    Compute instantaneous progress rate given cumulative progress with full validation.
-    This is the RHS of the differential equation.
+    Compute instantaneous rates for both progress and research stock.
+    This is the RHS of the coupled differential equation system.
     
     Args:
         t: Current time
-        cumulative_progress: Current cumulative progress
+        state: [cumulative_progress, research_stock]
         time_series_data: Input time series
         params: Model parameters
+        initial_research_stock_rate: RS'(0) needed for software progress calculation
     
     Returns:
-        Instantaneous progress rate
+        [dP/dt, dRS/dt] - rates for both state variables
     """
     # Input validation
     if not np.isfinite(t):
         logger.warning(f"Non-finite time input: {t}")
-        return 0.0
+        return [0.0, 0.0]
+    
+    if len(state) != 2:
+        logger.warning(f"Invalid state vector length: {len(state)}, expected 2")
+        return [0.0, 0.0]
+    
+    cumulative_progress, research_stock = state
     
     if not np.isfinite(cumulative_progress) or cumulative_progress < 0:
         logger.warning(f"Invalid cumulative progress: {cumulative_progress}")
         cumulative_progress = max(0.0, 1e-6)  # Use small positive value
+    
+    if not np.isfinite(research_stock) or research_stock <= 0:
+        logger.warning(f"Invalid research stock: {research_stock}")
+        research_stock = max(1e-6, params.research_stock_at_simulation_start)
     
     # Validate time is within reasonable bounds
     time_min, time_max = time_series_data.time.min(), time_series_data.time.max()
@@ -410,7 +483,7 @@ def progress_rate_at_time(t: float, cumulative_progress: float, time_series_data
         # Validate interpolated values
         if not all(np.isfinite([L_HUMAN, L_AI, experiment_compute, training_compute])):
             logger.warning(f"Non-finite interpolated values at t={t}")
-            return 0.0
+            return [0.0, 0.0]
         
         # Ensure non-negative values
         L_HUMAN = max(0.0, L_HUMAN)
@@ -431,57 +504,78 @@ def progress_rate_at_time(t: float, cumulative_progress: float, time_series_data
         
         if not np.isfinite(cognitive_output) or cognitive_output < 0:
             logger.warning(f"Invalid cognitive output: {cognitive_output}")
-            return 0.0
+            return [0.0, 0.0]
         
-        # Compute software progress rate with validation
-        software_progress_rate = compute_software_progress_rate(
+        # Compute research stock rate (dRS/dt) with validation
+        research_stock_rate = compute_research_stock_rate(
             experiment_compute, cognitive_output, params.alpha, params.rho_progress
         )
         
+        if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
+            logger.warning(f"Invalid research stock rate: {research_stock_rate}")
+            return [0.0, 0.0]
+        
+        # Compute software progress rate using research stock formulation
+        if initial_research_stock_rate is None or initial_research_stock_rate <= 0:
+            logger.warning("No valid initial research stock rate provided, using fallback")
+            # Fallback: use current rate as approximation
+            software_progress_rate = research_stock_rate
+        else:
+            software_progress_rate = compute_software_progress_rate(
+                research_stock, research_stock_rate, 
+                params.research_stock_at_simulation_start, initial_research_stock_rate
+            )
+        
         if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
             logger.warning(f"Invalid software progress rate: {software_progress_rate}")
-            return 0.0
+            return [0.0, 0.0]
         
-        # Compute overall progress rate
+        # Compute overall progress rate (dP/dt)
         overall_rate = compute_overall_progress_rate(
             software_progress_rate, training_compute, params.software_progress_share
         )
         
         if not np.isfinite(overall_rate) or overall_rate < 0:
             logger.warning(f"Invalid overall progress rate: {overall_rate}")
-            return 0.0
+            return [0.0, 0.0]
         
         # Apply normalization with validation
         if not np.isfinite(params.progress_rate_normalization) or params.progress_rate_normalization <= 0:
             logger.warning(f"Invalid progress rate normalization: {params.progress_rate_normalization}")
-            return 0.0
+            return [0.0, 0.0]
         
-        normalized_rate = overall_rate * params.progress_rate_normalization
+        normalized_progress_rate = overall_rate * params.progress_rate_normalization
         
         # Final validation
-        if not np.isfinite(normalized_rate) or normalized_rate < 0:
-            logger.warning(f"Invalid final normalized rate: {normalized_rate}")
-            return 0.0
+        if not np.isfinite(normalized_progress_rate) or normalized_progress_rate < 0:
+            logger.warning(f"Invalid final normalized progress rate: {normalized_progress_rate}")
+            return [0.0, 0.0]
         
         # Cap extremely large rates to prevent numerical issues
-        if normalized_rate > 1e3:
-            logger.warning(f"Very large progress rate {normalized_rate}, capping to 1000")
-            normalized_rate = 1e3
+        if normalized_progress_rate > 1e3:
+            logger.warning(f"Very large progress rate {normalized_progress_rate}, capping to 1000")
+            normalized_progress_rate = 1e3
         
-        logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, automation={automation_fraction:.3f}, rate={normalized_rate:.3f}")
+        if research_stock_rate > 1e3:
+            logger.warning(f"Very large research stock rate {research_stock_rate}, capping to 1000")
+            research_stock_rate = 1e3
         
-        return normalized_rate
+        logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
+                    f"automation={automation_fraction:.3f}, dP/dt={normalized_progress_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
+        
+        return [normalized_progress_rate, research_stock_rate]
         
     except Exception as e:
-        logger.error(f"Error computing progress rate at t={t}, progress={cumulative_progress}: {e}")
-        return 0.0  # Return zero rate on any error
+        logger.error(f"Error computing rates at t={t}, state={state}: {e}")
+        return [0.0, 0.0]  # Return zero rates on any error
 
 
 def integrate_progress(time_range: List[float], initial_progress: float, time_series_data: TimeSeriesData, 
-                      params: Parameters, direction: str = 'forward') -> Tuple[np.ndarray, np.ndarray]:
+                      params: Parameters, direction: str = 'forward') -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Solve the differential equation with robust fallback methods:
-    d(progress)/dt = progress_rate(t, progress)
+    Solve the coupled differential equation system with robust fallback methods:
+    d(progress)/dt = progress_rate(t, progress, research_stock)
+    d(research_stock)/dt = research_stock_rate(t, progress, research_stock)
     
     Args:
         time_range: [start_time, end_time]
@@ -491,19 +585,39 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         direction: 'forward' or 'backward'
     
     Returns:
-        Tuple of (times, cumulative_progress_values)
+        Tuple of (times, cumulative_progress_values, research_stock_values)
     """
+    # Calculate initial research stock rate for consistent computation
+    start_time = time_series_data.time[0]
+    initial_automation = compute_automation_fraction(initial_progress, params)
+    initial_L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
+    initial_L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
+    initial_experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
+    
+    initial_cognitive_output = compute_cognitive_output(
+        initial_automation, initial_L_AI, initial_L_HUMAN, 
+        params.rho_cognitive, params.cognitive_output_normalization
+    )
+    initial_research_stock_rate = compute_research_stock_rate(
+        initial_experiment_compute, initial_cognitive_output, 
+        params.alpha, params.rho_progress
+    )
+    
+    if initial_research_stock_rate <= 0:
+        logger.warning(f"Invalid initial research stock rate: {initial_research_stock_rate}, using fallback")
+        initial_research_stock_rate = 1.0
+    
     def ode_func(t, y):
         try:
-            rate = progress_rate_at_time(t, y[0], time_series_data, params)
-            # Validate the rate
-            if not np.isfinite(rate) or rate < 0:
-                logger.warning(f"Invalid progress rate {rate} at time {t}, progress {y[0]}")
-                return [0.0]  # Stop integration if rate becomes invalid
-            return [rate]
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate)
+            # Validate the rates
+            if len(rates) != 2 or not all(np.isfinite(rate) and rate >= 0 for rate in rates):
+                logger.warning(f"Invalid rates {rates} at time {t}, state {y}")
+                return [0.0, 0.0]  # Stop integration if rates become invalid
+            return rates
         except Exception as e:
-            logger.warning(f"Error computing progress rate at t={t}, progress={y[0]}: {e}")
-            return [0.0]  # Fail gracefully
+            logger.warning(f"Error computing rates at t={t}, state={y}: {e}")
+            return [0.0, 0.0]  # Fail gracefully
     
     def ode_func_bounded(t, y):
         """ODE function with bounds checking to prevent extreme values"""
@@ -515,21 +629,29 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                 logger.warning(f"Progress {y[0]} too large at time {t}, clamping")
                 y[0] = 1e6
             
-            rate = progress_rate_at_time(t, y[0], time_series_data, params)
+            # Prevent research stock from going negative or becoming extremely large
+            if y[1] <= 0:
+                y[1] = max(1e-6, params.research_stock_at_simulation_start)
+            elif y[1] > 1e10:
+                logger.warning(f"Research stock {y[1]} too large at time {t}, clamping")
+                y[1] = 1e10
             
-            # Clamp rate to reasonable bounds
-            if not np.isfinite(rate):
-                rate = 0.0
-            elif rate < 0:
-                rate = 0.0
-            elif rate > 1e3:  # Prevent explosive growth
-                logger.warning(f"Progress rate {rate} too large at time {t}, clamping")
-                rate = 1e3
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate)
             
-            return [rate]
+            # Clamp rates to reasonable bounds
+            for i in range(len(rates)):
+                if not np.isfinite(rates[i]):
+                    rates[i] = 0.0
+                elif rates[i] < 0:
+                    rates[i] = 0.0
+                elif rates[i] > 1e3:  # Prevent explosive growth
+                    logger.warning(f"Rate {i} ({rates[i]}) too large at time {t}, clamping")
+                    rates[i] = 1e3
+            
+            return rates
         except Exception as e:
             logger.warning(f"Error in bounded ODE function at t={t}: {e}")
-            return [0.0]
+            return [0.0, 0.0]
     
     t_start, t_end = time_range
     if direction == 'backward':
@@ -539,6 +661,9 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     if not np.isfinite(initial_progress) or initial_progress <= 0:
         logger.warning(f"Invalid initial progress {initial_progress}, using fallback")
         initial_progress = 1.0
+    
+    initial_research_stock = params.research_stock_at_simulation_start
+    initial_state = [initial_progress, initial_research_stock]
     
     # Try multiple integration methods with increasing robustness
     methods_to_try = [
@@ -558,7 +683,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             sol = integrate.solve_ivp(
                 ode_func_bounded,
                 [t_start, t_end], 
-                [initial_progress],
+                initial_state,
                 method=method,
                 dense_output=True,
                 **tolerances,
@@ -585,33 +710,47 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             dt = (t_end - t_start) / (n_steps - 1)
             
             progress_values = np.zeros(n_steps)
+            research_stock_values = np.zeros(n_steps)
             progress_values[0] = initial_progress
+            research_stock_values[0] = initial_research_stock
             
             for i in range(1, n_steps):
                 try:
-                    rate = progress_rate_at_time(times[i-1], progress_values[i-1], time_series_data, params)
-                    if not np.isfinite(rate) or rate < 0:
-                        rate = 0.0
-                    elif rate > 1e3:
-                        rate = 1e3
+                    state = [progress_values[i-1], research_stock_values[i-1]]
+                    rates = progress_rate_at_time(times[i-1], state, time_series_data, params, initial_research_stock_rate)
                     
-                    progress_values[i] = progress_values[i-1] + rate * dt
+                    # Validate and clamp rates
+                    for j in range(len(rates)):
+                        if not np.isfinite(rates[j]) or rates[j] < 0:
+                            rates[j] = 0.0
+                        elif rates[j] > 1e3:
+                            rates[j] = 1e3
                     
-                    # Ensure progress doesn't go negative or become too large
+                    progress_values[i] = progress_values[i-1] + rates[0] * dt
+                    research_stock_values[i] = research_stock_values[i-1] + rates[1] * dt
+                    
+                    # Ensure values don't go negative or become too large
                     if progress_values[i] < 0:
                         progress_values[i] = progress_values[i-1]
                     elif progress_values[i] > 1e6:
                         progress_values[i] = 1e6
+                    
+                    if research_stock_values[i] <= 0:
+                        research_stock_values[i] = max(research_stock_values[i-1], 1e-6)
+                    elif research_stock_values[i] > 1e10:
+                        research_stock_values[i] = 1e10
                         
                 except Exception as e:
                     logger.warning(f"Euler step failed at i={i}: {e}")
-                    progress_values[i] = progress_values[i-1]  # Keep previous value
+                    progress_values[i] = progress_values[i-1]  # Keep previous values
+                    research_stock_values[i] = research_stock_values[i-1]
             
             # Convert back to original time range
             final_times = np.linspace(min(time_range), max(time_range), 100)
             final_progress = np.interp(final_times, times, progress_values)
+            final_research_stock = np.interp(final_times, times, research_stock_values)
             
-            return final_times, final_progress
+            return final_times, final_progress, final_research_stock
             
         except Exception as e:
             logger.error(f"Even Euler fallback failed: {e}")
@@ -620,24 +759,39 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     # Create dense output over time range
     try:
         times = np.linspace(min(time_range), max(time_range), 100)
-        progress_values = sol.sol(times)[0]
+        solution_values = sol.sol(times)
+        progress_values = solution_values[0]
+        research_stock_values = solution_values[1]
         
         # Validate results
         if not all(np.isfinite(progress_values)):
-            logger.warning("Non-finite values in integration result")
+            logger.warning("Non-finite values in progress integration result")
             # Replace non-finite values with interpolation
             finite_mask = np.isfinite(progress_values)
             if np.any(finite_mask):
                 progress_values = np.interp(times, times[finite_mask], progress_values[finite_mask])
             else:
-                raise ValueError("All integration results are non-finite")
+                raise ValueError("All progress integration results are non-finite")
         
-        # Check for negative progress
+        if not all(np.isfinite(research_stock_values)):
+            logger.warning("Non-finite values in research stock integration result")
+            # Replace non-finite values with interpolation
+            finite_mask = np.isfinite(research_stock_values)
+            if np.any(finite_mask):
+                research_stock_values = np.interp(times, times[finite_mask], research_stock_values[finite_mask])
+            else:
+                raise ValueError("All research stock integration results are non-finite")
+        
+        # Check for negative values
         if np.any(progress_values < 0):
             logger.warning("Negative progress values detected, clamping to zero")
             progress_values = np.maximum(progress_values, 0.0)
         
-        return times, progress_values
+        if np.any(research_stock_values <= 0):
+            logger.warning("Non-positive research stock values detected, clamping to minimum")
+            research_stock_values = np.maximum(research_stock_values, 1e-6)
+        
+        return times, progress_values, research_stock_values
         
     except Exception as e:
         logger.error(f"Error creating dense output: {e}")
@@ -678,7 +832,7 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
                 cumulative_progress = initial_progress
             else:
                 time_range = [start_time, t]
-                times, progress_values = integrate_progress(time_range, initial_progress, time_series_data, params)
+                times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, time_series_data, params)
                 cumulative_progress = progress_values[-1]
         except Exception as e:
             logger.warning(f"Integration failed for time {t}: {e}")
@@ -693,7 +847,41 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
     # Compute target variable
     if constraint.target_variable == 'progress_rate':
         cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
-        software_progress_rate = compute_software_progress_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress)
+        
+        # For constraints, we need to compute the research stock rate and software progress rate
+        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress)
+        
+        # Get initial research stock rate for the calculation
+        start_time = time_series_data.time[0]
+        initial_automation = compute_automation_fraction(initial_progress, params)
+        initial_L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
+        initial_L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
+        initial_experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
+        
+        initial_cognitive_output = compute_cognitive_output(
+            initial_automation, initial_L_AI, initial_L_HUMAN, 
+            params.rho_cognitive, params.cognitive_output_normalization
+        )
+        initial_research_stock_rate = compute_research_stock_rate(
+            initial_experiment_compute, initial_cognitive_output, 
+            params.alpha, params.rho_progress
+        )
+        
+        # Determine research stock at evaluation time
+        if 'research_stock' in conditions:
+            research_stock = conditions['research_stock']
+        else:
+            # For anchor constraints, we might need to approximate or assume research stock
+            # grows at a constant rate (simple approximation)
+            time_elapsed = t - start_time
+            research_stock = params.research_stock_at_simulation_start + initial_research_stock_rate * time_elapsed
+            research_stock = max(1e-6, research_stock)  # Ensure positive
+        
+        software_progress_rate = compute_software_progress_rate(
+            research_stock, research_stock_rate, 
+            params.research_stock_at_simulation_start, initial_research_stock_rate
+        )
+        
         model_value = compute_overall_progress_rate(software_progress_rate, training_compute, params.software_progress_share)
         model_value *= params.progress_rate_normalization
     elif constraint.target_variable == 'automation_fraction':
@@ -744,6 +932,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         'automation_fraction_at_superhuman_coder': (0.1, 0.95),  # High but not extreme automation
         'progress_at_half_sc_automation': (1.0, 500),  # Reasonable progress values for sigmoid midpoint
         'automation_slope': (0.1, 10.0),  # Reasonable slope parameters for sigmoid steepness
+        'research_stock_at_simulation_start': (0.1, 100),  # Reasonable initial research stock values
         'cognitive_output_normalization': (0.00001, 0.1)  # Reasonable normalization range
     }
     
@@ -1138,7 +1327,7 @@ class ProgressModel:
         self.data = time_series_data
         self.results = {}
         
-    def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute progress over specified time range
         
@@ -1147,23 +1336,25 @@ class ProgressModel:
             initial_progress: Initial progress (defaults to 1.0)
         
         Returns:
-            Tuple of (times, cumulative_progress_values)
+            Tuple of (times, cumulative_progress_values, research_stock_values)
         """
         if initial_progress is None:
             initial_progress = 1.0  # Use a reasonable default value
         
-        times, progress_values = integrate_progress(time_range, initial_progress, self.data, self.params)
+        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
         # Store results
         self.results['times'] = times
         self.results['progress'] = progress_values
+        self.results['research_stock'] = research_stock_values
         self.results['automation_fraction'] = [compute_automation_fraction(p, self.params) for p in progress_values]
         
         logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
         logger.info(f"Progress: {progress_values[0]:.3f} -> {progress_values[-1]:.3f}")
+        logger.info(f"Research Stock: {research_stock_values[0]:.3f} -> {research_stock_values[-1]:.3f}")
         logger.info(f"Automation: {self.results['automation_fraction'][0]:.3f} -> {self.results['automation_fraction'][-1]:.3f}")
         
-        return times, progress_values
+        return times, progress_values, research_stock_values
     
     def plot_results(self, comprehensive: bool = False, save_path: Optional[str] = None):
         """Visualize progress, automation fraction, and component contributions"""
@@ -1289,6 +1480,7 @@ if __name__ == "__main__":
         automation_fraction_at_superhuman_coder=0.9,
         progress_at_half_sc_automation=50.0,  # Progress level where automation = 45% (half of 90%)
         automation_slope=2.0,  # Moderate slope for smooth transition
+        research_stock_at_simulation_start=1.0,  # Initial research stock
         progress_rate_normalization=1.0,
         cognitive_output_normalization=1.0
     )
@@ -1300,7 +1492,7 @@ if __name__ == "__main__":
     
     # Run model
     model = ProgressModel(params, data)
-    times, progress = model.compute_progress_trajectory([2019, 2030], initial_progress=1.0)
+    times, progress, research_stock = model.compute_progress_trajectory([2019, 2030], initial_progress=1.0)
     
     # Export results
     model.export_results("progress_results.csv")
