@@ -313,7 +313,14 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
     alpha = np.clip(alpha, 0.0, 1.0)
     
     # Use the generic CES function for computation
-    return _ces_function(experiment_compute, cognitive_output, alpha, rho)
+    rate = _ces_function(experiment_compute, cognitive_output, alpha, rho)
+    
+    # Cap extremely large rates to prevent numerical issues
+    if rate > 1e3:
+        logger.warning(f"Very large research stock rate {rate}, capping to 1000")
+        rate = 1e3
+        
+    return rate
 
 
 def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
@@ -556,10 +563,6 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             logger.warning(f"Very large progress rate {normalized_progress_rate}, capping to 1000")
             normalized_progress_rate = 1e3
         
-        if research_stock_rate > 1e3:
-            logger.warning(f"Very large research stock rate {research_stock_rate}, capping to 1000")
-            research_stock_rate = 1e3
-        
         logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
                     f"automation={automation_fraction:.3f}, dP/dt={normalized_progress_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
         
@@ -644,9 +647,6 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                     rates[i] = 0.0
                 elif rates[i] < 0:
                     rates[i] = 0.0
-                elif rates[i] > 1e3:  # Prevent explosive growth
-                    logger.warning(f"Rate {i} ({rates[i]}) too large at time {t}, clamping")
-                    rates[i] = 1e3
             
             return rates
         except Exception as e:
@@ -723,8 +723,6 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                     for j in range(len(rates)):
                         if not np.isfinite(rates[j]) or rates[j] < 0:
                             rates[j] = 0.0
-                        elif rates[j] > 1e3:
-                            rates[j] = 1e3
                     
                     progress_values[i] = progress_values[i-1] + rates[0] * dt
                     research_stock_values[i] = research_stock_values[i-1] + rates[1] * dt
@@ -907,7 +905,7 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
 
 
 def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_data: TimeSeriesData, 
-                       initial_params: Parameters, initial_progress: float = 1.0, fixed_params: Optional[List[str]] = None) -> Parameters:
+                       initial_params: Parameters, initial_progress: float = 1.0, fixed_params: Optional[List[str]] = None) -> Tuple[Parameters, List[Dict[str, Any]]]:
     """
     Find parameters that best satisfy anchor constraints.
     
@@ -1316,7 +1314,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
     
     optimized_params._constraint_evaluations = constraint_evaluations
     
-    return optimized_params
+    return optimized_params, constraint_evaluations
 
 
 class ProgressModel:
@@ -1343,11 +1341,38 @@ class ProgressModel:
         
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
+        # Calculate rates at each time step
+        progress_rates = []
+        research_stock_rates = []
+        
+        # We need the initial research stock rate for consistent software progress calculations
+        start_time = self.data.time[0]
+        initial_automation = compute_automation_fraction(initial_progress, self.params)
+        initial_L_HUMAN = np.interp(start_time, self.data.time, self.data.L_HUMAN)
+        initial_L_AI = np.interp(start_time, self.data.time, self.data.L_AI)
+        initial_experiment_compute = np.interp(start_time, self.data.time, self.data.experiment_compute)
+        initial_cognitive_output = compute_cognitive_output(
+            initial_automation, initial_L_AI, initial_L_HUMAN, 
+            self.params.rho_cognitive, self.params.cognitive_output_normalization
+        )
+        initial_research_stock_rate_val = compute_research_stock_rate(
+            initial_experiment_compute, initial_cognitive_output, 
+            self.params.alpha, self.params.rho_progress
+        )
+        
+        for i in range(len(times)):
+            state = [progress_values[i], research_stock_values[i]]
+            rates = progress_rate_at_time(times[i], state, self.data, self.params, initial_research_stock_rate_val)
+            progress_rates.append(rates[0])
+            research_stock_rates.append(rates[1])
+            
         # Store results
         self.results['times'] = times
         self.results['progress'] = progress_values
         self.results['research_stock'] = research_stock_values
         self.results['automation_fraction'] = [compute_automation_fraction(p, self.params) for p in progress_values]
+        self.results['progress_rates'] = progress_rates
+        self.results['research_stock_rates'] = research_stock_rates
         
         logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
         logger.info(f"Progress: {progress_values[0]:.3f} -> {progress_values[-1]:.3f}")
@@ -1412,14 +1437,15 @@ class ProgressModel:
             writer = csv.writer(csvfile)
             
             # Write header
-            writer.writerow(['time', 'cumulative_progress', 'automation_fraction'])
+            writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'research_stock'])
             
             # Write data
             for i in range(len(self.results['times'])):
                 writer.writerow([
                     self.results['times'][i],
                     self.results['progress'][i],
-                    self.results['automation_fraction'][i]
+                    self.results['automation_fraction'][i],
+                    self.results['research_stock'][i]
                 ])
         
         logger.info(f"Results exported to {filename}")
@@ -1487,7 +1513,7 @@ if __name__ == "__main__":
     
     # Estimate parameters
     logger.info("Estimating parameters...")
-    params = estimate_parameters(anchors, data, initial_params)
+    params, _ = estimate_parameters(anchors, data, initial_params)
     logger.info(f"Optimized parameters: {params}")
     
     # Run model

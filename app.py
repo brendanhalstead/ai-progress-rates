@@ -25,7 +25,8 @@ from progress_model import (
     ProgressModel, Parameters, TimeSeriesData, 
     AnchorConstraint, estimate_parameters,
     progress_rate_at_time, compute_cognitive_output,
-    compute_software_progress_rate
+    compute_software_progress_rate, compute_automation_fraction,
+    compute_research_stock_rate, compute_overall_progress_rate
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -88,7 +89,8 @@ def create_default_parameters():
         automation_fraction_at_superhuman_coder=0.90,  # Roughly 90% automation at superhuman level
         progress_at_half_sc_automation=50.0,  # Progress level where automation = 45% (half of superhuman)
         automation_slope=2.0,  # Moderate slope for smooth automation transition
-        cognitive_output_normalization=1e-3
+        cognitive_output_normalization=1e-3,
+        research_stock_at_simulation_start=1.0
     )
 
 def time_series_to_dict(data: TimeSeriesData):
@@ -111,12 +113,13 @@ def params_to_dict(params: Parameters):
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
         'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
         'automation_slope': params.automation_slope,
+        'research_stock_at_simulation_start': params.research_stock_at_simulation_start,
         'progress_rate_normalization': params.progress_rate_normalization,
         'cognitive_output_normalization': params.cognitive_output_normalization
     }
 
 def calculate_progress_rate_normalization(params: Parameters, time_series_data: TimeSeriesData, 
-                                         start_time: float, initial_progress: float) -> float:
+                                         start_time: float, initial_progress: float, initial_research_stock: float) -> float:
     """
     Calculate progress rate normalization so that initial progress rate equals 1.
     
@@ -125,12 +128,41 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
         time_series_data: Input time series
         start_time: Simulation start time
         initial_progress: Initial cumulative progress
+        initial_research_stock: Initial research stock
         
     Returns:
         Calculated normalization factor
     """
-    # Compute the unnormalized progress rate at start time
-    unnormalized_rate = progress_rate_at_time(start_time, initial_progress, time_series_data, params)
+    # We need the initial research stock rate to compute the software progress rate
+    initial_automation_at_start = compute_automation_fraction(initial_progress, params)
+    initial_L_HUMAN_at_start = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
+    initial_L_AI_at_start = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
+    initial_experiment_compute_at_start = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
+    initial_training_compute_at_start = np.interp(start_time, time_series_data.time, time_series_data.training_compute)
+
+    initial_cognitive_output_at_start = compute_cognitive_output(
+        initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
+        params.rho_cognitive, params.cognitive_output_normalization
+    )
+    
+    initial_research_stock_rate_at_start = compute_research_stock_rate(
+        initial_experiment_compute_at_start, initial_cognitive_output_at_start,
+        params.alpha, params.rho_progress
+    )
+
+    if initial_research_stock_rate_at_start <= 0:
+        initial_research_stock_rate_at_start = 1.0
+
+    initial_software_progress_rate = compute_software_progress_rate(
+        initial_research_stock, 
+        initial_research_stock_rate_at_start,
+        params.research_stock_at_simulation_start,
+        initial_research_stock_rate_at_start # RS'(0) is the same as RS'(t) at start_time
+    )
+
+    unnormalized_rate = compute_overall_progress_rate(
+        initial_software_progress_rate, initial_training_compute_at_start, params.software_progress_share
+    )
     
     # Return the normalization factor that makes the rate equal to 1
     if unnormalized_rate > 0:
@@ -139,7 +171,7 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
         logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
         return 1.0
 
-def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None):
+def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None):
     """Create interactive Plotly dashboard"""
     
     # Ensure all inputs are numpy arrays and handle edge cases
@@ -171,6 +203,14 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
         cognitive_outputs = np.array(cognitive_outputs, dtype=float)[valid_mask]
         # Remove any remaining invalid values
         cognitive_outputs = np.where(np.isfinite(cognitive_outputs), cognitive_outputs, 0)
+
+    if research_stocks is not None and len(research_stocks) > 0:
+        research_stocks = np.array(research_stocks, dtype=float)[valid_mask]
+        research_stocks = np.where(np.isfinite(research_stocks), research_stocks, 0)
+
+    if research_stock_rates is not None and len(research_stock_rates) > 0:
+        research_stock_rates = np.array(research_stock_rates, dtype=float)[valid_mask]
+        research_stock_rates = np.where(np.isfinite(research_stock_rates), research_stock_rates, 0)
     
     # Create subplots - expand to 6x2 layout for input time series
     fig = make_subplots(
@@ -179,7 +219,8 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
                        'Overall Progress Rate', 'Software Progress Rate',
                        'Cognitive Output', 'Progress vs Automation',
                        'Rate Components', 'Cognitive Output Components',
-                       'Human vs AI Labor', 'Experiment vs Training Compute'),
+                       'Human vs AI Labor', 'Experiment vs Training Compute',
+                       'Research Stock', 'Research Stock Rate'),
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
@@ -330,10 +371,30 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
                       mode='lines+markers', marker=dict(size=4)),
             row=5, col=2
         )
+
+    # Plot 11: Research Stock
+    if research_stocks is not None and len(research_stocks) > 0:
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=research_stocks.tolist(),
+                      name='Research Stock',
+                      line=dict(color='#8c564b', width=3),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=6, col=1
+        )
+
+    # Plot 12: Research Stock Rate
+    if research_stock_rates is not None and len(research_stock_rates) > 0:
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=research_stock_rates.tolist(),
+                      name='Research Stock Rate',
+                      line=dict(color='#e377c2', width=3),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=6, col=2
+        )
     
     # Update layout
     fig.update_layout(
-        height=1500,  # Increased height for 6x2 layout
+        height=1800,  # Increased height for 6x2 layout
         showlegend=False,
         title_text="AI Progress Modeling Dashboard",
         title_x=0.5,
@@ -373,13 +434,19 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     
     fig.update_yaxes(title_text="Automation (%)", row=3, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Rate (log scale)", type="log", row=4, col=1, gridcolor='lightgray')
-    fig.update_yaxes(title_text="Labor Contribution", row=4, col=2, gridcolor='lightgray')
+    fig.update_yaxes(title_text="Labor Contribution (log scale)", type="log", row=4, col=2, gridcolor='lightgray')
     
     # Add axis labels for new input time series plots
     fig.update_xaxes(title_text="Time", row=5, col=1, gridcolor='lightgray')
     fig.update_xaxes(title_text="Time", row=5, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Labor (log scale)", type="log", row=5, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Compute (log scale)", type="log", row=5, col=2, gridcolor='lightgray')
+
+    # Add axis labels for new research stock plots
+    fig.update_xaxes(title_text="Time", row=6, col=1, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=6, col=2, gridcolor='lightgray')
+    fig.update_yaxes(title_text="Research Stock (log scale)", type="log", row=6, col=1, gridcolor='lightgray')
+    fig.update_yaxes(title_text="Research Stock Rate (log scale)", type="log", row=6, col=2, gridcolor='lightgray')
     
     return fig
 
@@ -408,16 +475,46 @@ def compute_model():
         time_range = data.get('time_range', [2019, 2030])
         initial_progress = data.get('initial_progress', 1.0)
         
+        # Calculate initial research stock rate, RS'(0), for software progress calculations
+        try:
+            start_time = time_series.time[0]
+            initial_automation_at_start = compute_automation_fraction(initial_progress, params)
+            initial_L_HUMAN_at_start = np.interp(start_time, time_series.time, time_series.L_HUMAN)
+            initial_L_AI_at_start = np.interp(start_time, time_series.time, time_series.L_AI)
+            initial_experiment_compute_at_start = np.interp(start_time, time_series.time, time_series.experiment_compute)
+            
+            initial_cognitive_output_at_start = compute_cognitive_output(
+                initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
+                params.rho_cognitive, params.cognitive_output_normalization
+            )
+            
+            initial_research_stock_rate = compute_research_stock_rate(
+                initial_experiment_compute_at_start, initial_cognitive_output_at_start,
+                params.alpha, params.rho_progress
+            )
+            
+            if not np.isfinite(initial_research_stock_rate) or initial_research_stock_rate <= 0:
+                logger.warning(f"Invalid initial research stock rate ({initial_research_stock_rate}), using fallback 1.0")
+                initial_research_stock_rate = 1.0
+
+        except Exception as e:
+            logger.error(f"Error calculating initial research stock rate: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to calculate initial conditions: {e}',
+                'error_type': 'initialization_failure'
+            }), 500
+
         # Calculate and set the progress rate normalization to ensure initial rate = 1
         params.progress_rate_normalization = calculate_progress_rate_normalization(
-            params, time_series, time_range[0], initial_progress
+            params, time_series, time_range[0], initial_progress, params.research_stock_at_simulation_start
         )
         logger.info(f"Calculated progress rate normalization: {params.progress_rate_normalization}")
         
         # Compute model with comprehensive validation and error handling
         try:
             model = ProgressModel(params, time_series)
-            times, progress_values = model.compute_progress_trajectory(
+            times, progress_values, research_stock_values = model.compute_progress_trajectory(
                 time_range, initial_progress
             )
             
@@ -508,39 +605,38 @@ def compute_model():
                 ]
             }), 500
         
-        # Compute progress rates with error handling
-        progress_rates = []
-        for i, (t, p) in enumerate(zip(times, progress_values)):
-            try:
-                rate = progress_rate_at_time(t, p, time_series, params)
-                if np.isfinite(rate) and rate >= 0:
-                    progress_rates.append(rate)
-                else:
-                    progress_rates.append(0.0)
-            except (ZeroDivisionError, ValueError, OverflowError):
-                progress_rates.append(0.0)
-        
-        # Compute software progress rates and cognitive output for each time point
+        # Compute rates and intermediate values for plotting
+        progress_rates = model.results['progress_rates']
         software_progress_rates = []
         cognitive_outputs = []
-        for i, (t, p) in enumerate(zip(times, progress_values)):
+        research_stock_rates = model.results['research_stock_rates']
+
+        # To get the other intermediate values for plotting, we still need to iterate
+        for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
-                # Get interpolated values at time t
+                # Interpolate inputs for this specific time `t`
                 L_HUMAN = np.interp(t, time_series.time, time_series.L_HUMAN)
                 L_AI = np.interp(t, time_series.time, time_series.L_AI)
                 experiment_compute = np.interp(t, time_series.time, time_series.experiment_compute)
-                
-                # Compute automation fraction and cognitive output
-                automation_fraction = model.results['automation_fraction'][i]
-                cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
+                training_compute = np.interp(t, time_series.time, time_series.training_compute)
+
+                # Recalculate intermediate values for plotting
+                automation_fraction = compute_automation_fraction(p, params)
+                cognitive_output = compute_cognitive_output(
+                    automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
+                )
                 cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
-                
-                # Compute software progress rate
+
+                current_research_stock_rate = research_stock_rates[i]
                 software_rate = compute_software_progress_rate(
-                    experiment_compute, cognitive_output, params.alpha, params.rho_progress
+                    rs, current_research_stock_rate, 
+                    params.research_stock_at_simulation_start, 
+                    initial_research_stock_rate
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
-            except:
+
+            except Exception as e:
+                logger.warning(f"Error calculating metrics at t={t}: {e}")
                 software_progress_rates.append(0.0)
                 cognitive_outputs.append(0.0)
         
@@ -552,7 +648,9 @@ def compute_model():
             'automation_fraction': model.results['automation_fraction'],
             'progress_rates': progress_rates,
             'software_progress_rates': software_progress_rates,
-            'cognitive_outputs': cognitive_outputs
+            'cognitive_outputs': cognitive_outputs,
+            'research_stock': research_stock_values,
+            'research_stock_rates': research_stock_rates,
         }
         
         # Create Plotly figure
@@ -561,7 +659,9 @@ def compute_model():
             model.results['automation_fraction'], 
             progress_rates,
             software_progress_rates,
-            cognitive_outputs
+            cognitive_outputs,
+            research_stock_values,
+            research_stock_rates
         )
         
         return jsonify({
@@ -647,12 +747,11 @@ def estimate_params():
         
         # Estimate parameters with comprehensive error handling
         try:
-            estimated_params = estimate_parameters(anchors, time_series, initial_params, initial_progress)
+            estimated_params, constraint_evals = estimate_parameters(anchors, time_series, initial_params, initial_progress)
             
             # Validate the optimization results
             initial_obj = getattr(estimated_params, '_initial_objective', None)
             final_obj = getattr(estimated_params, '_final_objective', None)
-            constraint_evals = getattr(estimated_params, '_constraint_evaluations', [])
             
             # Check if optimization actually improved anything
             if initial_obj is not None and final_obj is not None:
@@ -769,7 +868,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate'])
         
         # Write data
         for i in range(len(results['times'])):
@@ -788,6 +887,16 @@ def export_csv():
             # Add cognitive output if available
             if 'cognitive_outputs' in results and i < len(results['cognitive_outputs']):
                 row.append(results['cognitive_outputs'][i])
+            else:
+                row.append(0.0)
+
+            if 'research_stock' in results and i < len(results['research_stock']):
+                row.append(results['research_stock'][i])
+            else:
+                row.append(0.0)
+
+            if 'research_stock_rates' in results and i < len(results['research_stock_rates']):
+                row.append(results['research_stock_rates'][i])
             else:
                 row.append(0.0)
             
@@ -832,6 +941,7 @@ def get_default_data():
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
             'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
             'automation_slope': params.automation_slope,
+            'research_stock_at_simulation_start': params.research_stock_at_simulation_start,
             'progress_rate_normalization': params.progress_rate_normalization,
             'cognitive_output_normalization': params.cognitive_output_normalization
         }
