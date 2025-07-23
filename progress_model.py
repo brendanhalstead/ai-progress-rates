@@ -482,9 +482,26 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
     
     try:
         # Interpolate time series data to time t with validation
-        L_HUMAN = np.interp(t, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI = np.interp(t, time_series_data.time, time_series_data.L_AI)
-        experiment_compute = np.interp(t, time_series_data.time, time_series_data.experiment_compute)
+        # Use log-space interpolation for exponentially growing variables
+        # This prevents scalloping on log plots and handles exponential growth better
+        if np.all(time_series_data.L_HUMAN > 0):
+            log_L_HUMAN = np.log(time_series_data.L_HUMAN)
+            L_HUMAN = np.exp(np.interp(t, time_series_data.time, log_L_HUMAN))
+        else:
+            L_HUMAN = np.interp(t, time_series_data.time, time_series_data.L_HUMAN)
+        
+        if np.all(time_series_data.L_AI > 0):
+            log_L_AI = np.log(time_series_data.L_AI)
+            L_AI = np.exp(np.interp(t, time_series_data.time, log_L_AI))
+        else:
+            L_AI = np.interp(t, time_series_data.time, time_series_data.L_AI)
+        
+        if np.all(time_series_data.experiment_compute > 0):
+            log_experiment_compute = np.log(time_series_data.experiment_compute)
+            experiment_compute = np.exp(np.interp(t, time_series_data.time, log_experiment_compute))
+        else:
+            experiment_compute = np.interp(t, time_series_data.time, time_series_data.experiment_compute)
+        
         training_compute = np.interp(t, time_series_data.time, time_series_data.training_compute)
         
         # Validate interpolated values
