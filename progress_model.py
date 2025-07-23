@@ -11,7 +11,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Dict, Any
 from scipy import optimize, integrate, interpolate
 import logging
@@ -35,22 +35,22 @@ class TimeSeriesData:
 class Parameters:
     """Model parameters with validation"""
     # Production function parameters
-    rho_cognitive: float  # Elasticity for cognitive output
-    rho_progress: float   # Elasticity for software progress
-    alpha: float          # Weight on experiment compute [0,1]
-    software_progress_share: float  # Weight on software progress [0,1]
+    rho_cognitive: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_cognitive'])
+    rho_progress: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_progress'])
+    alpha: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha'])
+    software_progress_share: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_progress_share'])
     
     # Automation sigmoid parameters
-    automation_fraction_at_superhuman_coder: float  # Upper limit of automation [0,1]
-    progress_at_half_sc_automation: float  # Progress level where automation = half of superhuman level
-    automation_slope: float  # Slope parameter controlling steepness of automation transition
+    automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
+    progress_at_half_sc_automation: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation'])
+    automation_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_slope'])
     
     # Research stock parameters
-    research_stock_at_simulation_start: float = 1.0  # Initial research stock RS(0)
+    research_stock_at_simulation_start: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['research_stock_at_simulation_start'])
     
     # Normalization
-    progress_rate_normalization: float = 1.0  # Auto-calculated to ensure initial progress rate = 1
-    cognitive_output_normalization: float = 1.0
+    progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
+    cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
     
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
@@ -1506,18 +1506,7 @@ if __name__ == "__main__":
     ]
     
     # Initial parameter guess
-    initial_params = Parameters(
-        rho_cognitive=0.5,
-        rho_progress=0.5,
-        alpha=0.5,
-        software_progress_share=0.7,
-        automation_fraction_at_superhuman_coder=0.9,
-        progress_at_half_sc_automation=50.0,  # Progress level where automation = 45% (half of 90%)
-        automation_slope=2.0,  # Moderate slope for smooth transition
-        research_stock_at_simulation_start=1.0,  # Initial research stock
-        progress_rate_normalization=1.0,
-        cognitive_output_normalization=1.0
-    )
+    initial_params = Parameters()
     
     # Estimate parameters
     logger.info("Estimating parameters...")

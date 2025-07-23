@@ -81,17 +81,7 @@ def create_default_time_series():
 
 def create_default_parameters():
     """Create default model parameters"""
-    return Parameters(
-        rho_cognitive=0.5,
-        rho_progress=0.5,  
-        alpha=0.5,
-        software_progress_share=0.7,
-        automation_fraction_at_superhuman_coder=0.90,  # Roughly 90% automation at superhuman level
-        progress_at_half_sc_automation=50.0,  # Progress level where automation = 45% (half of superhuman)
-        automation_slope=2.0,  # Moderate slope for smooth automation transition
-        cognitive_output_normalization=1e-3,
-        research_stock_at_simulation_start=1.0
-    )
+    return Parameters()
 
 def time_series_to_dict(data: TimeSeriesData):
     """Convert TimeSeriesData to dictionary for JSON serialization"""

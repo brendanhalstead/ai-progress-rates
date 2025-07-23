@@ -95,4 +95,20 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
     'perturbed_points': 3,
     'critical_param_perturbation_factor': 0.1,
     'other_param_perturbation_factor': 0.2
+}
+
+# =============================================================================
+# DEFAULT MODEL PARAMETERS
+# =============================================================================
+DEFAULT_PARAMETERS = {
+    'rho_cognitive': -0.2,
+    'rho_progress': -0.2,
+    'alpha': 0.5,
+    'software_progress_share': 0.5,
+    'automation_fraction_at_superhuman_coder': 0.90,
+    'progress_at_half_sc_automation': 20.0,
+    'automation_slope': 1.0,
+    'research_stock_at_simulation_start': 4.4,
+    'progress_rate_normalization': 1.0,  # This is usually auto-calculated
+    'cognitive_output_normalization': 3.16e-3,
 } 
