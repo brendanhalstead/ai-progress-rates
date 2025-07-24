@@ -28,6 +28,7 @@ from progress_model import (
     compute_software_progress_rate, compute_automation_fraction,
     compute_research_stock_rate, compute_overall_progress_rate
 )
+from metrics_calculator import get_metrics_for_dashboard
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
         logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
         return 1.0
 
-def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None, human_only_progress_rates=None, cognitive_output_normalization=None):
+def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None, human_only_progress_rates=None, ai_labor_contributions=None, human_labor_contributions=None):
     """Create interactive Plotly dashboard"""
     
     # Ensure all inputs are numpy arrays and handle edge cases
@@ -205,6 +206,14 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     if human_only_progress_rates is not None and len(human_only_progress_rates) > 0:
         human_only_progress_rates = np.array(human_only_progress_rates, dtype=float)[valid_mask]
         human_only_progress_rates = np.where(np.isfinite(human_only_progress_rates), human_only_progress_rates, 0)
+
+    if ai_labor_contributions is not None and len(ai_labor_contributions) > 0:
+        ai_labor_contributions = np.array(ai_labor_contributions, dtype=float)[valid_mask]
+        ai_labor_contributions = np.where(np.isfinite(ai_labor_contributions), ai_labor_contributions, 0)
+
+    if human_labor_contributions is not None and len(human_labor_contributions) > 0:
+        human_labor_contributions = np.array(human_labor_contributions, dtype=float)[valid_mask]
+        human_labor_contributions = np.where(np.isfinite(human_labor_contributions), human_labor_contributions, 0)
     
     # Create subplots - expand to 7x2 layout for input time series and human-only rates
     fig = make_subplots(
@@ -299,35 +308,16 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
         )
     
     # Plot 8: Cognitive Output Components (AI vs Human contribution)
-    if cognitive_outputs is not None and len(cognitive_outputs) > 0:
-        # Compute AI and Human labor contributions over time
-        ai_contributions = []
-        human_contributions = []
-        for i, t in enumerate(times):
-            try:
-                L_HUMAN = np.interp(t, session_data['time_series'].time, session_data['time_series'].L_HUMAN)
-                L_AI = np.interp(t, session_data['time_series'].time, session_data['time_series'].L_AI)
-                
-                
-                # Approximate contributions (simplified)
-                human_contrib = L_HUMAN * cognitive_output_normalization
-                ai_contrib = cognitive_outputs[i] - human_contrib
-                
-                ai_contributions.append(ai_contrib)
-                human_contributions.append(human_contrib)
-            except:
-                ai_contributions.append(0.0)
-                human_contributions.append(0.0)
-        
+    if ai_labor_contributions is not None and human_labor_contributions is not None and len(ai_labor_contributions) > 0 and len(human_labor_contributions) > 0:
         fig.add_trace(
-            go.Scatter(x=times.tolist(), y=ai_contributions,
+            go.Scatter(x=times.tolist(), y=ai_labor_contributions.tolist(),
                       name='AI contribution',
                       line=dict(color='#1f77b4', width=2),
                       mode='lines'),
             row=4, col=2
         )
         fig.add_trace(
-            go.Scatter(x=times.tolist(), y=human_contributions,
+            go.Scatter(x=times.tolist(), y=human_labor_contributions.tolist(),
                       name='Humans only',
                       line=dict(color='#ff7f0e', width=2),
                       mode='lines'),
@@ -646,85 +636,29 @@ def compute_model():
                 ]
             }), 500
         
-        # Compute rates and intermediate values for plotting
-        progress_rates = model.results['progress_rates']
-        software_progress_rates = []
-        cognitive_outputs = []
-        human_only_progress_rates = []  # New metric: progress rate with zero automation
-        research_stock_rates = model.results['research_stock_rates']
-
-        # To get the other intermediate values for plotting, we still need to iterate
-        for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
-            try:
-                # Interpolate inputs for this specific time `t`
-                L_HUMAN = np.interp(t, time_series.time, time_series.L_HUMAN)
-                L_AI = np.interp(t, time_series.time, time_series.L_AI)
-                experiment_compute = np.interp(t, time_series.time, time_series.experiment_compute)
-                training_compute = np.interp(t, time_series.time, time_series.training_compute)
-
-                # Recalculate intermediate values for plotting
-                automation_fraction = compute_automation_fraction(p, params)
-                cognitive_output = compute_cognitive_output(
-                    automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
-                )
-                cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
-
-                current_research_stock_rate = research_stock_rates[i]
-                software_rate = compute_software_progress_rate(
-                    rs, current_research_stock_rate, 
-                    params.research_stock_at_simulation_start, 
-                    initial_research_stock_rate
-                )
-                software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
-
-                # Calculate human-only progress rate (automation fraction = 0)
-                human_only_cognitive_output = L_HUMAN * params.cognitive_output_normalization
-                human_only_research_stock_rate = compute_research_stock_rate(
-                    experiment_compute, human_only_cognitive_output, params.alpha, params.rho_progress
-                )
-                human_only_software_rate = compute_software_progress_rate(
-                    rs, human_only_research_stock_rate,
-                    params.research_stock_at_simulation_start,
-                    initial_research_stock_rate
-                )
-                human_only_overall_rate = compute_overall_progress_rate(
-                    human_only_software_rate, training_compute, params.software_progress_share
-                ) * params.progress_rate_normalization
-                
-                human_only_progress_rates.append(human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0)
-
-            except Exception as e:
-                logger.warning(f"Error calculating metrics at t={t}: {e}")
-                software_progress_rates.append(0.0)
-                cognitive_outputs.append(0.0)
-                human_only_progress_rates.append(0.0)
+        # Calculate all metrics using the dedicated metrics calculator
+        dashboard_metrics = get_metrics_for_dashboard(
+            model.results, params, time_series, initial_research_stock_rate
+        )
         
-        # Store results
+        # Store results (including auxiliary metrics for potential export)
         session_data['current_params'] = params
         session_data['results'] = {
             'times': times,
             'progress': progress_values,
             'automation_fraction': model.results['automation_fraction'],
-            'progress_rates': progress_rates,
-            'software_progress_rates': software_progress_rates,
-            'cognitive_outputs': cognitive_outputs,
-            'human_only_progress_rates': human_only_progress_rates,
+            'progress_rates': model.results['progress_rates'],
+            'software_progress_rates': dashboard_metrics[4],  # Extract from calculated metrics
+            'cognitive_outputs': dashboard_metrics[5],
+            'human_only_progress_rates': dashboard_metrics[8],
+            'ai_labor_contributions': dashboard_metrics[9],
+            'human_labor_contributions': dashboard_metrics[10],
             'research_stock': research_stock_values,
-            'research_stock_rates': research_stock_rates,
+            'research_stock_rates': model.results['research_stock_rates'],
         }
         
-        # Create Plotly figure
-        fig = create_plotly_dashboard(
-            times, progress_values, 
-            model.results['automation_fraction'], 
-            progress_rates,
-            software_progress_rates,
-            cognitive_outputs,
-            research_stock_values,
-            research_stock_rates,
-            human_only_progress_rates,
-            cognitive_output_normalization=params.cognitive_output_normalization
-        )
+        # Create Plotly figure using the calculated metrics
+        fig = create_plotly_dashboard(*dashboard_metrics)
         
         return jsonify({
             'success': True,
@@ -732,7 +666,7 @@ def compute_model():
             'summary': {
                 'final_progress': float(progress_values[-1]),
                 'final_automation': float(model.results['automation_fraction'][-1]),
-                'avg_progress_rate': float(np.mean(progress_rates)),
+                'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
                 'time_range': time_range
             }
         })
@@ -930,7 +864,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'human_only_progress_rate'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
         
         # Write data
         for i in range(len(results['times'])):
@@ -965,6 +899,18 @@ def export_csv():
             # Add human-only progress rate if available
             if 'human_only_progress_rates' in results and i < len(results['human_only_progress_rates']):
                 row.append(results['human_only_progress_rates'][i])
+            else:
+                row.append(0.0)
+
+            # Add AI labor contribution if available
+            if 'ai_labor_contributions' in results and i < len(results['ai_labor_contributions']):
+                row.append(results['ai_labor_contributions'][i])
+            else:
+                row.append(0.0)
+
+            # Add human labor contribution if available
+            if 'human_labor_contributions' in results and i < len(results['human_labor_contributions']):
+                row.append(results['human_labor_contributions'][i])
             else:
                 row.append(0.0)
             
