@@ -161,7 +161,7 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
         logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
         return 1.0
 
-def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None):
+def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None, human_only_progress_rates=None, cognitive_output_normalization=None):
     """Create interactive Plotly dashboard"""
     
     # Ensure all inputs are numpy arrays and handle edge cases
@@ -201,17 +201,23 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     if research_stock_rates is not None and len(research_stock_rates) > 0:
         research_stock_rates = np.array(research_stock_rates, dtype=float)[valid_mask]
         research_stock_rates = np.where(np.isfinite(research_stock_rates), research_stock_rates, 0)
+
+    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0:
+        human_only_progress_rates = np.array(human_only_progress_rates, dtype=float)[valid_mask]
+        human_only_progress_rates = np.where(np.isfinite(human_only_progress_rates), human_only_progress_rates, 0)
     
-    # Create subplots - expand to 6x2 layout for input time series
+    # Create subplots - expand to 7x2 layout for input time series and human-only rates
     fig = make_subplots(
-        rows=6, cols=2,
+        rows=7, cols=2,
         subplot_titles=('Cumulative Progress', 'Automation Fraction', 
                        'Overall Progress Rate', 'Software Progress Rate',
                        'Cognitive Output', 'Progress vs Automation',
                        'Rate Components', 'Cognitive Output Components',
                        'Human vs AI Labor', 'Experiment vs Training Compute',
-                       'Research Stock', 'Research Stock Rate'),
+                       'Research Stock', 'Research Stock Rate',
+                       'Human-Only Progress Rate', 'Automation Progress Multiplier'),
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
@@ -301,11 +307,11 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
             try:
                 L_HUMAN = np.interp(t, session_data['time_series'].time, session_data['time_series'].L_HUMAN)
                 L_AI = np.interp(t, session_data['time_series'].time, session_data['time_series'].L_AI)
-                automation_frac = automation_fraction[i]
+                
                 
                 # Approximate contributions (simplified)
-                ai_contrib = automation_frac * L_AI
-                human_contrib = (1 - automation_frac) * L_HUMAN
+                human_contrib = L_HUMAN * cognitive_output_normalization
+                ai_contrib = cognitive_outputs[i] - human_contrib
                 
                 ai_contributions.append(ai_contrib)
                 human_contributions.append(human_contrib)
@@ -315,14 +321,14 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
         
         fig.add_trace(
             go.Scatter(x=times.tolist(), y=ai_contributions,
-                      name='AI Contribution',
+                      name='AI contribution',
                       line=dict(color='#1f77b4', width=2),
                       mode='lines'),
             row=4, col=2
         )
         fig.add_trace(
             go.Scatter(x=times.tolist(), y=human_contributions,
-                      name='Human Contribution',
+                      name='Humans only',
                       line=dict(color='#ff7f0e', width=2),
                       mode='lines'),
             row=4, col=2
@@ -381,12 +387,44 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
                       mode='lines+markers', marker=dict(size=4)),
             row=6, col=2
         )
+
+    # Plot 13: Human-Only Progress Rate
+    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0:
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=human_only_progress_rates.tolist(),
+                      name='Human-Only Progress Rate',
+                      line=dict(color='#ff7f0e', width=3),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=7, col=1
+        )
+
+    # Plot 14: Automation Progress Multiplier
+    if progress_rates is not None and human_only_progress_rates is not None and len(progress_rates) > 0 and len(human_only_progress_rates) > 0:
+        # Calculate automation multiplier (overall rate / human-only rate)
+        automation_multiplier = []
+        for i in range(len(progress_rates)):
+            if human_only_progress_rates[i] > 0:
+                multiplier = progress_rates[i] / human_only_progress_rates[i]
+                automation_multiplier.append(multiplier if np.isfinite(multiplier) else 1.0)
+            else:
+                automation_multiplier.append(1.0)  # No multiplier if human-only rate is zero
+        
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=automation_multiplier,
+                      name='Automation Multiplier',
+                      line=dict(color='#d62728', width=3),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=7, col=2
+        )
+        
+        # Add horizontal line at y=1 for reference (no automation benefit)
+        fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=7, col=2)
     
     # Update layout
     fig.update_layout(
-        height=1800,  # Increased height for 6x2 layout
+        height=2100,  # Increased height for 7x2 layout
         showlegend=False,
-        title_text="AI Progress Modeling Dashboard",
+        title_text="AI Progress Metrics",
         title_x=0.5,
         plot_bgcolor='white'
     )
@@ -437,6 +475,19 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     fig.update_xaxes(title_text="Time", row=6, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Research Stock (log scale)", type="log", row=6, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Research Stock Rate (log scale)", type="log", row=6, col=2, gridcolor='lightgray')
+
+    # Add axis labels for human-only progress rate plots
+    fig.update_xaxes(title_text="Time", row=7, col=1, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=7, col=2, gridcolor='lightgray')
+    
+    # Use log scale for human-only progress rate if it spans multiple orders of magnitude
+    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0 and np.max(human_only_progress_rates) > 0:
+        fig.update_yaxes(title_text="Human-Only Rate (log scale)", type="log", row=7, col=1, gridcolor='lightgray')
+    else:
+        fig.update_yaxes(title_text="Human-Only Rate", row=7, col=1, gridcolor='lightgray')
+    
+    # Automation multiplier axis (always linear scale)
+    fig.update_yaxes(title_text="Automation Multiplier", row=7, col=2, gridcolor='lightgray')
     
     return fig
 
@@ -599,6 +650,7 @@ def compute_model():
         progress_rates = model.results['progress_rates']
         software_progress_rates = []
         cognitive_outputs = []
+        human_only_progress_rates = []  # New metric: progress rate with zero automation
         research_stock_rates = model.results['research_stock_rates']
 
         # To get the other intermediate values for plotting, we still need to iterate
@@ -625,10 +677,27 @@ def compute_model():
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
 
+                # Calculate human-only progress rate (automation fraction = 0)
+                human_only_cognitive_output = L_HUMAN * params.cognitive_output_normalization
+                human_only_research_stock_rate = compute_research_stock_rate(
+                    experiment_compute, human_only_cognitive_output, params.alpha, params.rho_progress
+                )
+                human_only_software_rate = compute_software_progress_rate(
+                    rs, human_only_research_stock_rate,
+                    params.research_stock_at_simulation_start,
+                    initial_research_stock_rate
+                )
+                human_only_overall_rate = compute_overall_progress_rate(
+                    human_only_software_rate, training_compute, params.software_progress_share
+                ) * params.progress_rate_normalization
+                
+                human_only_progress_rates.append(human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0)
+
             except Exception as e:
                 logger.warning(f"Error calculating metrics at t={t}: {e}")
                 software_progress_rates.append(0.0)
                 cognitive_outputs.append(0.0)
+                human_only_progress_rates.append(0.0)
         
         # Store results
         session_data['current_params'] = params
@@ -639,6 +708,7 @@ def compute_model():
             'progress_rates': progress_rates,
             'software_progress_rates': software_progress_rates,
             'cognitive_outputs': cognitive_outputs,
+            'human_only_progress_rates': human_only_progress_rates,
             'research_stock': research_stock_values,
             'research_stock_rates': research_stock_rates,
         }
@@ -651,7 +721,9 @@ def compute_model():
             software_progress_rates,
             cognitive_outputs,
             research_stock_values,
-            research_stock_rates
+            research_stock_rates,
+            human_only_progress_rates,
+            cognitive_output_normalization=params.cognitive_output_normalization
         )
         
         return jsonify({
@@ -858,7 +930,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'human_only_progress_rate'])
         
         # Write data
         for i in range(len(results['times'])):
@@ -887,6 +959,12 @@ def export_csv():
 
             if 'research_stock_rates' in results and i < len(results['research_stock_rates']):
                 row.append(results['research_stock_rates'][i])
+            else:
+                row.append(0.0)
+
+            # Add human-only progress rate if available
+            if 'human_only_progress_rates' in results and i < len(results['human_only_progress_rates']):
+                row.append(results['human_only_progress_rates'][i])
             else:
                 row.append(0.0)
             
