@@ -648,17 +648,17 @@ def compute_model():
             'progress': progress_values,
             'automation_fraction': model.results['automation_fraction'],
             'progress_rates': model.results['progress_rates'],
-            'software_progress_rates': dashboard_metrics[4],  # Extract from calculated metrics
-            'cognitive_outputs': dashboard_metrics[5],
-            'human_only_progress_rates': dashboard_metrics[8],
-            'ai_labor_contributions': dashboard_metrics[9],
-            'human_labor_contributions': dashboard_metrics[10],
+            'software_progress_rates': dashboard_metrics['software_progress_rates'],
+            'cognitive_outputs': dashboard_metrics['cognitive_outputs'],
+            'human_only_progress_rates': dashboard_metrics['human_only_progress_rates'],
+            'ai_labor_contributions': dashboard_metrics['ai_labor_contributions'],
+            'human_labor_contributions': dashboard_metrics['human_labor_contributions'],
             'research_stock': research_stock_values,
             'research_stock_rates': model.results['research_stock_rates'],
         }
         
         # Create Plotly figure using the calculated metrics
-        fig = create_plotly_dashboard(*dashboard_metrics)
+        fig = create_plotly_dashboard(**dashboard_metrics)
         
         return jsonify({
             'success': True,

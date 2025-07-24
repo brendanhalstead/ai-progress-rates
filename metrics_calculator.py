@@ -192,7 +192,7 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
 
 def get_metrics_for_dashboard(model_results: Dict[str, Any], params: Parameters,
                              time_series_data: TimeSeriesData,
-                             initial_research_stock_rate: float) -> tuple:
+                             initial_research_stock_rate: float) -> Dict[str, Any]:
     """
     Get all metrics needed for the dashboard in the exact format expected by create_plotly_dashboard.
     
@@ -206,10 +206,7 @@ def get_metrics_for_dashboard(model_results: Dict[str, Any], params: Parameters,
         initial_research_stock_rate: Initial research stock rate
         
     Returns:
-        Tuple containing all arguments needed for create_plotly_dashboard:
-        (times, progress, automation_fraction, progress_rates, software_progress_rates,
-         cognitive_outputs, research_stocks, research_stock_rates, human_only_progress_rates,
-         ai_labor_contributions, human_labor_contributions)
+        Dict containing all arguments needed for create_plotly_dashboard.
     """
     
     # Calculate all metrics
@@ -217,17 +214,17 @@ def get_metrics_for_dashboard(model_results: Dict[str, Any], params: Parameters,
         model_results, params, time_series_data, initial_research_stock_rate
     )
     
-    # Extract in the order expected by create_plotly_dashboard
-    return (
-        all_metrics['times'],
-        all_metrics['progress'], 
-        all_metrics['automation_fraction'],
-        all_metrics['progress_rates'],
-        all_metrics['software_progress_rates'],
-        all_metrics['cognitive_outputs'],
-        all_metrics['research_stock'],
-        all_metrics['research_stock_rates'],
-        all_metrics['human_only_progress_rates'],
-        all_metrics['ai_labor_contributions'],
-        all_metrics['human_labor_contributions']
-    ) 
+    # Return a dictionary with keys matching create_plotly_dashboard arguments
+    return {
+        'times': all_metrics['times'],
+        'progress': all_metrics['progress'],
+        'automation_fraction': all_metrics['automation_fraction'],
+        'progress_rates': all_metrics['progress_rates'],
+        'software_progress_rates': all_metrics['software_progress_rates'],
+        'cognitive_outputs': all_metrics['cognitive_outputs'],
+        'research_stocks': all_metrics['research_stock'],
+        'research_stock_rates': all_metrics['research_stock_rates'],
+        'human_only_progress_rates': all_metrics['human_only_progress_rates'],
+        'ai_labor_contributions': all_metrics['ai_labor_contributions'],
+        'human_labor_contributions': all_metrics['human_labor_contributions']
+    } 
