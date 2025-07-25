@@ -20,6 +20,7 @@ import io
 import csv
 from datetime import datetime
 import logging
+from typing import Dict, Any
 
 from progress_model import (
     ProgressModel, Parameters, TimeSeriesData, 
@@ -28,7 +29,7 @@ from progress_model import (
     compute_software_progress_rate, compute_automation_fraction,
     compute_research_stock_rate, compute_overall_progress_rate
 )
-from metrics_calculator import get_metrics_for_dashboard
+from metrics_calculator import calculate_all_metrics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -162,13 +163,13 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
         logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
         return 1.0
 
-def create_plotly_dashboard(times, progress, automation_fraction, progress_rates=None, software_progress_rates=None, cognitive_outputs=None, research_stocks=None, research_stock_rates=None, human_only_progress_rates=None, ai_labor_contributions=None, human_labor_contributions=None):
+def create_plotly_dashboard(metrics: Dict[str, Any]):
     """Create interactive Plotly dashboard"""
     
-    # Ensure all inputs are numpy arrays and handle edge cases
-    times = np.array(times, dtype=float)
-    progress = np.array(progress, dtype=float)
-    automation_fraction = np.array(automation_fraction, dtype=float)
+    # Extract required data
+    times = np.array(metrics['times'], dtype=float)
+    progress = np.array(metrics['progress'], dtype=float)
+    automation_fraction = np.array(metrics['automation_fraction'], dtype=float)
     
     # Validate input data
     if len(times) == 0 or len(progress) == 0 or len(automation_fraction) == 0:
@@ -180,39 +181,45 @@ def create_plotly_dashboard(times, progress, automation_fraction, progress_rates
     progress = progress[valid_mask]
     automation_fraction = automation_fraction[valid_mask]
     
-    if progress_rates is not None and len(progress_rates) > 0:
-        progress_rates = np.array(progress_rates, dtype=float)[valid_mask]
-        # Remove any remaining invalid rates
+    # Extract optional metrics and apply validation
+    progress_rates = None
+    if 'progress_rates' in metrics and metrics['progress_rates'] is not None and len(metrics['progress_rates']) > 0:
+        progress_rates = np.array(metrics['progress_rates'], dtype=float)[valid_mask]
         progress_rates = np.where(np.isfinite(progress_rates), progress_rates, 0)
     
-    if software_progress_rates is not None and len(software_progress_rates) > 0:
-        software_progress_rates = np.array(software_progress_rates, dtype=float)[valid_mask]
-        # Remove any remaining invalid rates
+    software_progress_rates = None
+    if 'software_progress_rates' in metrics and metrics['software_progress_rates'] is not None and len(metrics['software_progress_rates']) > 0:
+        software_progress_rates = np.array(metrics['software_progress_rates'], dtype=float)[valid_mask]
         software_progress_rates = np.where(np.isfinite(software_progress_rates), software_progress_rates, 0)
     
-    if cognitive_outputs is not None and len(cognitive_outputs) > 0:
-        cognitive_outputs = np.array(cognitive_outputs, dtype=float)[valid_mask]
-        # Remove any remaining invalid values
+    cognitive_outputs = None
+    if 'cognitive_outputs' in metrics and metrics['cognitive_outputs'] is not None and len(metrics['cognitive_outputs']) > 0:
+        cognitive_outputs = np.array(metrics['cognitive_outputs'], dtype=float)[valid_mask]
         cognitive_outputs = np.where(np.isfinite(cognitive_outputs), cognitive_outputs, 0)
 
-    if research_stocks is not None and len(research_stocks) > 0:
-        research_stocks = np.array(research_stocks, dtype=float)[valid_mask]
+    research_stocks = None
+    if 'research_stock' in metrics and metrics['research_stock'] is not None and len(metrics['research_stock']) > 0:
+        research_stocks = np.array(metrics['research_stock'], dtype=float)[valid_mask]
         research_stocks = np.where(np.isfinite(research_stocks), research_stocks, 0)
 
-    if research_stock_rates is not None and len(research_stock_rates) > 0:
-        research_stock_rates = np.array(research_stock_rates, dtype=float)[valid_mask]
+    research_stock_rates = None
+    if 'research_stock_rates' in metrics and metrics['research_stock_rates'] is not None and len(metrics['research_stock_rates']) > 0:
+        research_stock_rates = np.array(metrics['research_stock_rates'], dtype=float)[valid_mask]
         research_stock_rates = np.where(np.isfinite(research_stock_rates), research_stock_rates, 0)
 
-    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0:
-        human_only_progress_rates = np.array(human_only_progress_rates, dtype=float)[valid_mask]
+    human_only_progress_rates = None
+    if 'human_only_progress_rates' in metrics and metrics['human_only_progress_rates'] is not None and len(metrics['human_only_progress_rates']) > 0:
+        human_only_progress_rates = np.array(metrics['human_only_progress_rates'], dtype=float)[valid_mask]
         human_only_progress_rates = np.where(np.isfinite(human_only_progress_rates), human_only_progress_rates, 0)
 
-    if ai_labor_contributions is not None and len(ai_labor_contributions) > 0:
-        ai_labor_contributions = np.array(ai_labor_contributions, dtype=float)[valid_mask]
+    ai_labor_contributions = None
+    if 'ai_labor_contributions' in metrics and metrics['ai_labor_contributions'] is not None and len(metrics['ai_labor_contributions']) > 0:
+        ai_labor_contributions = np.array(metrics['ai_labor_contributions'], dtype=float)[valid_mask]
         ai_labor_contributions = np.where(np.isfinite(ai_labor_contributions), ai_labor_contributions, 0)
 
-    if human_labor_contributions is not None and len(human_labor_contributions) > 0:
-        human_labor_contributions = np.array(human_labor_contributions, dtype=float)[valid_mask]
+    human_labor_contributions = None
+    if 'human_labor_contributions' in metrics and metrics['human_labor_contributions'] is not None and len(metrics['human_labor_contributions']) > 0:
+        human_labor_contributions = np.array(metrics['human_labor_contributions'], dtype=float)[valid_mask]
         human_labor_contributions = np.where(np.isfinite(human_labor_contributions), human_labor_contributions, 0)
     
     # Create subplots - expand to 7x2 layout for input time series and human-only rates
@@ -637,28 +644,16 @@ def compute_model():
             }), 500
         
         # Calculate all metrics using the dedicated metrics calculator
-        dashboard_metrics = get_metrics_for_dashboard(
+        all_metrics = calculate_all_metrics(
             model.results, params, time_series, initial_research_stock_rate
         )
         
         # Store results (including auxiliary metrics for potential export)
         session_data['current_params'] = params
-        session_data['results'] = {
-            'times': times,
-            'progress': progress_values,
-            'automation_fraction': model.results['automation_fraction'],
-            'progress_rates': model.results['progress_rates'],
-            'software_progress_rates': dashboard_metrics['software_progress_rates'],
-            'cognitive_outputs': dashboard_metrics['cognitive_outputs'],
-            'human_only_progress_rates': dashboard_metrics['human_only_progress_rates'],
-            'ai_labor_contributions': dashboard_metrics['ai_labor_contributions'],
-            'human_labor_contributions': dashboard_metrics['human_labor_contributions'],
-            'research_stock': research_stock_values,
-            'research_stock_rates': model.results['research_stock_rates'],
-        }
+        session_data['results'] = all_metrics
         
         # Create Plotly figure using the calculated metrics
-        fig = create_plotly_dashboard(**dashboard_metrics)
+        fig = create_plotly_dashboard(all_metrics)
         
         return jsonify({
             'success': True,

@@ -190,41 +190,4 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
     return all_metrics
 
 
-def get_metrics_for_dashboard(model_results: Dict[str, Any], params: Parameters,
-                             time_series_data: TimeSeriesData,
-                             initial_research_stock_rate: float) -> Dict[str, Any]:
-    """
-    Get all metrics needed for the dashboard in the exact format expected by create_plotly_dashboard.
-    
-    This function serves as the interface between the metrics calculation system
-    and the dashboard plotting function.
-    
-    Args:
-        model_results: Core model results
-        params: Model parameters  
-        time_series_data: Input time series
-        initial_research_stock_rate: Initial research stock rate
-        
-    Returns:
-        Dict containing all arguments needed for create_plotly_dashboard.
-    """
-    
-    # Calculate all metrics
-    all_metrics = calculate_all_metrics(
-        model_results, params, time_series_data, initial_research_stock_rate
-    )
-    
-    # Return a dictionary with keys matching create_plotly_dashboard arguments
-    return {
-        'times': all_metrics['times'],
-        'progress': all_metrics['progress'],
-        'automation_fraction': all_metrics['automation_fraction'],
-        'progress_rates': all_metrics['progress_rates'],
-        'software_progress_rates': all_metrics['software_progress_rates'],
-        'cognitive_outputs': all_metrics['cognitive_outputs'],
-        'research_stocks': all_metrics['research_stock'],
-        'research_stock_rates': all_metrics['research_stock_rates'],
-        'human_only_progress_rates': all_metrics['human_only_progress_rates'],
-        'ai_labor_contributions': all_metrics['ai_labor_contributions'],
-        'human_labor_contributions': all_metrics['human_labor_contributions']
-    } 
+ 
