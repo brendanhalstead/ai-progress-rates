@@ -105,10 +105,10 @@ DEFAULT_PARAMETERS = {
     'rho_progress': -0.2,
     'alpha': 0.5,
     'software_progress_share': 0.5,
-    'automation_fraction_at_superhuman_coder': 0.90,
-    'progress_at_half_sc_automation': 20.0,
-    'automation_slope': 1.0,
-    'research_stock_at_simulation_start': 4.4,
+    'automation_fraction_at_superhuman_coder': 0.99,
+    'progress_at_half_sc_automation': 8.0,
+    'automation_slope': 2.0,
+    'research_stock_at_simulation_start': 1.2,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
-    'cognitive_output_normalization': 3.16e-3,
+    'cognitive_output_normalization': 5e-4,
 } 
