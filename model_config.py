@@ -38,6 +38,11 @@ EULER_FALLBACK_MIN_STEPS = 100
 EULER_FALLBACK_STEPS_PER_YEAR = 10
 DENSE_OUTPUT_POINTS = 100
 
+# ODE step size logging configuration
+ODE_STEP_SIZE_LOGGING = True
+ODE_SMALL_STEP_THRESHOLD = 1e-6  # Threshold for warning about very small steps
+ODE_STEP_VARIATION_THRESHOLD = 100.0  # Threshold for warning about step size variation
+
 # =============================================================================
 # PARAMETER ESTIMATION
 # =============================================================================

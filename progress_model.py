@@ -379,6 +379,29 @@ def compute_overall_progress_rate(software_progress_rate: float, training_comput
     return software_share * software_progress_rate + (1 - software_share) * training_compute
 
 
+def _log_interp(x: float, xp: np.ndarray, fp: np.ndarray) -> float:
+    """
+    Perform log-space interpolation for exponential trends.
+    
+    Args:
+        x: Point to interpolate at
+        xp: Known x-coordinates (must be sorted)
+        fp: Known y-coordinates (must be positive for log-space)
+        
+    Returns:
+        Interpolated value
+    """
+    # Ensure all values are positive for log-space interpolation
+    if np.any(fp <= 0):
+        # Fall back to linear interpolation if any values are non-positive
+        return np.interp(x, xp, fp)
+    
+    # Perform log-space interpolation: log(y) = log(y1) + (log(y2) - log(y1)) * (x - x1) / (x2 - x1)
+    log_fp = np.log(fp)
+    log_interpolated = np.interp(x, xp, log_fp)
+    return np.exp(log_interpolated)
+
+
 def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: Parameters, 
                                    initial_progress: float = 1.0) -> float:
     """
@@ -397,7 +420,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         dt = 1e-3  # Small time step for numerical differentiation
         
         # Get initial conditions at t=0
-        initial_automation = compute_automation_fraction(initial_progress, params)
+        initial_automation = 0
         L_HUMAN_0 = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
         L_AI_0 = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
         experiment_compute_0 = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
@@ -413,16 +436,15 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             params.alpha, params.rho_progress
         )
         
-        # Calculate RS'(dt) and RS'(-dt) for central difference numerical differentiation
-        # Need to account for how inputs change over time
+        # Calculate RS'(dt) for numerical differentiation
+        # Use log-space interpolation for exponential trends
+        L_HUMAN_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.L_HUMAN)
+        L_AI_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.L_AI)
+        experiment_compute_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.experiment_compute)
         
-        # Forward point (t + dt)
-        L_HUMAN_dt_pos = np.interp(start_time + dt, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI_dt_pos = np.interp(start_time + dt, time_series_data.time, time_series_data.L_AI)
-        experiment_compute_dt_pos = np.interp(start_time + dt, time_series_data.time, time_series_data.experiment_compute)
-        
-        cognitive_output_dt_pos = compute_cognitive_output(
-            initial_automation, L_AI_dt_pos, L_HUMAN_dt_pos,
+        # Automation fraction changes very little over small dt, so use same value
+        cognitive_output_dt = compute_cognitive_output(
+            initial_automation, L_AI_dt, L_HUMAN_dt,
             params.rho_cognitive, params.cognitive_output_normalization
         )
         
@@ -430,6 +452,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             experiment_compute_dt_pos, cognitive_output_dt_pos,
             params.alpha, params.rho_progress
         )
+        logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
         # Backward point (t - dt)
         L_HUMAN_dt_neg = np.interp(start_time - dt, time_series_data.time, time_series_data.L_HUMAN)
@@ -782,13 +805,14 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     initial_state = [initial_progress, initial_research_stock]
     
     # Try multiple integration methods with increasing robustness
-    methods_to_try = [
-        ('RK45', {'rtol': 1e-6, 'atol': 1e-8}),      # Default high precision
-        ('RK45', {'rtol': 1e-4, 'atol': 1e-6}),      # Relaxed precision
-        ('RK23', {'rtol': 1e-4, 'atol': 1e-6}),      # Lower order method
-        ('DOP853', {'rtol': 1e-3, 'atol': 1e-5}),    # Explicit method
-        ('Radau', {'rtol': 1e-3, 'atol': 1e-5})      # Implicit method for stiff problems
-    ]
+    # methods_to_try = [
+    #     ('RK45', {'rtol': 1e-6, 'atol': 1e-8}),      # Default high precision
+    #     ('RK45', {'rtol': 1e-4, 'atol': 1e-6}),      # Relaxed precision
+    #     ('RK23', {'rtol': 1e-4, 'atol': 1e-6}),      # Lower order method
+    #     ('DOP853', {'rtol': 1e-3, 'atol': 1e-5}),    # Explicit method
+    #     ('Radau', {'rtol': 1e-3, 'atol': 1e-5})      # Implicit method for stiff problems
+    # ]
+    methods_to_try = []
     
     sol = None
     for method, tolerances in methods_to_try:
@@ -808,6 +832,30 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             
             if sol.success:
                 logger.debug(f"Integration succeeded with method {method}")
+                
+                # Log ODE step size information
+                if cfg.ODE_STEP_SIZE_LOGGING and hasattr(sol, 't') and len(sol.t) > 1:
+                    step_sizes = np.diff(sol.t)
+                    min_step = np.min(step_sizes)
+                    max_step = np.max(step_sizes)
+                    mean_step = np.mean(step_sizes)
+                    total_steps = len(sol.t)
+                    
+                    logger.info(f"ODE step size stats for {method}: "
+                              f"min={min_step:.2e}, max={max_step:.2e}, "
+                              f"mean={mean_step:.2e}, total_steps={total_steps}")
+                    
+                    # Log if step sizes are very small (potential stiffness indicator)
+                    if min_step < cfg.ODE_SMALL_STEP_THRESHOLD:
+                        logger.warning(f"Very small step sizes detected with {method}: "
+                                     f"min_step={min_step:.2e} - this may indicate stiff ODE")
+                    
+                    # Log if step sizes vary significantly (potential instability)
+                    step_variation = max_step / min_step if min_step > 0 else float('inf')
+                    if step_variation > cfg.ODE_STEP_VARIATION_THRESHOLD:
+                        logger.warning(f"Large step size variation with {method}: "
+                                     f"max/min ratio={step_variation:.1f} - potential instability")
+                
                 break
             else:
                 logger.warning(f"Integration with {method} failed: {sol.message}")
@@ -824,6 +872,11 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             n_steps = max(cfg.EULER_FALLBACK_MIN_STEPS, int(abs(t_end - t_start) * cfg.EULER_FALLBACK_STEPS_PER_YEAR))  # Adaptive step count
             times = np.linspace(t_start, t_end, n_steps)
             dt = (t_end - t_start) / (n_steps - 1)
+            
+            # Log Euler step size information
+            if cfg.ODE_STEP_SIZE_LOGGING:
+                logger.info(f"Euler fallback integration: dt={dt:.2e}, n_steps={n_steps}, "
+                           f"time_range=[{t_start:.2f}, {t_end:.2f}]")
             
             progress_values = np.zeros(n_steps)
             research_stock_values = np.zeros(n_steps)

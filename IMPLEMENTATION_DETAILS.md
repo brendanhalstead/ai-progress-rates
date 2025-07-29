@@ -40,6 +40,13 @@ This document enumerates the *engineering–level* behaviours of `progress_model
    * `Radau` (stiff)
 2. Each RHS evaluation clamps state & derivative values into safe ranges.
 3. If **all** SciPy solvers fail, a custom **Euler fallback** with adaptive step count (≥100) is executed, again with per-step clamping.
+4. **ODE Step Size Logging**: The integration process logs detailed step size statistics including:
+   * Minimum, maximum, and mean step sizes
+   * Total number of integration steps
+   * Warnings for very small step sizes (potential stiffness indicators)
+   * Warnings for large step size variations (potential instability indicators)
+   * Euler fallback step size information when scipy integrators fail
+   * Configurable via `ODE_STEP_SIZE_LOGGING`, `ODE_SMALL_STEP_THRESHOLD`, and `ODE_STEP_VARIATION_THRESHOLD` in `model_config.py`
 
 ## 4. Normalisation Mechanics
 
