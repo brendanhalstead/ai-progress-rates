@@ -739,6 +739,7 @@ def estimate_params():
         initial_params_dict = data.get('initial_parameters', {})
         initial_params = Parameters(**initial_params_dict)
         initial_progress = data.get('initial_progress', 1.0)
+        fixed_params = data.get('fixed_params', [])
         
         # Use stored time series or default
         time_series = session_data['time_series']
@@ -747,7 +748,9 @@ def estimate_params():
         
         # Estimate parameters with comprehensive error handling
         try:
-            estimated_params, constraint_evals = estimate_parameters(anchors, time_series, initial_params, initial_progress)
+            estimated_params, constraint_evals = estimate_parameters(
+                anchors, time_series, initial_params, initial_progress, fixed_params=fixed_params
+            )
             
             # Validate the optimization results
             initial_obj = getattr(estimated_params, '_initial_objective', None)

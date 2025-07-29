@@ -1118,7 +1118,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
     
     # Always fix progress_rate_normalization - it should not be optimized
     if 'progress_rate_normalization' not in fixed_params:
-        fixed_params = fixed_params.copy() if fixed_params else []
+        fixed_params = fixed_params.copy()
         fixed_params.append('progress_rate_normalization')
     
     # Calculate progress_rate_normalization to ensure initial progress rate = 1
@@ -1356,7 +1356,8 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
     
     starting_points = generate_strategic_starting_points()
     logger.info(f"Generated {len(starting_points)} strategic starting points")
-    
+    for starting_point in starting_points:
+        logger.info(f"Starting point: {starting_point}")
     # Calculate initial objective value
     initial_objective = objective(x0)
     
