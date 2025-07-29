@@ -227,14 +227,14 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
         rows=7, cols=2,
         subplot_titles=('Cumulative Progress', 'Automation Fraction', 
                        'Overall Progress Rate', 'Software Progress Rate',
-                       'Cognitive Output', 'Progress vs Automation',
+                       'Cognitive Output & Experiment Compute', 'Progress vs Automation',
                        'Rate Components', 'Cognitive Output Components',
-                       'Human vs AI Labor', 'Experiment vs Training Compute',
+                       'Human vs AI Labor', 'Training Compute',
                        'Research Stock', 'Research Stock Rate',
                        'Human-Only Progress Rate', 'Automation Progress Multiplier'),
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": True}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
@@ -278,14 +278,27 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
             row=2, col=2
         )
     
-    # Plot 5: Cognitive Output (if available)
+    # Plot 5: Cognitive Output and Experiment Compute (if available)
     if cognitive_outputs is not None and len(cognitive_outputs) > 0:
         fig.add_trace(
             go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
                       name='Cognitive Output',
                       line=dict(color='#9467bd', width=3),
                       mode='lines+markers', marker=dict(size=4)),
-            row=3, col=1
+            row=3, col=1, secondary_y=False
+        )
+    
+    # Add experiment compute on the same plot with secondary y-axis
+    if session_data['time_series'] is not None:
+        time_series = session_data['time_series']
+        # Interpolate experiment compute to match cognitive output time points
+        experiment_compute_interp = np.interp(times, time_series.time, time_series.experiment_compute)
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=experiment_compute_interp.tolist(),
+                      name='Experiment Compute',
+                      line=dict(color='#2ca02c', width=3, dash='dash'),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=3, col=1, secondary_y=True
         )
     
     # Plot 6: Progress vs Automation scatter
@@ -349,14 +362,7 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
             row=5, col=1
         )
         
-        # Plot 10: Experiment vs Training Compute
-        fig.add_trace(
-            go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
-                      name='Experiment Compute',
-                      line=dict(color='#2ca02c', width=2),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=5, col=2
-        )
+        # Plot 10: Training Compute
         fig.add_trace(
             go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute.tolist(),
                       name='Training Compute',
@@ -451,11 +457,13 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     else:
         fig.update_yaxes(title_text="Software Rate", row=2, col=2, gridcolor='lightgray')
     
-    # Cognitive output scale
+    # Cognitive output and experiment compute scale - dual y-axes
     if cognitive_outputs is not None and len(cognitive_outputs) > 0 and np.max(cognitive_outputs) > 0:
-        fig.update_yaxes(title_text="Cognitive Output (log scale)", type="log", row=3, col=1, gridcolor='lightgray')
+        fig.update_yaxes(title_text="Cognitive Output (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=False)
+        fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=True)
     else:
-        fig.update_yaxes(title_text="Cognitive Output", row=3, col=1, gridcolor='lightgray')
+        fig.update_yaxes(title_text="Cognitive Output", row=3, col=1, gridcolor='lightgray', secondary_y=False)
+        fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=True)
     
     fig.update_yaxes(title_text="Automation (%)", row=3, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Rate (log scale)", type="log", row=4, col=1, gridcolor='lightgray')
@@ -465,7 +473,7 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     fig.update_xaxes(title_text="Time", row=5, col=1, gridcolor='lightgray')
     fig.update_xaxes(title_text="Time", row=5, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Labor (log scale)", type="log", row=5, col=1, gridcolor='lightgray')
-    fig.update_yaxes(title_text="Compute (log scale)", type="log", row=5, col=2, gridcolor='lightgray')
+    fig.update_yaxes(title_text="Training Compute (log scale)", type="log", row=5, col=2, gridcolor='lightgray')
 
     # Add axis labels for new research stock plots
     fig.update_xaxes(title_text="Time", row=6, col=1, gridcolor='lightgray')
