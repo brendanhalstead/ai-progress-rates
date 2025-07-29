@@ -155,7 +155,7 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
     unnormalized_rate = compute_overall_progress_rate(
         initial_software_progress_rate, initial_training_compute_at_start, params.software_progress_share
     )
-    
+    logger.info(f"unnormalized_rate: {unnormalized_rate}")
     # Return the normalization factor that makes the rate equal to 1
     if unnormalized_rate > 0:
         return 1.0 / unnormalized_rate

@@ -788,14 +788,13 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     initial_state = [initial_progress, initial_research_stock]
     
     # Try multiple integration methods with increasing robustness
-    # methods_to_try = [
-    #     ('RK45', {'rtol': 1e-6, 'atol': 1e-8}),      # Default high precision
-    #     ('RK45', {'rtol': 1e-4, 'atol': 1e-6}),      # Relaxed precision
-    #     ('RK23', {'rtol': 1e-4, 'atol': 1e-6}),      # Lower order method
-    #     ('DOP853', {'rtol': 1e-3, 'atol': 1e-5}),    # Explicit method
-    #     ('Radau', {'rtol': 1e-3, 'atol': 1e-5})      # Implicit method for stiff problems
-    # ]
-    methods_to_try = []
+    methods_to_try = [
+        ('RK45', {'rtol': 1e-6, 'atol': 1e-8}),      # Default high precision
+        ('RK45', {'rtol': 1e-4, 'atol': 1e-6}),      # Relaxed precision
+        ('RK23', {'rtol': 1e-4, 'atol': 1e-6}),      # Lower order method
+        ('DOP853', {'rtol': 1e-3, 'atol': 1e-5}),    # Explicit method
+        ('Radau', {'rtol': 1e-3, 'atol': 1e-5})      # Implicit method for stiff problems
+    ]
     
     sol = None
     for method, tolerances in methods_to_try:

@@ -107,11 +107,11 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -0.2,
     'rho_progress': -0.1,
-    'alpha': 0.3,
+    'alpha': 0.5,
     'software_progress_share': 0.5,
     'automation_fraction_at_superhuman_coder': 0.99,
-    'progress_at_half_sc_automation': 16.0,
-    'automation_slope': 1.7,
+    'progress_at_half_sc_automation': 18.0,
+    'automation_slope': 1.6,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
     'cognitive_output_normalization': 1,
 } 
