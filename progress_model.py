@@ -417,13 +417,13 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
     """
     try:
         start_time = time_series_data.time[0]
-        dt = 1e-3  # Small time step for numerical differentiation
+        dt = 1e-6  # Small time step for numerical differentiation
         
         # Get initial conditions at t=0
         initial_automation = 0
-        L_HUMAN_0 = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI_0 = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
-        experiment_compute_0 = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
+        L_HUMAN_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
+        L_AI_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_AI)
+        experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         cognitive_output_0 = compute_cognitive_output(
             initial_automation, L_AI_0, L_HUMAN_0, 
@@ -448,32 +448,15 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             params.rho_cognitive, params.cognitive_output_normalization
         )
         
-        rs_rate_dt_pos = compute_research_stock_rate(
-            experiment_compute_dt_pos, cognitive_output_dt_pos,
+        rs_rate_dt = compute_research_stock_rate(
+            experiment_compute_dt, cognitive_output_dt,
             params.alpha, params.rho_progress
         )
         logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
-        # Backward point (t - dt)
-        L_HUMAN_dt_neg = np.interp(start_time - dt, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI_dt_neg = np.interp(start_time - dt, time_series_data.time, time_series_data.L_AI)
-        experiment_compute_dt_neg = np.interp(start_time - dt, time_series_data.time, time_series_data.experiment_compute)
-        
-        cognitive_output_dt_neg = compute_cognitive_output(
-            initial_automation, L_AI_dt_neg, L_HUMAN_dt_neg,
-            params.rho_cognitive, params.cognitive_output_normalization
-        )
-        
-        rs_rate_dt_neg = compute_research_stock_rate(
-            experiment_compute_dt_neg, cognitive_output_dt_neg,
-            params.alpha, params.rho_progress
-        )
-        
-        logger.info(f"Central difference points: rs_rate(-dt)={rs_rate_dt_neg:.6f}, rs_rate(0)={rs_rate_0:.6f}, rs_rate(+dt)={rs_rate_dt_pos:.6f}")
-        
-        # Calculate RS''(0) using central difference (more accurate than forward difference)
-        rs_rate_second_derivative = (rs_rate_dt_pos - rs_rate_dt_neg) / (2 * dt)
-        logger.info(f"Calculated rs_rate_second_derivative (central diff): {rs_rate_second_derivative:.6f}")
+        # Calculate RS''(0) using forward difference
+        rs_rate_second_derivative = (rs_rate_dt - rs_rate_0) / dt
+        logger.info(f"Calculated rs_rate_second_derivative: {rs_rate_second_derivative:.6f}")
         
         # Avoid division by zero or very small denominators
         if abs(rs_rate_second_derivative) < cfg.PARAM_CLIP_MIN:
