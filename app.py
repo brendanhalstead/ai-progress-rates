@@ -72,7 +72,7 @@ def create_default_time_series():
     except Exception as e:
         logger.warning(f"Error loading input_data.csv: {e}, falling back to synthetic data")
         # Fallback to synthetic data if CSV loading fails
-        time = np.linspace(2019, 2030, 12)
+        time = np.linspace(2029, 2030, 12)
         L_HUMAN = np.ones_like(time) * 1e6
         L_AI = np.logspace(3, 8, len(time))
         experiment_compute = np.logspace(6, 10, len(time))  # Use exponential growth as fallback
@@ -518,7 +518,7 @@ def compute_model():
             session_data['time_series'] = time_series
         
         # Get time range
-        time_range = data.get('time_range', [2019, 2030])
+        time_range = data.get('time_range', [2029, 2030])
         initial_progress = data.get('initial_progress', 1.0)
         
         # Calculate initial research stock rate, RS'(0), for software progress calculations

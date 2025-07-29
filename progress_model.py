@@ -107,7 +107,8 @@ class Parameters:
         # Sanitize research stock parameters
         if not np.isfinite(self.research_stock_at_simulation_start) or self.research_stock_at_simulation_start <= 0:
             logger.warning(f"Invalid research_stock_at_simulation_start: {self.research_stock_at_simulation_start}, setting to 1.0")
-            self.research_stock_at_simulation_start = 1.0
+            
+            self.research_stock_at_simulation_start = 0.0001
         else:
             self.research_stock_at_simulation_start = max(cfg.RESEARCH_STOCK_START_MIN, self.research_stock_at_simulation_start)
         

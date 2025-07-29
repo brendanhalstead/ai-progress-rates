@@ -106,9 +106,9 @@ DEFAULT_PARAMETERS = {
     'alpha': 0.5,
     'software_progress_share': 0.5,
     'automation_fraction_at_superhuman_coder': 0.99,
-    'progress_at_half_sc_automation': 8.0,
+    'progress_at_half_sc_automation': 250.0,
     'automation_slope': 2.0,
-    'research_stock_at_simulation_start': 1.2,
+    'research_stock_at_simulation_start': 0.00001,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
     'cognitive_output_normalization': 5e-4,
 } 
