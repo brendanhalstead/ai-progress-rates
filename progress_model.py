@@ -452,11 +452,11 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             experiment_compute_dt, cognitive_output_dt,
             params.alpha, params.rho_progress
         )
-        logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
+        # logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
         # Calculate RS''(0) using forward difference
         rs_rate_second_derivative = (rs_rate_dt - rs_rate_0) / dt
-        logger.info(f"Calculated rs_rate_second_derivative: {rs_rate_second_derivative:.6f}")
+        # logger.info(f"Calculated rs_rate_second_derivative: {rs_rate_second_derivative:.6f}")
         
         # Avoid division by zero or very small denominators
         if abs(rs_rate_second_derivative) < cfg.PARAM_CLIP_MIN:
@@ -475,8 +475,8 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         # Apply reasonable bounds
         initial_research_stock = max(cfg.PARAM_CLIP_MIN, initial_research_stock)
         
-        logger.info(f"Calculated initial research stock: RS(0) = {initial_research_stock:.6f} "
-                   f"(RS'(0) = {rs_rate_0:.6f}, RS''(0) = {rs_rate_second_derivative:.6f})")
+        # logger.info(f"Calculated initial research stock: RS(0) = {initial_research_stock:.6f} "
+        #            f"(RS'(0) = {rs_rate_0:.6f}, RS''(0) = {rs_rate_second_derivative:.6f})")
         
         return initial_research_stock
         

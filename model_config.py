@@ -50,14 +50,14 @@ RELATIVE_ERROR_CLIP = 100.0
 
 # Parameter bounds for optimization
 PARAMETER_BOUNDS = {
-    'rho_cognitive': (-1, 1),
+    'rho_cognitive': (-1, 0),
     'rho_progress': (-1, 1),
     'alpha': (0.05, 0.95),
     'software_progress_share': (0.05, 0.95),
-    'automation_fraction_at_superhuman_coder': (0.1, 0.95),
+    'automation_fraction_at_superhuman_coder': (0.1, 0.99),
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
-    'cognitive_output_normalization': (0.00001, 0.1)
+    'cognitive_output_normalization': (0.00001, 10)
 }
 
 # Validation thresholds for parameter combinations
