@@ -67,7 +67,26 @@ Where:
 -   \( S(t) \): The software progress rate at time \(t\).
 -   \( RS(t) \): The research stock at time \(t\).
 -   \( RS'(t) \): The growth rate of research stock at time \(t\).
--   \( RS(0), RS'(0) \): The initial values of the research stock and its growth rate, used for normalization.
+-   \( RS(0), RS'(0) \): The initial values of the research stock and its growth rate, used for normalization (see Section 2.3.1).
+
+#### 2.3.1. Initial Research Stock Calculation
+
+Unlike other model parameters, the initial research stock \( RS(0) \) is not user-configurable. Instead, it is calculated dynamically at the beginning of each simulation using the formula:
+
+\[
+RS(0) = \frac{[RS'(0)]^2}{RS''(0)}
+\]
+
+Where:
+-   \( RS'(0) \): The initial research stock growth rate, calculated using the research production function at \( t=0 \) with initial values for cognitive output and experiment compute.
+-   \( RS''(0) \): The second derivative of the research stock rate at \( t=0 \), computed via numerical differentiation by evaluating \( RS'(t) \) at \( t=0 \) and \( t=dt \) where \( dt \) is a small time step.
+
+This approach ensures that the initial research stock is determined endogenously by the model's structure and initial conditions, rather than being an arbitrary parameter. The formula reflects the relationship between the stock level, its growth rate, and the acceleration of that growth rate at the simulation's starting point.
+
+**Implementation Details:**
+- The calculation uses numerical differentiation with a small time step (\( dt = 10^{-6} \)) to approximate \( RS''(0) \).
+- Robust error handling ensures the calculation produces a positive, finite value.
+- If the second derivative is too small (indicating numerical instability), the system falls back to using \( RS'(0) \) as the initial research stock.
 
 ### 2.4. Overall Progress Rate (R)
 

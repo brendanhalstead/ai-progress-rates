@@ -30,7 +30,7 @@ S(t) = \frac{RS(0) \cdot RS'(t)}{RS'(0) \cdot RS(t)}
 \]
 
 Where:
-- \(RS(0)\): Initial research stock (new parameter)
+- \(RS(0)\): Initial research stock (calculated using \(RS(0) = \frac{[RS'(0)]^2}{RS''(0)}\))
 - \(RS'(0)\): Initial rate of research stock growth
 - \(RS(t)\): Current research stock (integrated from \(RS'(t)\))
 - \(RS'(t)\): Current rate of research stock growth
@@ -67,13 +67,13 @@ The system now consists of two coupled ODEs:
 ### Parameter Changes
 
 - **Removed**: `progress_at_simulation_start` (or equivalent)
-- **Added**: `research_stock_at_simulation_start` (i.e., \(RS(0)\))
+- **Changed**: `research_stock_at_simulation_start` (i.e., \(RS(0)\)) is now calculated dynamically using the formula \(RS(0) = \frac{[RS'(0)]^2}{RS''(0)}\) rather than being a user-configurable parameter
 
 ### Initial Conditions
 
 At the simulation start time \(t_0\):
 - \(P(t_0) = 0\) (or as specified)
-- \(RS(t_0) = RS(0)\) (new parameter)
+- \(RS(t_0) = RS(0)\) (calculated dynamically using \(RS(0) = \frac{[RS'(0)]^2}{RS''(0)}\))
 - \(RS'(0)\) must be computed from the initial values of experiment compute and cognitive output
 
 ## Interpretation

@@ -24,7 +24,7 @@ NORMALIZATION_MIN = 1e-10
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
-MAX_RESEARCH_STOCK_RATE = 100000000.0
+MAX_RESEARCH_STOCK_RATE = 10000000000.0
 MAX_NORMALIZED_PROGRESS_RATE = 100.0
 TIME_EXTRAPOLATION_WINDOW = 10.0
 
@@ -101,12 +101,12 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -0.2,
-    'rho_progress': -0.2,
-    'alpha': 0.5,
+    'rho_progress': -0.1,
+    'alpha': 0.3,
     'software_progress_share': 0.5,
     'automation_fraction_at_superhuman_coder': 0.99,
-    'progress_at_half_sc_automation': 250.0,
-    'automation_slope': 2.0,
+    'progress_at_half_sc_automation': 16.0,
+    'automation_slope': 1.7,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
-    'cognitive_output_normalization': 5e-4,
+    'cognitive_output_normalization': 1,
 } 
