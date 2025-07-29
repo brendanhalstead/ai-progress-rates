@@ -27,7 +27,8 @@ from progress_model import (
     AnchorConstraint, estimate_parameters,
     progress_rate_at_time, compute_cognitive_output,
     compute_software_progress_rate, compute_automation_fraction,
-    compute_research_stock_rate, compute_overall_progress_rate
+    compute_research_stock_rate, compute_overall_progress_rate,
+    calculate_initial_research_stock
 )
 from metrics_calculator import calculate_all_metrics
 
@@ -105,7 +106,6 @@ def params_to_dict(params: Parameters):
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
         'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
         'automation_slope': params.automation_slope,
-        'research_stock_at_simulation_start': params.research_stock_at_simulation_start,
         'progress_rate_normalization': params.progress_rate_normalization,
         'cognitive_output_normalization': params.cognitive_output_normalization
     }
@@ -148,7 +148,7 @@ def calculate_progress_rate_normalization(params: Parameters, time_series_data: 
     initial_software_progress_rate = compute_software_progress_rate(
         initial_research_stock, 
         initial_research_stock_rate_at_start,
-        params.research_stock_at_simulation_start,
+        initial_research_stock,  # Use calculated initial research stock
         initial_research_stock_rate_at_start # RS'(0) is the same as RS'(t) at start_time
     )
 
@@ -551,9 +551,10 @@ def compute_model():
                 'error_type': 'initialization_failure'
             }), 500
 
-        # Calculate and set the progress rate normalization to ensure initial rate = 1
+        # Calculate initial research stock and set the progress rate normalization to ensure initial rate = 1
+        initial_research_stock_calc = calculate_initial_research_stock(time_series, params, initial_progress)
         params.progress_rate_normalization = calculate_progress_rate_normalization(
-            params, time_series, time_range[0], initial_progress, params.research_stock_at_simulation_start
+            params, time_series, time_range[0], initial_progress, initial_research_stock_calc
         )
         logger.info(f"Calculated progress rate normalization: {params.progress_rate_normalization}")
         
@@ -653,7 +654,7 @@ def compute_model():
         
         # Calculate all metrics using the dedicated metrics calculator
         all_metrics = calculate_all_metrics(
-            model.results, params, time_series, initial_research_stock_rate
+            model.results, params, time_series, initial_research_stock_rate, initial_research_stock_calc
         )
         
         # Store results (including auxiliary metrics for potential export)
@@ -958,7 +959,6 @@ def get_default_data():
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
             'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
             'automation_slope': params.automation_slope,
-            'research_stock_at_simulation_start': params.research_stock_at_simulation_start,
             'progress_rate_normalization': params.progress_rate_normalization,
             'cognitive_output_normalization': params.cognitive_output_normalization
         }

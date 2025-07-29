@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 def calculate_auxiliary_metrics(model_results: Dict[str, Any], params: Parameters, 
                               time_series_data: TimeSeriesData, 
-                              initial_research_stock_rate: float) -> Dict[str, Any]:
+                              initial_research_stock_rate: float,
+                              initial_research_stock: float) -> Dict[str, Any]:
     """
     Calculate all auxiliary metrics needed for visualization from core model results.
     
@@ -38,6 +39,7 @@ def calculate_auxiliary_metrics(model_results: Dict[str, Any], params: Parameter
         params: Model parameters object
         time_series_data: Input time series data
         initial_research_stock_rate: Initial research stock rate for calculations
+        initial_research_stock: Initial research stock value
         
     Returns:
         Dict containing all auxiliary metrics:
@@ -86,7 +88,7 @@ def calculate_auxiliary_metrics(model_results: Dict[str, Any], params: Parameter
             current_research_stock_rate = research_stock_rates[i]
             software_rate = compute_software_progress_rate(
                 rs, current_research_stock_rate, 
-                params.research_stock_at_simulation_start, 
+                initial_research_stock, 
                 initial_research_stock_rate
             )
             software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
@@ -99,7 +101,7 @@ def calculate_auxiliary_metrics(model_results: Dict[str, Any], params: Parameter
             )
             human_only_software_rate = compute_software_progress_rate(
                 rs, human_only_research_stock_rate,
-                params.research_stock_at_simulation_start,
+                initial_research_stock,
                 initial_research_stock_rate
             )
             human_only_overall_rate = compute_overall_progress_rate(
@@ -152,7 +154,8 @@ def calculate_auxiliary_metrics(model_results: Dict[str, Any], params: Parameter
 
 def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
                          time_series_data: TimeSeriesData, 
-                         initial_research_stock_rate: float) -> Dict[str, Any]:
+                         initial_research_stock_rate: float,
+                         initial_research_stock: float) -> Dict[str, Any]:
     """
     Calculate both core and auxiliary metrics in a single comprehensive structure.
     
@@ -164,6 +167,7 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
         params: Model parameters
         time_series_data: Input time series
         initial_research_stock_rate: Initial research stock rate
+        initial_research_stock: Initial research stock value
     
     Returns:
         Dict containing both core and auxiliary metrics
@@ -174,7 +178,7 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
     
     # Add auxiliary metrics
     auxiliary_metrics = calculate_auxiliary_metrics(
-        model_results, params, time_series_data, initial_research_stock_rate
+        model_results, params, time_series_data, initial_research_stock_rate, initial_research_stock
     )
     all_metrics.update(auxiliary_metrics)
     

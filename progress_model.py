@@ -45,9 +45,6 @@ class Parameters:
     progress_at_half_sc_automation: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation'])
     automation_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_slope'])
     
-    # Research stock parameters
-    research_stock_at_simulation_start: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['research_stock_at_simulation_start'])
-    
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
     cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
@@ -103,14 +100,6 @@ class Parameters:
         else:
             # Clamp slope to reasonable range to prevent numerical instability
             self.automation_slope = np.clip(self.automation_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
-        
-        # Sanitize research stock parameters
-        if not np.isfinite(self.research_stock_at_simulation_start) or self.research_stock_at_simulation_start <= 0:
-            logger.warning(f"Invalid research_stock_at_simulation_start: {self.research_stock_at_simulation_start}, setting to 1.0")
-            
-            self.research_stock_at_simulation_start = 0.0001
-        else:
-            self.research_stock_at_simulation_start = max(cfg.RESEARCH_STOCK_START_MIN, self.research_stock_at_simulation_start)
         
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
@@ -390,6 +379,88 @@ def compute_overall_progress_rate(software_progress_rate: float, training_comput
     return software_share * software_progress_rate + (1 - software_share) * training_compute
 
 
+def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: Parameters, 
+                                   initial_progress: float = 1.0) -> float:
+    """
+    Calculate initial research stock using the formula: RS(0) = (RS'(0))^2 / RS''(0)
+    
+    Args:
+        time_series_data: Input time series data
+        params: Model parameters  
+        initial_progress: Initial cumulative progress
+        
+    Returns:
+        Calculated initial research stock value
+    """
+    try:
+        start_time = time_series_data.time[0]
+        dt = 1e-6  # Small time step for numerical differentiation
+        
+        # Get initial conditions at t=0
+        initial_automation = compute_automation_fraction(initial_progress, params)
+        L_HUMAN_0 = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
+        L_AI_0 = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
+        experiment_compute_0 = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
+        
+        cognitive_output_0 = compute_cognitive_output(
+            initial_automation, L_AI_0, L_HUMAN_0, 
+            params.rho_cognitive, params.cognitive_output_normalization
+        )
+        
+        # Calculate RS'(0)
+        rs_rate_0 = compute_research_stock_rate(
+            experiment_compute_0, cognitive_output_0, 
+            params.alpha, params.rho_progress
+        )
+        
+        # Calculate RS'(dt) for numerical differentiation
+        # Need to account for how inputs change over time
+        L_HUMAN_dt = np.interp(start_time + dt, time_series_data.time, time_series_data.L_HUMAN)
+        L_AI_dt = np.interp(start_time + dt, time_series_data.time, time_series_data.L_AI)
+        experiment_compute_dt = np.interp(start_time + dt, time_series_data.time, time_series_data.experiment_compute)
+        
+        # Automation fraction changes very little over small dt, so use same value
+        cognitive_output_dt = compute_cognitive_output(
+            initial_automation, L_AI_dt, L_HUMAN_dt,
+            params.rho_cognitive, params.cognitive_output_normalization
+        )
+        
+        rs_rate_dt = compute_research_stock_rate(
+            experiment_compute_dt, cognitive_output_dt,
+            params.alpha, params.rho_progress
+        )
+        
+        # Calculate RS''(0) using numerical differentiation
+        rs_rate_second_derivative = (rs_rate_dt - rs_rate_0) / dt
+        
+        # Avoid division by zero or very small denominators
+        if abs(rs_rate_second_derivative) < cfg.PARAM_CLIP_MIN:
+            logger.warning(f"Very small research stock second derivative: {rs_rate_second_derivative}, using fallback")
+            # Use a reasonable fallback value
+            return max(cfg.PARAM_CLIP_MIN, rs_rate_0)
+        
+        # Calculate initial research stock: RS(0) = (RS'(0))^2 / RS''(0)
+        initial_research_stock = (rs_rate_0 ** 2) / rs_rate_second_derivative
+        
+        # Ensure the result is positive and finite
+        if not np.isfinite(initial_research_stock) or initial_research_stock <= 0:
+            logger.warning(f"Invalid calculated initial research stock: {initial_research_stock}, using fallback")
+            return max(cfg.PARAM_CLIP_MIN, rs_rate_0)
+        
+        # Apply reasonable bounds
+        initial_research_stock = max(cfg.PARAM_CLIP_MIN, initial_research_stock)
+        
+        logger.info(f"Calculated initial research stock: RS(0) = {initial_research_stock:.6f} "
+                   f"(RS'(0) = {rs_rate_0:.6f}, RS''(0) = {rs_rate_second_derivative:.6f})")
+        
+        return initial_research_stock
+        
+    except Exception as e:
+        logger.error(f"Error calculating initial research stock: {e}")
+        # Fallback to a reasonable default
+        return 1.0
+
+
 def compute_automation_fraction(cumulative_progress: float, params: Parameters) -> float:
     """
     Sigmoid function for automation fraction based on cumulative progress.
@@ -443,7 +514,8 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
 
 
 def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSeriesData, params: Parameters, 
-                         initial_research_stock_rate: Optional[float] = None) -> List[float]:
+                         initial_research_stock_rate: Optional[float] = None, 
+                         initial_research_stock: Optional[float] = None) -> List[float]:
     """
     Compute instantaneous rates for both progress and research stock.
     This is the RHS of the coupled differential equation system.
@@ -454,6 +526,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         time_series_data: Input time series
         params: Model parameters
         initial_research_stock_rate: RS'(0) needed for software progress calculation
+        initial_research_stock: RS(0) calculated initial research stock value
     
     Returns:
         [dP/dt, dRS/dt] - rates for both state variables
@@ -475,7 +548,11 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
     
     if not np.isfinite(research_stock) or research_stock <= 0:
         logger.warning(f"Invalid research stock: {research_stock}")
-        research_stock = max(cfg.PARAM_CLIP_MIN, params.research_stock_at_simulation_start)
+        if initial_research_stock is not None and initial_research_stock > 0:
+            research_stock = max(cfg.PARAM_CLIP_MIN, initial_research_stock)
+        else:
+            # Fallback calculation if initial research stock not provided
+            research_stock = calculate_initial_research_stock(time_series_data, params, cumulative_progress)
     
     # Validate time is within reasonable bounds
     time_min, time_max = time_series_data.time.min(), time_series_data.time.max()
@@ -549,7 +626,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         else:
             software_progress_rate = compute_software_progress_rate(
                 research_stock, research_stock_rate, 
-                params.research_stock_at_simulation_start, initial_research_stock_rate
+                initial_research_stock, initial_research_stock_rate
             )
         
         if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
@@ -631,7 +708,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     
     def ode_func(t, y):
         try:
-            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate)
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate, initial_research_stock)
             # Validate the rates
             if len(rates) != 2 or not all(np.isfinite(rate) and rate >= 0 for rate in rates):
                 logger.warning(f"Invalid rates {rates} at time {t}, state {y}")
@@ -653,12 +730,12 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             
             # Prevent research stock from going negative or becoming extremely large
             if y[1] <= 0:
-                y[1] = max(1e-6, params.research_stock_at_simulation_start)
+                y[1] = max(1e-6, initial_research_stock)
             elif y[1] > cfg.RESEARCH_STOCK_ODE_CLAMP_MAX:
                 logger.warning(f"Research stock {y[1]} too large at time {t}, clamping")
                 y[1] = cfg.RESEARCH_STOCK_ODE_CLAMP_MAX
             
-            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate)
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate, initial_research_stock)
             
             # Clamp rates to reasonable bounds
             for i in range(len(rates)):
@@ -681,7 +758,8 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         logger.warning(f"Invalid initial progress {initial_progress}, using fallback")
         initial_progress = 1.0
     
-    initial_research_stock = params.research_stock_at_simulation_start
+    # Calculate initial research stock using RS(0) = (RS'(0))^2 / RS''(0)
+    initial_research_stock = calculate_initial_research_stock(time_series_data, params, initial_progress)
     initial_state = [initial_progress, initial_research_stock]
     
     # Try multiple integration methods with increasing robustness
@@ -736,7 +814,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             for i in range(1, n_steps):
                 try:
                     state = [progress_values[i-1], research_stock_values[i-1]]
-                    rates = progress_rate_at_time(times[i-1], state, time_series_data, params, initial_research_stock_rate)
+                    rates = progress_rate_at_time(times[i-1], state, time_series_data, params, initial_research_stock_rate, initial_research_stock)
                     
                     # Validate and clamp rates
                     for j in range(len(rates)):
@@ -890,13 +968,14 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
         else:
             # For anchor constraints, we might need to approximate or assume research stock
             # grows at a constant rate (simple approximation)
+            initial_research_stock_calc = calculate_initial_research_stock(time_series_data, params, initial_progress)
             time_elapsed = t - start_time
-            research_stock = params.research_stock_at_simulation_start + initial_research_stock_rate * time_elapsed
+            research_stock = initial_research_stock_calc + initial_research_stock_rate * time_elapsed
             research_stock = max(1e-6, research_stock)  # Ensure positive
         
         software_progress_rate = compute_software_progress_rate(
             research_stock, research_stock_rate, 
-            params.research_stock_at_simulation_start, initial_research_stock_rate
+            initial_research_stock_calc, initial_research_stock_rate
         )
         
         model_value = compute_overall_progress_rate(software_progress_rate, training_compute, params.software_progress_share)
@@ -1000,9 +1079,17 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         initial_automation, initial_L_AI, initial_L_HUMAN, 
         initial_params.rho_cognitive, initial_params.cognitive_output_normalization
     )
-    initial_software_progress_rate = compute_software_progress_rate(
+    
+    # Calculate initial research stock and rates
+    initial_research_stock_calc = calculate_initial_research_stock(time_series_data, initial_params, initial_progress)
+    initial_research_stock_rate_calc = compute_research_stock_rate(
         initial_experiment_compute, initial_cognitive_output, 
         initial_params.alpha, initial_params.rho_progress
+    )
+    
+    initial_software_progress_rate = compute_software_progress_rate(
+        initial_research_stock_calc, initial_research_stock_rate_calc, 
+        initial_research_stock_calc, initial_research_stock_rate_calc
     )
     initial_overall_rate = compute_overall_progress_rate(
         initial_software_progress_rate, initial_training_compute, 
@@ -1369,9 +1456,12 @@ class ProgressModel:
             self.params.alpha, self.params.rho_progress
         )
         
+        # Calculate initial research stock
+        initial_research_stock_val = calculate_initial_research_stock(self.data, self.params, initial_progress)
+        
         for i in range(len(times)):
             state = [progress_values[i], research_stock_values[i]]
-            rates = progress_rate_at_time(times[i], state, self.data, self.params, initial_research_stock_rate_val)
+            rates = progress_rate_at_time(times[i], state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
             progress_rates.append(rates[0])
             research_stock_rates.append(rates[1])
             

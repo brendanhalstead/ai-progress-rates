@@ -123,15 +123,7 @@
                                 </div>
                             </div>
                             
-                            <!-- Research Stock Parameters -->
-                            <div class="param-group">
-                                <h6 class="text-muted">Research Stock</h6>
-                                <div class="mb-3">
-                                    <label class="param-label">Initial Research Stock: <span id="research_stock_at_simulation_start_val">1.0</span></label>
-                                    <input type="range" class="range-input form-range" id="research_stock_at_simulation_start" min="0" max="100" step="0.01" value="0.01">
-                                    <small class="text-muted">RS(0), the initial value for the research stock state. Range: [0.1, 100].</small>
-                                </div>
-                            </div>
+
 
                             <!-- Normalization Parameters -->
                             <div class="param-group">
@@ -339,7 +331,6 @@
                                  automation_fraction_at_superhuman_coder: parseFloat($('#automation_fraction_at_superhuman_coder').val()),
                 progress_at_half_sc_automation: parseFloat($('#progress_at_half_sc_automation').val()),
                 automation_slope: parseFloat($('#automation_slope').val()),
-                research_stock_at_simulation_start: parseFloat($('#research_stock_at_simulation_start').val()),
                 cognitive_output_normalization: Math.pow(10, parseFloat($('#cognitive_output_normalization').val()))
             };
             console.log('Collected parameters:', params);
@@ -528,11 +519,7 @@
                                     const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
                                     const maxVal = parseFloat($('#' + key).attr('max')) || 10;
                                     newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (key === 'research_stock_at_simulation_start') {
-                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 100;
-                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
+                                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
                                     // Ensure elasticity values are within UI bounds [-1, 1]
                                     newValue = Math.max(-1, Math.min(1, newValue));
                                 } else if (key === 'alpha' || key === 'software_progress_share') {

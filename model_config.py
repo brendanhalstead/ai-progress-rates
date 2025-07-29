@@ -52,7 +52,6 @@ PARAMETER_BOUNDS = {
     'automation_fraction_at_superhuman_coder': (0.1, 0.95),
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
-    'research_stock_at_simulation_start': (0.1, 100),
     'cognitive_output_normalization': (0.00001, 0.1)
 }
 
@@ -108,7 +107,6 @@ DEFAULT_PARAMETERS = {
     'automation_fraction_at_superhuman_coder': 0.99,
     'progress_at_half_sc_automation': 250.0,
     'automation_slope': 2.0,
-    'research_stock_at_simulation_start': 0.00001,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
     'cognitive_output_normalization': 5e-4,
 } 
