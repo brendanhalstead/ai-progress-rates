@@ -1646,88 +1646,116 @@ class ProgressModel:
         if not self.results:
             raise ValueError("No results available. Run compute_progress_trajectory first.")
         
-        # Extract conditions
-        conditions = constraint.conditions.copy()
-
-        assert len(conditions.keys()) == 1, "Only one condition is allowed"
-
-        if conditions.get('time', None) is not None:
-            t = conditions['time']
-            # Find the closest time point in the metrics
-            times = self.results['times']
-            if t <= times[0]:
+        # Cache frequently accessed arrays to avoid repeated dictionary lookups
+        times = self.results['times']
+        
+        # Extract condition (only one allowed)
+        conditions = constraint.conditions
+        if len(conditions) != 1:
+            raise ValueError("Only one condition is allowed")
+        
+        condition_key, condition_value = next(iter(conditions.items()))
+        
+        # Optimize condition processing with direct lookup table
+        if condition_key == 'time':
+            # Already optimized with binary search
+            if condition_value <= times[0]:
                 time_idx = 0
-            elif t >= times[-1]:
+            elif condition_value >= times[-1]:
                 time_idx = len(times) - 1
             else:
-                # Interpolate to find closest index
-                time_idx = np.searchsorted(times, t)
+                time_idx = np.searchsorted(times, condition_value)
                 if time_idx > 0:
                     # Choose closer of the two neighboring points
-                    if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
+                    if abs(times[time_idx] - condition_value) > abs(times[time_idx-1] - condition_value):
                         time_idx = time_idx - 1
-        if conditions.get('automation_fraction', None) is not None:
-            # Find the closest time point in the metrics
-            times = self.results['times']
-            automation_values = self.results['automation_fraction']
-            # Find the time at which the automation fraction is closest to the condition value
-            time_idx = np.argmin(np.abs(automation_values - conditions['automation_fraction']))
-            if automation_values[time_idx] - conditions['automation_fraction'] > 0.01:
-                logger.warning(f"Automation fraction never reaches condition value")
-                return 0
+        else:
+            # For all other conditions, use optimized search
+            condition_array = self.results.get(condition_key)
+            if condition_array is None:
+                # Handle input time series conditions
+                if condition_key in ['L_HUMAN', 'L_AI', 'experiment_compute']:
+                    input_series = self.results['input_time_series'][condition_key]
+                    # Interpolate to model times for comparison
+                    condition_array = np.interp(times, self.results['input_time_series']['time'], input_series)
+                else:
+                    raise ValueError(f"Unknown condition key: {condition_key}")
             
-        elif conditions.get('L_HUMAN', None) is not None:
-            # Find the time at which the L_HUMAN is closest to the condition value
-            times = self.results['times']
-            L_HUMAN_values = self.results['L_HUMAN']
-            time_idx = np.argmin(np.abs(L_HUMAN_values - conditions['L_HUMAN']))
-            if L_HUMAN_values[time_idx] - conditions['L_HUMAN'] > 0.01:
-                logger.warning(f"L_HUMAN never reaches condition value")
-                return 0
-        elif conditions.get('L_AI', None) is not None:
-            # Find the time at which the L_AI is closest to the condition value
-            times = self.results['times']
-            L_AI_values = self.results['L_AI']
-            time_idx = np.argmin(np.abs(L_AI_values - conditions['L_AI']))
-            if L_AI_values[time_idx] - conditions['L_AI'] > 0.01:
-                logger.warning(f"L_AI never reaches condition value")
-                return 0
-        elif conditions.get('experiment_compute', None) is not None:
-            # Find the time at which the experiment compute is closest to the condition value
-            times = self.results['times']
-            experiment_compute_values = self.results['experiment_compute']
-            time_idx = np.argmin(np.abs(experiment_compute_values - conditions['experiment_compute']))
-            if experiment_compute_values[time_idx] - conditions['experiment_compute'] > 0.01:
-                logger.warning(f"Experiment compute never reaches condition value")
-                return 0
+            # Use optimized closest value search
+            time_idx = self._find_closest_index(condition_array, condition_value)
+            
+            # Check if condition value is reachable (with tolerance)
+            if abs(condition_array[time_idx] - condition_value) > 0.01:
+                logger.warning(f"{condition_key} never reaches condition value")
+                return 0.0
 
-        # Compute target variable
-        if constraint.target_variable == 'progress_rate':
-            # Use pre-computed progress rate if available, otherwise compute it
+        # Direct array access for target variable (avoid dictionary lookup)
+        target_key = constraint.target_variable
+        if target_key == 'progress_rate':
             model_value = self.results['progress_rates'][time_idx]
-                
-        elif constraint.target_variable == 'automation_fraction':
+        elif target_key == 'automation_fraction':
             model_value = self.results['automation_fraction'][time_idx]
-            
-        elif constraint.target_variable == 'cognitive_output':
+        elif target_key == 'cognitive_output':
             model_value = self.results['cognitive_outputs'][time_idx]
-                
         else:
-            raise ValueError(f"Unknown target variable: {constraint.target_variable}")
+            raise ValueError(f"Unknown target variable: {target_key}")
         
-        # Use relative error for better scaling across different variable types
+        # Optimized error calculation
         if constraint.target_value != 0:
-            # Relative error: (model - target) / target
             error = (model_value - constraint.target_value) / abs(constraint.target_value)
-            # Cap the relative error to prevent numerical issues
-            error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
+            # Use faster clipping if available
+            error = max(-cfg.RELATIVE_ERROR_CLIP, min(cfg.RELATIVE_ERROR_CLIP, error))
         else:
-            # Absolute error if target is zero to avoid division by zero
             error = model_value - constraint.target_value
         
-        logger.debug(f"Constraint evaluation: target={constraint.target_variable}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
+        logger.debug(f"Constraint evaluation: target={target_key}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
         
         return error
+    
+    def _find_closest_index(self, array: np.ndarray, target_value: float) -> int:
+        """
+        Optimized method to find closest array index to target value.
+        
+        Uses binary search when array is sorted, otherwise falls back to linear search.
+        Could be further optimized by checking monotonicity once and caching the result.
+        """
+        # Quick check if array is sorted (monotonic)
+        if len(array) > 1:
+            is_increasing = np.all(array[1:] >= array[:-1])
+            is_decreasing = np.all(array[1:] <= array[:-1])
+            
+            if is_increasing:
+                # Use binary search for increasing array
+                idx = np.searchsorted(array, target_value)
+                if idx == 0:
+                    return 0
+                elif idx == len(array):
+                    return len(array) - 1
+                else:
+                    # Choose closer of two neighboring points
+                    if abs(array[idx] - target_value) < abs(array[idx-1] - target_value):
+                        return idx
+                    else:
+                        return idx - 1
+            elif is_decreasing:
+                # Use binary search for decreasing array (search on reversed)
+                reversed_array = array[::-1]
+                reversed_idx = np.searchsorted(reversed_array, target_value)
+                if reversed_idx == 0:
+                    return len(array) - 1
+                elif reversed_idx == len(reversed_array):
+                    return 0
+                else:
+                    # Convert back to original index and choose closer point
+                    idx1 = len(array) - 1 - reversed_idx
+                    idx2 = len(array) - reversed_idx
+                    if abs(array[idx1] - target_value) < abs(array[idx2] - target_value):
+                        return idx1
+                    else:
+                        return idx2
+        
+        # Fall back to linear search for non-monotonic arrays
+        return np.argmin(np.abs(array - target_value))
     
     def evaluate_all_constraints(self, constraints: List[AnchorConstraint]) -> float:
         """
