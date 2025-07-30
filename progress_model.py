@@ -1648,73 +1648,69 @@ class ProgressModel:
         
         # Extract conditions
         conditions = constraint.conditions.copy()
-        
-        # Get evaluation time
-        t = conditions.get('time', 2025.0)
-        
-        # Find the closest time point in the metrics
-        times = self.results['times']
-        if t <= times[0]:
-            time_idx = 0
-        elif t >= times[-1]:
-            time_idx = len(times) - 1
-        else:
-            # Interpolate to find closest index
-            time_idx = np.searchsorted(times, t)
-            if time_idx > 0:
-                # Choose closer of the two neighboring points
-                if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
-                    time_idx = time_idx - 1
-        
-        # Extract values at evaluation time, using conditions if explicitly provided
-        cumulative_progress = conditions.get('cumulative_progress', self.results['progress'][time_idx])
-        research_stock = conditions.get('research_stock', self.results['research_stock'][time_idx])
-        
-        # Get automation fraction (compute if not provided, since it depends on progress)
-        if 'automation_fraction' in conditions:
-            automation_fraction = conditions['automation_fraction']
-        else:
-            automation_fraction = compute_automation_fraction(cumulative_progress, self.params)
-        
-        # Get input values for the evaluation time
-        input_series = self.results['input_time_series']
-        L_HUMAN = conditions.get('L_HUMAN', np.interp(t, input_series['time'], input_series['L_HUMAN']))
-        L_AI = conditions.get('L_AI', np.interp(t, input_series['time'], input_series['L_AI']))
-        experiment_compute = conditions.get('experiment_compute', np.interp(t, input_series['time'], input_series['experiment_compute']))
-        training_compute = conditions.get('training_compute', np.interp(t, input_series['time'], input_series['training_compute']))
-        
+
+        assert len(conditions.keys()) == 1, "Only one condition is allowed"
+
+        if conditions.get('time', None) is not None:
+            t = conditions['time']
+            # Find the closest time point in the metrics
+            times = self.results['times']
+            if t <= times[0]:
+                time_idx = 0
+            elif t >= times[-1]:
+                time_idx = len(times) - 1
+            else:
+                # Interpolate to find closest index
+                time_idx = np.searchsorted(times, t)
+                if time_idx > 0:
+                    # Choose closer of the two neighboring points
+                    if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
+                        time_idx = time_idx - 1
+        if conditions.get('automation_fraction', None) is not None:
+            # Find the closest time point in the metrics
+            times = self.results['times']
+            automation_values = self.results['automation_fraction']
+            # Find the time at which the automation fraction is closest to the condition value
+            time_idx = np.argmin(np.abs(automation_values - conditions['automation_fraction']))
+            if automation_values[time_idx] - conditions['automation_fraction'] > 0.01:
+                logger.warning(f"Automation fraction never reaches condition value")
+                return 0
+            
+        elif conditions.get('L_HUMAN', None) is not None:
+            # Find the time at which the L_HUMAN is closest to the condition value
+            times = self.results['times']
+            L_HUMAN_values = self.results['L_HUMAN']
+            time_idx = np.argmin(np.abs(L_HUMAN_values - conditions['L_HUMAN']))
+            if L_HUMAN_values[time_idx] - conditions['L_HUMAN'] > 0.01:
+                logger.warning(f"L_HUMAN never reaches condition value")
+                return 0
+        elif conditions.get('L_AI', None) is not None:
+            # Find the time at which the L_AI is closest to the condition value
+            times = self.results['times']
+            L_AI_values = self.results['L_AI']
+            time_idx = np.argmin(np.abs(L_AI_values - conditions['L_AI']))
+            if L_AI_values[time_idx] - conditions['L_AI'] > 0.01:
+                logger.warning(f"L_AI never reaches condition value")
+                return 0
+        elif conditions.get('experiment_compute', None) is not None:
+            # Find the time at which the experiment compute is closest to the condition value
+            times = self.results['times']
+            experiment_compute_values = self.results['experiment_compute']
+            time_idx = np.argmin(np.abs(experiment_compute_values - conditions['experiment_compute']))
+            if experiment_compute_values[time_idx] - conditions['experiment_compute'] > 0.01:
+                logger.warning(f"Experiment compute never reaches condition value")
+                return 0
+
         # Compute target variable
         if constraint.target_variable == 'progress_rate':
             # Use pre-computed progress rate if available, otherwise compute it
-            if time_idx < len(self.results['progress_rates']):
-                model_value = self.results['progress_rates'][time_idx]
-            else:
-                # Fallback computation (shouldn't happen with proper setup)
-                cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.cognitive_output_normalization)
-                research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, self.params.alpha, self.params.rho_progress)
-                
-                # Need initial values for software progress calculation
-                initial_research_stock = self.results['research_stock'][0]
-                initial_research_stock_rate = self.results['research_stock_rates'][0]
-                
-                software_progress_rate = compute_software_progress_rate(
-                    research_stock, research_stock_rate, 
-                    initial_research_stock, initial_research_stock_rate
-                )
-                
-                model_value = compute_overall_progress_rate(software_progress_rate, training_compute, self.params.software_progress_share)
-                model_value *= self.params.progress_rate_normalization
+            model_value = self.results['progress_rates'][time_idx]
                 
         elif constraint.target_variable == 'automation_fraction':
-            model_value = automation_fraction
+            model_value = self.results['automation_fraction'][time_idx]
             
         elif constraint.target_variable == 'cognitive_output':
-            # Use pre-computed cognitive output if available
-            if time_idx < len(self.results['cognitive_outputs']):
-                model_value = self.results['cognitive_outputs'][time_idx]
-            else:
-                # Fallback computation
-                model_value = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.cognitive_output_normalization)
+            model_value = self.results['cognitive_outputs'][time_idx]
                 
         else:
             raise ValueError(f"Unknown target variable: {constraint.target_variable}")
