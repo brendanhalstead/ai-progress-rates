@@ -50,7 +50,7 @@ RELATIVE_ERROR_CLIP = 100.0
 
 # Parameter bounds for optimization
 PARAMETER_BOUNDS = {
-    'rho_cognitive': (-1, 0),
+    'rho_cognitive': (-10, 0),
     'rho_progress': (-1, 1),
     'alpha': (0.05, 0.95),
     'software_progress_share': (0.05, 0.95),
@@ -105,7 +105,7 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # DEFAULT MODEL PARAMETERS
 # =============================================================================
 DEFAULT_PARAMETERS = {
-    'rho_cognitive': -0.2,
+    'rho_cognitive': -2,
     'rho_progress': -0.1,
     'alpha': 0.5,
     'software_progress_share': 0.5,
