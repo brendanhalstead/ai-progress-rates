@@ -233,20 +233,7 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- Results Summary -->
-                <div class="summary-card">
-                    <h6>Model Results</h6>
-                    <div id="resultsSummary">
-                        <div>Run model to see results</div>
-                    </div>
-                    <div class="mt-2" id="parameterImpact" style="display: none;">
-                        <small class="text-light">
-                            <strong>Parameter Impact:</strong><br>
-                            <span id="impactText"></span>
-                        </small>
-                    </div>
-                </div>
+
             </div>
             
             <!-- Right Panel: Visualization -->
@@ -398,7 +385,6 @@
                                 modeBarButtonsToRemove: ['pan2d', 'lasso2d']
                             });
                         }
-                        updateResultsSummary(response.summary);
                     } else {
                         showError(response.error);
                     }
@@ -614,7 +600,6 @@
                                     modeBarButtonsToRemove: ['pan2d', 'lasso2d']
                                 });
                             }
-                            updateResultsSummary(response.summary);
                         }
                         
                         // Show parameter changes in validation area
@@ -705,40 +690,7 @@
             window.location.href = '/api/export-csv';
         }
         
-        // Store previous results for comparison
-        let previousResults = null;
-        
-        function updateResultsSummary(summary) {
-            $('#resultsSummary').html(
-                `<div><strong>Final Progress:</strong> ${summary.final_progress.toExponential(2)}</div>` +
-                `<div><strong>Final Automation:</strong> ${(summary.final_automation * 100).toFixed(1)}%</div>` +
-                `<div><strong>Avg Progress Rate:</strong> ${summary.avg_progress_rate.toExponential(2)}</div>` +
-                `<div><strong>Time Range:</strong> ${summary.time_range[0]} - ${summary.time_range[1]}</div>`
-            );
-            
-            // Show change from previous results
-            if (previousResults) {
-                const progressChange = ((summary.final_progress - previousResults.final_progress) / previousResults.final_progress * 100);
-                const rateChange = ((summary.avg_progress_rate - previousResults.avg_progress_rate) / previousResults.avg_progress_rate * 100);
-                
-                let changeText = '';
-                if (Math.abs(progressChange) > 1) {
-                    changeText += `Progress: ${progressChange > 0 ? '+' : ''}${progressChange.toFixed(1)}%<br>`;
-                }
-                if (Math.abs(rateChange) > 1) {
-                    changeText += `Rate: ${rateChange > 0 ? '+' : ''}${rateChange.toFixed(1)}%`;
-                }
-                
-                if (changeText) {
-                    $('#impactText').html(changeText);
-                    $('#parameterImpact').show();
-                } else {
-                    $('#parameterImpact').hide();
-                }
-            }
-            
-            previousResults = summary;
-        }
+
         
         function populateFixedParamsCheckboxes() {
             const params = {
