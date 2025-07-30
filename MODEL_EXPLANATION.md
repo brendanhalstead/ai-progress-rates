@@ -8,12 +8,12 @@ The model is built around a core system of coupled ordinary differential equatio
 
 1.  **Inputs**: The model takes time-series data for human labor, AI labor (in human-equivalents), and compute resources (for experiments and training).
 2.  **Production Functions**: A series of nested Constant Elasticity of Substitution (CES) production functions combine these inputs to produce rates of change.
-3.  **Research Stock**: A new state variable, "research stock," represents the accumulated knowledge and algorithmic sophistication. This stock grows based on research inputs (cognitive labor and experiment compute).
-4.  **Software Progress**: The rate of "software progress" is no longer a direct output of a production function. Instead, it is derived from the growth of the research stock, modeling progress as the rate of *improvement relative to* the existing knowledge base.
+3.  **Research Stock**: A core state variable representing accumulated knowledge and algorithmic sophistication. This stock grows based on research inputs (cognitive labor and experiment compute).
+4.  **Software Progress**: The rate of "software progress" is dynamically derived from the growth of the research stock, modeling progress as the rate of *improvement relative to* the existing knowledge base.
 5.  **Automation Feedback Loop**: As cumulative AI progress (`P`) accumulates, it enables greater automation of cognitive tasks. This increased automation, in turn, amplifies the effective labor input, which accelerates the growth of both research stock and overall progress.
 6.  **Integration**: The model integrates the instantaneous rates over time to calculate the two core state variables: cumulative AI progress (`P`) and cumulative research stock (`RS`).
 
-The model's dynamics are governed by a set of parameters that define the relationships between its components. These parameters can be estimated by constraining the model to match certain "anchor points"—plausible real-world observations or expert judgments.
+The model includes extensive numerical safeguards and robust parameter estimation capabilities to ensure stable computation across a wide range of parameter values and scenarios.
 
 ## 2. Core Components and Equations
 
@@ -39,6 +39,8 @@ Where:
     -   If \( \rho_{cog} \to 0 \), the function approaches a Cobb-Douglas form: \( C \propto \left(\frac{L_{AI}}{a}\right)^a \cdot \left(\frac{L_{human}}{1-a}\right)^{1-a} \).
     -   If \( \rho_{cog} \to -\infty \), they are perfect complements (Leontief): \( C \propto \min\left(\frac{L_{AI}}{a}, \frac{L_{human}}{1-a}\right) \).
 -   \( N_{cognitive} \): A normalization constant (`cognitive_output_normalization`).
+
+**Numerical Safeguards**: The implementation includes extensive edge-case handling for extreme rho values, overflow protection, and bounds checking to ensure numerical stability.
 
 ### 2.2. Research Stock Growth Rate (RS')
 
@@ -67,26 +69,25 @@ Where:
 -   \( S(t) \): The software progress rate at time \(t\).
 -   \( RS(t) \): The research stock at time \(t\).
 -   \( RS'(t) \): The growth rate of research stock at time \(t\).
--   \( RS(0), RS'(0) \): The initial values of the research stock and its growth rate, used for normalization (see Section 2.3.1).
+-   \( RS(0), RS'(0) \): The initial values of the research stock and its growth rate, used for normalization.
 
 #### 2.3.1. Initial Research Stock Calculation
 
-Unlike other model parameters, the initial research stock \( RS(0) \) is not user-configurable. Instead, it is calculated dynamically at the beginning of each simulation using the formula:
+The initial research stock \( RS(0) \) is calculated dynamically at the beginning of each simulation using a robust method that accounts for the model's dynamics:
 
 \[
 RS(0) = \frac{[RS'(0)]^2}{RS''(0)}
 \]
 
 Where:
--   \( RS'(0) \): The initial research stock growth rate, calculated using the research production function at \( t=0 \) with initial values for cognitive output and experiment compute.
--   \( RS''(0) \): The second derivative of the research stock rate at \( t=0 \), computed via numerical differentiation by evaluating \( RS'(t) \) at \( t=0 \) and \( t=dt \) where \( dt \) is a small time step.
+-   \( RS'(0) \): The initial research stock growth rate, calculated using the research production function at \( t=0 \).
+-   \( RS''(0) \): The second derivative of the research stock rate at \( t=0 \), computed via numerical differentiation.
 
-This approach ensures that the initial research stock is determined endogenously by the model's structure and initial conditions, rather than being an arbitrary parameter. The formula reflects the relationship between the stock level, its growth rate, and the acceleration of that growth rate at the simulation's starting point.
-
-**Implementation Details:**
-- The calculation uses numerical differentiation with a small time step (\( dt = 10^{-6} \)) to approximate \( RS''(0) \).
-- Robust error handling ensures the calculation produces a positive, finite value.
-- If the second derivative is too small (indicating numerical instability), the system falls back to using \( RS'(0) \) as the initial research stock.
+**Implementation Features**:
+- Uses numerical differentiation with a small time step (\( dt = 10^{-6} \)) for stability
+- Includes robust error handling with fallback strategies
+- Ensures the calculation produces positive, finite values
+- Falls back to using \( RS'(0) \) as the initial research stock if numerical instability is detected
 
 ### 2.4. Overall Progress Rate (R)
 
@@ -118,6 +119,8 @@ Where:
 -   \( P_{mid} \): The level of cumulative progress at which automation reaches half of its maximum value, L/2 (`progress_at_half_sc_automation`).
 -   \( k \): The growth rate or steepness of the sigmoid curve (`automation_slope`).
 
+**Numerical Safeguards**: The implementation includes overflow protection for extreme exponent values and fallback linear interpolation if exponential calculations fail.
+
 ## 3. Integration and System Dynamics
 
 The core of the model is a system of coupled ordinary differential equations (ODEs) that tie all the components together. The state of the system is defined by two variables: cumulative progress \( P \) and research stock \( RS \).
@@ -129,16 +132,77 @@ The core of the model is a system of coupled ordinary differential equations (OD
 \frac{dRS}{dt} = RS'(t, P)
 \]
 
-These equations are solved numerically.
+**Robust Integration Strategy**: The implementation uses a multi-tier approach:
+1. Attempts a sequence of SciPy integrators with progressively looser tolerances (RK45, RK23, DOP853, Radau)
+2. Each RHS evaluation includes state and derivative clamping for numerical stability
+3. Falls back to custom Euler integration with adaptive step sizing if all SciPy solvers fail
+4. Includes comprehensive step size logging and performance monitoring
+
+These equations are solved numerically with extensive safeguards:
 - The progress rate \( \frac{dP}{dt} \) depends on time \( t \) (via inputs), cumulative progress \( P \) (via the automation fraction in cognitive output), and the research stock \( RS \) (via the software progress rate).
 - The research stock rate \( \frac{dRS}{dt} \) depends on time \( t \) (via inputs) and cumulative progress \( P \) (via the automation fraction).
 
 This system of coupled equations creates the model's rich, non-linear dynamics, where progress in one area feeds back to accelerate others.
 
-## 4. Parameter Estimation
+## 4. Parameter Estimation and Validation
 
-The model's behavior is sensitive to its parameters (e.g., \( \rho_{cog}, \rho_{prog}, \alpha \)). Since their true values are unknown, the script provides a mechanism to estimate them using `estimate_parameters`.
+The model includes a sophisticated parameter estimation system that can calibrate parameters to match empirical anchor points or expert judgments.
 
-This function takes a set of **anchor constraints**—user-defined targets for the model's output under specific conditions. For example, a constraint might state: "When the automation fraction is 90% and AI labor is 1 billion, the progress rate should be 5.0."
+### 4.1. Anchor Constraint System
 
-The estimation process uses numerical optimization (specifically, the L-BFGS-B algorithm) to find a set of parameters that minimizes the squared error between the model's outputs and the targets defined by the anchor constraints. This allows the model to be calibrated against expert knowledge or empirical data. 
+**Anchor constraints** allow users to specify targets for the model's output under specific conditions. For example: "When the automation fraction is 90% and AI labor is 1 billion, the progress rate should be 5.0."
+
+### 4.2. Robust Optimization
+
+The estimation process includes:
+- **Multi-method optimization**: Primary L-BFGS-B with automatic fallbacks to TNC and SLSQP
+- **Strategic starting points**: Diverse initial parameter vectors using extremes, Latin hypercube sampling, and constraint-informed guesses
+- **Regularization**: Quartic penalties for extreme elasticities and quadratic penalties for boundary-clinging parameters
+- **Constraint pre-screening**: Physical plausibility checks to exclude infeasible constraints
+- **Early termination**: Stops optimization when excellent parameter sets are found
+
+### 4.3. Parameter Validation
+
+Comprehensive validation includes:
+- **Physical constraints**: Parameters must fall within economically and physically meaningful ranges
+- **Numerical stability checks**: Parameter combinations are tested for mathematical stability
+- **Cross-parameter validation**: Checks for parameter combinations that cause numerical instability
+- **Automatic sanitization**: Invalid parameters are automatically corrected with warnings
+
+## 5. Model Configuration and Extensibility
+
+The model uses a comprehensive configuration system (`model_config.py`) that allows fine-tuning of:
+- **Numerical stability parameters**: Thresholds for numerical edge cases
+- **Integration settings**: ODE solver tolerances and fallback strategies  
+- **Parameter bounds**: Valid ranges for all model parameters
+- **Optimization settings**: Regularization weights and termination criteria
+- **Performance monitoring**: Step size logging and diagnostic controls
+
+This configuration-driven approach ensures the model can be adapted for different use cases while maintaining numerical stability and robustness.
+
+## 6. Enhanced Features
+
+### 6.1. Comprehensive Metrics Calculation
+
+The model now calculates and tracks:
+- Human-only progress rates (counterfactual without AI automation)
+- Individual labor contributions (AI vs human)
+- Automation progress multipliers
+- Research stock dynamics
+- Software vs training progress components
+
+### 6.2. Robust Error Handling
+
+- Graceful degradation when numerical issues arise
+- Detailed error messages with suggested parameter adjustments
+- Automatic fallback to stable parameter combinations
+- Comprehensive logging for debugging and performance analysis
+
+### 6.3. Validation and Testing
+
+- Parameter combination feasibility checking
+- Constraint satisfaction verification
+- Integration stability validation
+- Performance benchmarking and optimization
+
+The model represents a sophisticated, numerically stable, and highly configurable framework for exploring AI progress scenarios with extensive validation and robust parameter estimation capabilities. 
