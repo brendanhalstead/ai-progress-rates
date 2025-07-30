@@ -157,6 +157,9 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
                          initial_research_stock_rate: float,
                          initial_research_stock: float) -> Dict[str, Any]:
     """
+    DEPRECATED: This function is deprecated. Use ProgressModel.compute_progress_trajectory() instead,
+    which computes all metrics in a single pass without redundancy.
+    
     Calculate both core and auxiliary metrics in a single comprehensive structure.
     
     This is a convenience function that combines core model results with 
@@ -172,6 +175,13 @@ def calculate_all_metrics(model_results: Dict[str, Any], params: Parameters,
     Returns:
         Dict containing both core and auxiliary metrics
     """
+    import warnings
+    warnings.warn(
+        "calculate_all_metrics is deprecated. Use ProgressModel.compute_progress_trajectory() instead, "
+        "which computes all metrics efficiently in a single pass.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     
     # Start with core model results
     all_metrics = model_results.copy()

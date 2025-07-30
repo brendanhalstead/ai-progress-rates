@@ -30,7 +30,6 @@ from progress_model import (
     compute_research_stock_rate, compute_overall_progress_rate,
     calculate_initial_research_stock, setup_model_with_normalization, compute_initial_conditions
 )
-from metrics_calculator import calculate_all_metrics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -491,6 +490,8 @@ def compute_model():
                 time_range, initial_progress
             )
             
+            # All metrics are now available in model.results - no need for separate calculation
+            
             # Validate results
             if len(times) == 0 or len(progress_values) == 0:
                 logger.error("Model computation produced no results")
@@ -578,10 +579,8 @@ def compute_model():
                 ]
             }), 500
         
-        # Calculate all metrics using the dedicated metrics calculator
-        all_metrics = calculate_all_metrics(
-            model.results, params, time_series, initial_research_stock_rate, initial_research_stock_calc
-        )
+        # All metrics are now computed by ProgressModel - use them directly
+        all_metrics = model.results
         
         # Store results (including auxiliary metrics for potential export)
         session_data['current_params'] = params
@@ -693,14 +692,8 @@ def estimate_params():
                     time_range, initial_progress
                 )
                 
-                # Get initial conditions for metrics calculation
-                initial_conditions = compute_initial_conditions(time_series, estimated_params, initial_progress)
-                initial_research_stock_rate = initial_conditions.research_stock_rate
-                
-                # Calculate all metrics
-                all_metrics = calculate_all_metrics(
-                    model.results, estimated_params, time_series, initial_research_stock_rate, initial_research_stock_calc
-                )
+                # All metrics are now computed by ProgressModel - use them directly
+                all_metrics = model.results
                 
                 # Store results
                 session_data['results'] = all_metrics

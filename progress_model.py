@@ -611,7 +611,7 @@ def setup_model_with_normalization(time_series_data: TimeSeriesData, params: Par
     # Calculate and set progress rate normalization
     params.progress_rate_normalization = compute_progress_rate_normalization(initial_conditions, params)
     
-    logger.info(f"Calculated progress_rate_normalization: {params.progress_rate_normalization}")
+    # logger.info(f"Calculated progress_rate_normalization: {params.progress_rate_normalization}")
     
     return params, initial_conditions
 
@@ -1176,6 +1176,109 @@ def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: T
     return error
 
 
+def evaluate_anchor_constraint_with_metrics(constraint: AnchorConstraint, all_metrics: Dict[str, Any], params: Parameters) -> float:
+    """
+    Evaluate model at specified conditions using pre-computed metrics.
+    This is a simplified version that avoids redundant integration and computation.
+    
+    Args:
+        constraint: Constraint specification
+        all_metrics: Pre-computed metrics from calculate_all_metrics
+        params: Model parameters
+    
+    Returns:
+        Error (model_value - target_value)
+    """
+    # Extract conditions
+    conditions = constraint.conditions.copy()
+    
+    # Get evaluation time
+    t = conditions.get('time', 2025.0)
+    
+    # Find the closest time point in the metrics
+    times = all_metrics['times']
+    if t <= times[0]:
+        # Use first time point
+        time_idx = 0
+    elif t >= times[-1]:
+        # Use last time point  
+        time_idx = len(times) - 1
+    else:
+        # Interpolate to find closest index
+        time_idx = np.searchsorted(times, t)
+        if time_idx > 0:
+            # Choose closer of the two neighboring points
+            if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
+                time_idx = time_idx - 1
+    
+    # Extract values at evaluation time, using conditions if explicitly provided
+    cumulative_progress = conditions.get('cumulative_progress', all_metrics['progress'][time_idx])
+    research_stock = conditions.get('research_stock', all_metrics['research_stock'][time_idx])
+    
+    # Get automation fraction (compute if not provided, since it depends on progress)
+    if 'automation_fraction' in conditions:
+        automation_fraction = conditions['automation_fraction']
+    else:
+        automation_fraction = compute_automation_fraction(cumulative_progress, params)
+    
+    # Get input values for the evaluation time
+    input_series = all_metrics['input_time_series']
+    L_HUMAN = conditions.get('L_HUMAN', np.interp(t, input_series['time'], input_series['L_HUMAN']))
+    L_AI = conditions.get('L_AI', np.interp(t, input_series['time'], input_series['L_AI']))
+    experiment_compute = conditions.get('experiment_compute', np.interp(t, input_series['time'], input_series['experiment_compute']))
+    training_compute = conditions.get('training_compute', np.interp(t, input_series['time'], input_series['training_compute']))
+    
+    # Compute target variable
+    if constraint.target_variable == 'progress_rate':
+        # Use pre-computed progress rate if available, otherwise compute it
+        if time_idx < len(all_metrics['progress_rates']):
+            model_value = all_metrics['progress_rates'][time_idx]
+        else:
+            # Fallback computation (shouldn't happen with proper setup)
+            cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
+            research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress)
+            
+            # Need initial values for software progress calculation
+            initial_research_stock = all_metrics['research_stock'][0]
+            initial_research_stock_rate = all_metrics['research_stock_rates'][0]
+            
+            software_progress_rate = compute_software_progress_rate(
+                research_stock, research_stock_rate, 
+                initial_research_stock, initial_research_stock_rate
+            )
+            
+            model_value = compute_overall_progress_rate(software_progress_rate, training_compute, params.software_progress_share)
+            model_value *= params.progress_rate_normalization
+            
+    elif constraint.target_variable == 'automation_fraction':
+        model_value = automation_fraction
+        
+    elif constraint.target_variable == 'cognitive_output':
+        # Use pre-computed cognitive output if available
+        if time_idx < len(all_metrics['cognitive_outputs']):
+            model_value = all_metrics['cognitive_outputs'][time_idx]
+        else:
+            # Fallback computation
+            model_value = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
+            
+    else:
+        raise ValueError(f"Unknown target variable: {constraint.target_variable}")
+    
+    # Use relative error for better scaling across different variable types
+    if constraint.target_value != 0:
+        # Relative error: (model - target) / target
+        error = (model_value - constraint.target_value) / abs(constraint.target_value)
+        # Cap the relative error to prevent numerical issues
+        error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
+    else:
+        # Absolute error if target is zero to avoid division by zero
+        error = model_value - constraint.target_value
+    
+    logger.debug(f"Constraint evaluation (with metrics): target={constraint.target_variable}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
+    
+    return error
+
+
 def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_data: TimeSeriesData, 
                        initial_params: Parameters, initial_progress: float = 1.0, fixed_params: Optional[List[str]] = None) -> Tuple[Parameters, List[Dict[str, Any]]]:
     """
@@ -1327,32 +1430,47 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         
         params = Parameters(**params_dict)
         
-        # Evaluate constraints
-        total_error = 0.0
-        for i, constraint in enumerate(anchor_constraints):
-            try:
-                error = evaluate_anchor_constraint(constraint, time_series_data, params, initial_progress)
-                weighted_error = constraint.weight * (error ** 2)
-                total_error += weighted_error
-                logger.debug(f"Constraint {i+1}: error={error:.6f}, weighted_error={weighted_error:.6f}")
-            except Exception as e:
-                logger.warning(f"Error evaluating constraint {i+1}: {e}")
-                return cfg.OBJECTIVE_FUNCTION_CONFIG['high_penalty']  # High penalty for constraint evaluation failures
-        
-        # Add regularization to prevent extreme parameter values
-        regularization = 0.0
-        for i, (name, value) in enumerate(zip(param_names, x)):
-            if name in ['rho_cognitive', 'rho_progress']:
-                # Penalize extreme elasticity values more strongly
-                regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['elasticity_regularization_weight'] * (value ** 4)  # Quartic penalty for elasticities
-            elif name in ['alpha', 'software_progress_share']:
-                # Penalize values near boundaries (0 or 1)
-                distance_from_center = abs(value - 0.5)
-                if distance_from_center > cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']:  # Tighter boundary avoidance
-                    regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_regularization_weight'] * ((distance_from_center - cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']) ** 2)
-        
-        # return total_error + regularization
-        return total_error
+        try:
+            # Set up model with proper normalization
+            normalized_params, initial_conditions = setup_model_with_normalization(
+                time_series_data, params, initial_progress
+            )
+            
+            # Determine time range needed for all constraints
+            constraint_times = []
+            for constraint in anchor_constraints:
+                t = constraint.conditions.get('time', 2025.0)
+                constraint_times.append(t)
+            
+            start_time = time_series_data.time[0]
+            end_time = max(max(constraint_times), time_series_data.time[-1])
+            time_range = [start_time, end_time]
+            
+            # Use ProgressModel to compute trajectory and all metrics in one pass
+            model = ProgressModel(normalized_params, time_series_data)
+            model.compute_progress_trajectory(time_range, initial_progress)
+            
+            # Evaluate all constraints using the model's built-in methods
+            total_error = model.evaluate_all_constraints(anchor_constraints)
+            
+            # Add regularization to prevent extreme parameter values
+            regularization = 0.0
+            for i, (name, value) in enumerate(zip(param_names, x)):
+                if name in ['rho_cognitive', 'rho_progress']:
+                    # Penalize extreme elasticity values more strongly
+                    regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['elasticity_regularization_weight'] * (value ** 4)  # Quartic penalty for elasticities
+                elif name in ['alpha', 'software_progress_share']:
+                    # Penalize values near boundaries (0 or 1)
+                    distance_from_center = abs(value - 0.5)
+                    if distance_from_center > cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']:  # Tighter boundary avoidance
+                        regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_regularization_weight'] * ((distance_from_center - cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']) ** 2)
+            
+            # return total_error + regularization
+            return total_error
+            
+        except Exception as e:
+            logger.warning(f"Error in objective function: {e}")
+            return cfg.OBJECTIVE_FUNCTION_CONFIG['high_penalty']
     
     # Initial values and bounds for optimization
     x0 = [getattr(initial_params, name) for name in param_names]
@@ -1565,7 +1683,7 @@ class ProgressModel:
         
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Compute progress over specified time range
+        Compute progress over specified time range with comprehensive metrics
         
         Args:
             time_range: [start_time, end_time]
@@ -1579,35 +1697,258 @@ class ProgressModel:
         
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
-        # Calculate rates at each time step
-        progress_rates = []
-        research_stock_rates = []
-        
         # Use utility function to compute initial conditions
         initial_conditions = compute_initial_conditions(self.data, self.params, initial_progress)
         initial_research_stock_rate_val = initial_conditions.research_stock_rate
         initial_research_stock_val = initial_conditions.research_stock
         
-        for i in range(len(times)):
-            state = [progress_values[i], research_stock_values[i]]
-            rates = progress_rate_at_time(times[i], state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
-            progress_rates.append(rates[0])
-            research_stock_rates.append(rates[1])
-            
-        # Store results
-        self.results['times'] = times
-        self.results['progress'] = progress_values
-        self.results['research_stock'] = research_stock_values
-        self.results['automation_fraction'] = [compute_automation_fraction(p, self.params) for p in progress_values]
-        self.results['progress_rates'] = progress_rates
-        self.results['research_stock_rates'] = research_stock_rates
+        # Calculate all metrics in a single pass to avoid redundancy
+        progress_rates = []
+        research_stock_rates = []
+        automation_fractions = []
+        cognitive_outputs = []
+        software_progress_rates = []
+        human_only_progress_rates = []
+        ai_labor_contributions = []
+        human_labor_contributions = []
         
-        logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
-        logger.info(f"Progress: {progress_values[0]:.3f} -> {progress_values[-1]:.3f}")
-        logger.info(f"Research Stock: {research_stock_values[0]:.3f} -> {research_stock_values[-1]:.3f}")
-        logger.info(f"Automation: {self.results['automation_fraction'][0]:.3f} -> {self.results['automation_fraction'][-1]:.3f}")
+        # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
+        
+        for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
+            try:
+                state = [p, rs]
+                rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
+                progress_rates.append(rates[0])
+                research_stock_rates.append(rates[1])
+                
+                # Compute automation fraction
+                automation_fraction = compute_automation_fraction(p, self.params)
+                automation_fractions.append(automation_fraction)
+                
+                # Interpolate input time series to current time
+                L_HUMAN = np.interp(t, self.data.time, self.data.L_HUMAN)
+                L_AI = np.interp(t, self.data.time, self.data.L_AI)
+                experiment_compute = np.interp(t, self.data.time, self.data.experiment_compute)
+                training_compute = np.interp(t, self.data.time, self.data.training_compute)
+                
+                # Compute cognitive output
+                cognitive_output = compute_cognitive_output(
+                    automation_fraction, L_AI, L_HUMAN, 
+                    self.params.rho_cognitive, self.params.cognitive_output_normalization
+                )
+                cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
+                
+                # Compute software progress rate
+                current_research_stock_rate = research_stock_rates[i]
+                software_rate = compute_software_progress_rate(
+                    rs, current_research_stock_rate, 
+                    initial_research_stock_val, 
+                    initial_research_stock_rate_val
+                )
+                software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
+                
+                # Calculate human-only progress rate (with automation fraction = 0)
+                human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
+                human_only_research_stock_rate = compute_research_stock_rate(
+                    experiment_compute, human_only_cognitive_output, 
+                    self.params.alpha, self.params.rho_progress
+                )
+                human_only_software_rate = compute_software_progress_rate(
+                    rs, human_only_research_stock_rate,
+                    initial_research_stock_val,
+                    initial_research_stock_rate_val
+                )
+                human_only_overall_rate = compute_overall_progress_rate(
+                    human_only_software_rate, training_compute, self.params.software_progress_share
+                ) * self.params.progress_rate_normalization
+                
+                human_only_progress_rates.append(
+                    human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0
+                )
+                
+                # Calculate labor contributions to cognitive output
+                human_contrib = L_HUMAN * self.params.cognitive_output_normalization
+                ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
+                
+                human_labor_contributions.append(human_contrib)
+                ai_labor_contributions.append(ai_contrib)
+                
+            except Exception as e:
+                logger.warning(f"Error calculating metrics at t={t}: {e}")
+                # Use safe fallback values
+                if len(progress_rates) <= i:
+                    progress_rates.append(0.0)
+                if len(research_stock_rates) <= i:
+                    research_stock_rates.append(0.0)
+                automation_fractions.append(0.0)
+                cognitive_outputs.append(0.0)
+                software_progress_rates.append(0.0)
+                human_only_progress_rates.append(0.0)
+                human_labor_contributions.append(0.0)
+                ai_labor_contributions.append(0.0)
+        
+        # Calculate automation multipliers (overall rate / human-only rate)
+        automation_multipliers = []
+        for i in range(len(progress_rates)):
+            if human_only_progress_rates[i] > 0:
+                multiplier = progress_rates[i] / human_only_progress_rates[i]
+                automation_multipliers.append(multiplier if np.isfinite(multiplier) else 1.0)
+            else:
+                automation_multipliers.append(1.0)  # No multiplier if human-only rate is zero
+            
+        # Store comprehensive results
+        self.results = {
+            'times': times,
+            'progress': progress_values,
+            'research_stock': research_stock_values,
+            'automation_fraction': automation_fractions,
+            'progress_rates': progress_rates,
+            'research_stock_rates': research_stock_rates,
+            'cognitive_outputs': cognitive_outputs,
+            'software_progress_rates': software_progress_rates,
+            'human_only_progress_rates': human_only_progress_rates,
+            'ai_labor_contributions': ai_labor_contributions,
+            'human_labor_contributions': human_labor_contributions,
+            'automation_multipliers': automation_multipliers,
+            'input_time_series': {
+                'time': self.data.time,
+                'L_HUMAN': self.data.L_HUMAN,
+                'L_AI': self.data.L_AI,
+                'experiment_compute': self.data.experiment_compute,
+                'training_compute': self.data.training_compute
+            }
+        }
+        
+        # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
+        # logger.info(f"Progress: {progress_values[0]:.3f} -> {progress_values[-1]:.3f}")
+        # logger.info(f"Research Stock: {research_stock_values[0]:.3f} -> {research_stock_values[-1]:.3f}")
+        # logger.info(f"Automation: {automation_fractions[0]:.3f} -> {automation_fractions[-1]:.3f}")
         
         return times, progress_values, research_stock_values
+    
+    def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:
+        """
+        Evaluate an anchor constraint using pre-computed metrics.
+        
+        Args:
+            constraint: Constraint specification
+            
+        Returns:
+            Error (model_value - target_value), normalized if target != 0
+        """
+        if not self.results:
+            raise ValueError("No results available. Run compute_progress_trajectory first.")
+        
+        # Extract conditions
+        conditions = constraint.conditions.copy()
+        
+        # Get evaluation time
+        t = conditions.get('time', 2025.0)
+        
+        # Find the closest time point in the metrics
+        times = self.results['times']
+        if t <= times[0]:
+            time_idx = 0
+        elif t >= times[-1]:
+            time_idx = len(times) - 1
+        else:
+            # Interpolate to find closest index
+            time_idx = np.searchsorted(times, t)
+            if time_idx > 0:
+                # Choose closer of the two neighboring points
+                if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
+                    time_idx = time_idx - 1
+        
+        # Extract values at evaluation time, using conditions if explicitly provided
+        cumulative_progress = conditions.get('cumulative_progress', self.results['progress'][time_idx])
+        research_stock = conditions.get('research_stock', self.results['research_stock'][time_idx])
+        
+        # Get automation fraction (compute if not provided, since it depends on progress)
+        if 'automation_fraction' in conditions:
+            automation_fraction = conditions['automation_fraction']
+        else:
+            automation_fraction = compute_automation_fraction(cumulative_progress, self.params)
+        
+        # Get input values for the evaluation time
+        input_series = self.results['input_time_series']
+        L_HUMAN = conditions.get('L_HUMAN', np.interp(t, input_series['time'], input_series['L_HUMAN']))
+        L_AI = conditions.get('L_AI', np.interp(t, input_series['time'], input_series['L_AI']))
+        experiment_compute = conditions.get('experiment_compute', np.interp(t, input_series['time'], input_series['experiment_compute']))
+        training_compute = conditions.get('training_compute', np.interp(t, input_series['time'], input_series['training_compute']))
+        
+        # Compute target variable
+        if constraint.target_variable == 'progress_rate':
+            # Use pre-computed progress rate if available, otherwise compute it
+            if time_idx < len(self.results['progress_rates']):
+                model_value = self.results['progress_rates'][time_idx]
+            else:
+                # Fallback computation (shouldn't happen with proper setup)
+                cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.cognitive_output_normalization)
+                research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, self.params.alpha, self.params.rho_progress)
+                
+                # Need initial values for software progress calculation
+                initial_research_stock = self.results['research_stock'][0]
+                initial_research_stock_rate = self.results['research_stock_rates'][0]
+                
+                software_progress_rate = compute_software_progress_rate(
+                    research_stock, research_stock_rate, 
+                    initial_research_stock, initial_research_stock_rate
+                )
+                
+                model_value = compute_overall_progress_rate(software_progress_rate, training_compute, self.params.software_progress_share)
+                model_value *= self.params.progress_rate_normalization
+                
+        elif constraint.target_variable == 'automation_fraction':
+            model_value = automation_fraction
+            
+        elif constraint.target_variable == 'cognitive_output':
+            # Use pre-computed cognitive output if available
+            if time_idx < len(self.results['cognitive_outputs']):
+                model_value = self.results['cognitive_outputs'][time_idx]
+            else:
+                # Fallback computation
+                model_value = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.cognitive_output_normalization)
+                
+        else:
+            raise ValueError(f"Unknown target variable: {constraint.target_variable}")
+        
+        # Use relative error for better scaling across different variable types
+        if constraint.target_value != 0:
+            # Relative error: (model - target) / target
+            error = (model_value - constraint.target_value) / abs(constraint.target_value)
+            # Cap the relative error to prevent numerical issues
+            error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
+        else:
+            # Absolute error if target is zero to avoid division by zero
+            error = model_value - constraint.target_value
+        
+        logger.debug(f"Constraint evaluation: target={constraint.target_variable}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
+        
+        return error
+    
+    def evaluate_all_constraints(self, constraints: List[AnchorConstraint]) -> float:
+        """
+        Evaluate all anchor constraints and return total weighted error.
+        
+        Args:
+            constraints: List of anchor constraints
+            
+        Returns:
+            Total weighted squared error
+        """
+        total_error = 0.0
+        for i, constraint in enumerate(constraints):
+            try:
+                error = self.evaluate_anchor_constraint(constraint)
+                weighted_error = constraint.weight * (error ** 2)
+                total_error += weighted_error
+                logger.debug(f"Constraint {i+1}: error={error:.6f}, weighted_error={weighted_error:.6f}")
+            except Exception as e:
+                logger.warning(f"Error evaluating constraint {i+1}: {e}")
+                # Return high penalty for constraint evaluation failures
+                return cfg.OBJECTIVE_FUNCTION_CONFIG['high_penalty']
+        
+        return total_error
     
     def plot_results(self, comprehensive: bool = False, save_path: Optional[str] = None):
         """Visualize progress, automation fraction, and component contributions"""
