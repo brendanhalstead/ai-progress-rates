@@ -806,26 +806,20 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h6>Conditions</h6>
+                                <h6>Condition</h6>
                                 <div class="mb-2">
-                                    <label class="form-label">Time</label>
-                                    <input type="number" class="form-control form-control-sm" 
-                                           name="time" placeholder="e.g., 2030" step="0.1">
+                                    <label class="form-label">Condition Variable</label>
+                                    <select class="form-select form-select-sm" name="condition_variable">
+                                        <option value="time">Time</option>
+                                        <option value="automation_fraction">Automation Fraction</option>
+                                        <option value="L_AI">AI Labor</option>
+                                        <option value="L_HUMAN">Human Labor</option>
+                                    </select>
                                 </div>
                                 <div class="mb-2">
-                                    <label class="form-label">Automation Fraction</label>
+                                    <label class="form-label">Condition Value</label>
                                     <input type="number" class="form-control form-control-sm" 
-                                           name="automation_fraction" placeholder="0.0-1.0" step="0.01" min="0" max="1">
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label">AI Labor</label>
-                                    <input type="number" class="form-control form-control-sm" 
-                                           name="L_AI" placeholder="e.g., 1e9" step="any">
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label">Human Labor</label>
-                                    <input type="number" class="form-control form-control-sm" 
-                                           name="L_HUMAN" placeholder="e.g., 1e8" step="any">
+                                           name="condition_value" placeholder="Enter value" step="any" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -852,7 +846,8 @@
                         </div>
                         <div class="mt-2">
                             <small class="text-muted">
-                                Preview: When <span class="constraint-preview" data-constraint="${constraintId}">conditions are met</span>, 
+                                Preview: When <span class="condition-var-preview" data-constraint="${constraintId}">condition variable</span> = 
+                                <span class="condition-val-preview" data-constraint="${constraintId}">value</span>, 
                                 expect <span class="target-preview" data-constraint="${constraintId}">target variable</span> = 
                                 <span class="value-preview" data-constraint="${constraintId}">value</span>
                             </small>
@@ -881,25 +876,26 @@
             const card = document.getElementById(constraintId);
             const inputs = card.querySelectorAll('input, select');
             
-            let conditions = [];
+            let conditionVar = '';
+            let conditionVal = '';
             let targetVar = '';
             let targetVal = '';
             
             inputs.forEach(input => {
                 const value = input.value;
-                if (value && input.name !== 'target_value' && input.name !== 'weight') {
-                    if (input.name === 'target_variable') {
-                        targetVar = value;
-                    } else {
-                        conditions.push(`${input.name}=${value}`);
-                    }
+                if (input.name === 'condition_variable') {
+                    conditionVar = value;
+                } else if (input.name === 'condition_value') {
+                    conditionVal = value;
+                } else if (input.name === 'target_variable') {
+                    targetVar = value;
                 } else if (input.name === 'target_value') {
                     targetVal = value;
                 }
             });
             
-            const conditionText = conditions.length > 0 ? conditions.join(', ') : 'conditions are met';
-            card.querySelector('.constraint-preview').textContent = conditionText;
+            card.querySelector('.condition-var-preview').textContent = conditionVar || 'condition variable';
+            card.querySelector('.condition-val-preview').textContent = conditionVal || 'value';
             card.querySelector('.target-preview').textContent = targetVar || 'target variable';
             card.querySelector('.value-preview').textContent = targetVal || 'value';
         }
@@ -930,22 +926,32 @@
                     weight: 1.0
                 };
                 
+                let conditionVariable = '';
+                let conditionValue = '';
+                
                 inputs.forEach(input => {
                     const value = input.value;
                     if (value) {
-                        if (input.name === 'target_variable') {
+                        if (input.name === 'condition_variable') {
+                            conditionVariable = value;
+                        } else if (input.name === 'condition_value') {
+                            conditionValue = parseFloat(value);
+                        } else if (input.name === 'target_variable') {
                             constraint.target_variable = value;
                         } else if (input.name === 'target_value') {
                             constraint.target_value = parseFloat(value);
                         } else if (input.name === 'weight') {
                             constraint.weight = parseFloat(value);
-                        } else {
-                            constraint.conditions[input.name] = parseFloat(value);
                         }
                     }
                 });
                 
-                if (constraint.target_variable && constraint.target_value && Object.keys(constraint.conditions).length > 0) {
+                // Add the single condition to the conditions object
+                if (conditionVariable && conditionValue !== '') {
+                    constraint.conditions[conditionVariable] = conditionValue;
+                }
+                
+                if (constraint.target_variable && constraint.target_value !== '' && Object.keys(constraint.conditions).length > 0) {
                     constraints.push(constraint);
                 }
             });
