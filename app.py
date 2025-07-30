@@ -340,7 +340,7 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     
     # Update layout
     fig.update_layout(
-        height=2100,  # Height for 7x2 layout
+        autosize=True,  # Auto-fit to container dimensions
         showlegend=False,
         title_text="AI Progress Metrics",
         title_x=0.5,
