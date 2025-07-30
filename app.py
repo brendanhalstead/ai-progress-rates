@@ -28,7 +28,7 @@ from progress_model import (
     progress_rate_at_time, compute_cognitive_output,
     compute_software_progress_rate, compute_automation_fraction,
     compute_research_stock_rate, compute_overall_progress_rate,
-    calculate_initial_research_stock
+    calculate_initial_research_stock, setup_model_with_normalization, compute_initial_conditions
 )
 from metrics_calculator import calculate_all_metrics
 
@@ -110,58 +110,7 @@ def params_to_dict(params: Parameters):
         'cognitive_output_normalization': params.cognitive_output_normalization
     }
 
-def calculate_progress_rate_normalization(params: Parameters, time_series_data: TimeSeriesData, 
-                                         start_time: float, initial_progress: float, initial_research_stock: float) -> float:
-    """
-    Calculate progress rate normalization so that initial progress rate equals 1.
-    
-    Args:
-        params: Model parameters (with temporary progress_rate_normalization=1)
-        time_series_data: Input time series
-        start_time: Simulation start time
-        initial_progress: Initial cumulative progress
-        initial_research_stock: Initial research stock
-        
-    Returns:
-        Calculated normalization factor
-    """
-    # We need the initial research stock rate to compute the software progress rate
-    initial_automation_at_start = compute_automation_fraction(initial_progress, params)
-    initial_L_HUMAN_at_start = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
-    initial_L_AI_at_start = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
-    initial_experiment_compute_at_start = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
-    initial_training_compute_at_start = np.interp(start_time, time_series_data.time, time_series_data.training_compute)
 
-    initial_cognitive_output_at_start = compute_cognitive_output(
-        initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
-        params.rho_cognitive, params.cognitive_output_normalization
-    )
-    
-    initial_research_stock_rate_at_start = compute_research_stock_rate(
-        initial_experiment_compute_at_start, initial_cognitive_output_at_start,
-        params.alpha, params.rho_progress
-    )
-
-    if initial_research_stock_rate_at_start <= 0:
-        initial_research_stock_rate_at_start = 1.0
-
-    initial_software_progress_rate = compute_software_progress_rate(
-        initial_research_stock, 
-        initial_research_stock_rate_at_start,
-        initial_research_stock,  # Use calculated initial research stock
-        initial_research_stock_rate_at_start # RS'(0) is the same as RS'(t) at start_time
-    )
-
-    unnormalized_rate = compute_overall_progress_rate(
-        initial_software_progress_rate, initial_training_compute_at_start, params.software_progress_share
-    )
-    logger.info(f"unnormalized_rate: {unnormalized_rate}")
-    # Return the normalization factor that makes the rate equal to 1
-    if unnormalized_rate > 0:
-        return 1.0 / unnormalized_rate
-    else:
-        logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
-        return 1.0
 
 def create_plotly_dashboard(metrics: Dict[str, Any]):
     """Create interactive Plotly dashboard"""
@@ -521,42 +470,19 @@ def compute_model():
         time_range = data.get('time_range', [2029, 2030])
         initial_progress = data.get('initial_progress', 1.0)
         
-        # Calculate initial research stock rate, RS'(0), for software progress calculations
+        # Use utility function to set up model with proper normalization
         try:
-            start_time = time_series.time[0]
-            initial_automation_at_start = compute_automation_fraction(initial_progress, params)
-            initial_L_HUMAN_at_start = np.interp(start_time, time_series.time, time_series.L_HUMAN)
-            initial_L_AI_at_start = np.interp(start_time, time_series.time, time_series.L_AI)
-            initial_experiment_compute_at_start = np.interp(start_time, time_series.time, time_series.experiment_compute)
-            
-            initial_cognitive_output_at_start = compute_cognitive_output(
-                initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
-                params.rho_cognitive, params.cognitive_output_normalization
-            )
-            
-            initial_research_stock_rate = compute_research_stock_rate(
-                initial_experiment_compute_at_start, initial_cognitive_output_at_start,
-                params.alpha, params.rho_progress
-            )
-            
-            if not np.isfinite(initial_research_stock_rate) or initial_research_stock_rate <= 0:
-                logger.warning(f"Invalid initial research stock rate ({initial_research_stock_rate}), using fallback 1.0")
-                initial_research_stock_rate = 1.0
-
+            params, initial_conditions = setup_model_with_normalization(time_series, params, initial_progress)
+            # Extract needed values for metrics calculation
+            initial_research_stock_rate = initial_conditions.research_stock_rate
+            initial_research_stock_calc = initial_conditions.research_stock
         except Exception as e:
-            logger.error(f"Error calculating initial research stock rate: {e}")
+            logger.error(f"Error setting up model: {e}")
             return jsonify({
                 'success': False,
-                'error': f'Failed to calculate initial conditions: {e}',
+                'error': f'Failed to set up model: {e}',
                 'error_type': 'initialization_failure'
             }), 500
-
-        # Calculate initial research stock and set the progress rate normalization to ensure initial rate = 1
-        initial_research_stock_calc = calculate_initial_research_stock(time_series, params, initial_progress)
-        params.progress_rate_normalization = calculate_progress_rate_normalization(
-            params, time_series, time_range[0], initial_progress, initial_research_stock_calc
-        )
-        logger.info(f"Calculated progress rate normalization: {params.progress_rate_normalization}")
         
         # Compute model with comprehensive validation and error handling
         try:
@@ -752,12 +678,10 @@ def estimate_params():
                 anchors, time_series, initial_params, initial_progress, fixed_params=fixed_params
             )
             
-            # Calculate initial research stock and set the progress rate normalization for estimated params
+            # Set up estimated parameters with proper normalization
             time_range = data.get('time_range', [time_series.time[0], time_series.time[-1]])
-            initial_research_stock_calc = calculate_initial_research_stock(time_series, estimated_params, initial_progress)
-            estimated_params.progress_rate_normalization = calculate_progress_rate_normalization(
-                estimated_params, time_series, time_range[0], initial_progress, initial_research_stock_calc
-            )
+            estimated_params, initial_conditions = setup_model_with_normalization(time_series, estimated_params, initial_progress)
+            initial_research_stock_calc = initial_conditions.research_stock
             
             # Update session state with the optimized parameters
             session_data['current_params'] = estimated_params
@@ -769,25 +693,9 @@ def estimate_params():
                     time_range, initial_progress
                 )
                 
-                # Calculate initial research stock rate for metrics
-                start_time = time_series.time[0]
-                initial_automation_at_start = compute_automation_fraction(initial_progress, estimated_params)
-                initial_L_HUMAN_at_start = np.interp(start_time, time_series.time, time_series.L_HUMAN)
-                initial_L_AI_at_start = np.interp(start_time, time_series.time, time_series.L_AI)
-                initial_experiment_compute_at_start = np.interp(start_time, time_series.time, time_series.experiment_compute)
-                
-                initial_cognitive_output_at_start = compute_cognitive_output(
-                    initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
-                    estimated_params.rho_cognitive, estimated_params.cognitive_output_normalization
-                )
-                
-                initial_research_stock_rate = compute_research_stock_rate(
-                    initial_experiment_compute_at_start, initial_cognitive_output_at_start,
-                    estimated_params.alpha, estimated_params.rho_progress
-                )
-                
-                if not np.isfinite(initial_research_stock_rate) or initial_research_stock_rate <= 0:
-                    initial_research_stock_rate = 1.0
+                # Get initial conditions for metrics calculation
+                initial_conditions = compute_initial_conditions(time_series, estimated_params, initial_progress)
+                initial_research_stock_rate = initial_conditions.research_stock_rate
                 
                 # Calculate all metrics
                 all_metrics = calculate_all_metrics(
