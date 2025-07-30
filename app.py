@@ -169,6 +169,11 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     if 'human_labor_contributions' in metrics and metrics['human_labor_contributions'] is not None and len(metrics['human_labor_contributions']) > 0:
         human_labor_contributions = np.array(metrics['human_labor_contributions'], dtype=float)[valid_mask]
         human_labor_contributions = np.where(np.isfinite(human_labor_contributions), human_labor_contributions, 0)
+
+    automation_multipliers = None
+    if 'automation_multipliers' in metrics and metrics['automation_multipliers'] is not None and len(metrics['automation_multipliers']) > 0:
+        automation_multipliers = np.array(metrics['automation_multipliers'], dtype=float)[valid_mask]
+        automation_multipliers = np.where(np.isfinite(automation_multipliers), automation_multipliers, 1.0)
     
     # Create subplots - expand to 7x2 layout for input time series and human-only rates
     fig = make_subplots(
@@ -350,18 +355,9 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
         )
 
     # Plot 14: Automation Progress Multiplier
-    if progress_rates is not None and human_only_progress_rates is not None and len(progress_rates) > 0 and len(human_only_progress_rates) > 0:
-        # Calculate automation multiplier (overall rate / human-only rate)
-        automation_multiplier = []
-        for i in range(len(progress_rates)):
-            if human_only_progress_rates[i] > 0:
-                multiplier = progress_rates[i] / human_only_progress_rates[i]
-                automation_multiplier.append(multiplier if np.isfinite(multiplier) else 1.0)
-            else:
-                automation_multiplier.append(1.0)  # No multiplier if human-only rate is zero
-        
+    if automation_multipliers is not None and len(automation_multipliers) > 0:
         fig.add_trace(
-            go.Scatter(x=times.tolist(), y=automation_multiplier,
+            go.Scatter(x=times.tolist(), y=automation_multipliers.tolist(),
                       name='Automation Multiplier',
                       line=dict(color='#d62728', width=3),
                       mode='lines+markers', marker=dict(size=4)),
