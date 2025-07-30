@@ -114,68 +114,51 @@ def params_to_dict(params: Parameters):
 def create_plotly_dashboard(metrics: Dict[str, Any]):
     """Create interactive Plotly dashboard"""
     
-    # Extract required data
+    # Extract and convert all metrics to numpy arrays
     times = np.array(metrics['times'], dtype=float)
     progress = np.array(metrics['progress'], dtype=float)
     automation_fraction = np.array(metrics['automation_fraction'], dtype=float)
+    progress_rates = np.array(metrics['progress_rates'], dtype=float)
+    software_progress_rates = np.array(metrics['software_progress_rates'], dtype=float)
+    cognitive_outputs = np.array(metrics['cognitive_outputs'], dtype=float)
+    research_stocks = np.array(metrics['research_stock'], dtype=float)
+    research_stock_rates = np.array(metrics['research_stock_rates'], dtype=float)
+    human_only_progress_rates = np.array(metrics['human_only_progress_rates'], dtype=float)
+    ai_labor_contributions = np.array(metrics['ai_labor_contributions'], dtype=float)
+    human_labor_contributions = np.array(metrics['human_labor_contributions'], dtype=float)
+    automation_multipliers = np.array(metrics['automation_multipliers'], dtype=float)
     
     # Validate input data
-    if len(times) == 0 or len(progress) == 0 or len(automation_fraction) == 0:
+    if len(times) == 0:
         raise ValueError("Empty input data")
     
-    # Handle invalid values
+    # Handle invalid values with a single mask applied to all metrics
     valid_mask = np.isfinite(times) & np.isfinite(progress) & np.isfinite(automation_fraction)
     times = times[valid_mask]
     progress = progress[valid_mask]
     automation_fraction = automation_fraction[valid_mask]
+    progress_rates = progress_rates[valid_mask]
+    software_progress_rates = software_progress_rates[valid_mask]
+    cognitive_outputs = cognitive_outputs[valid_mask]
+    research_stocks = research_stocks[valid_mask]
+    research_stock_rates = research_stock_rates[valid_mask]
+    human_only_progress_rates = human_only_progress_rates[valid_mask]
+    ai_labor_contributions = ai_labor_contributions[valid_mask]
+    human_labor_contributions = human_labor_contributions[valid_mask]
+    automation_multipliers = automation_multipliers[valid_mask]
     
-    # Extract optional metrics and apply validation
-    progress_rates = None
-    if 'progress_rates' in metrics and metrics['progress_rates'] is not None and len(metrics['progress_rates']) > 0:
-        progress_rates = np.array(metrics['progress_rates'], dtype=float)[valid_mask]
-        progress_rates = np.where(np.isfinite(progress_rates), progress_rates, 0)
+    # Clean up any remaining non-finite values
+    progress_rates = np.where(np.isfinite(progress_rates), progress_rates, 0)
+    software_progress_rates = np.where(np.isfinite(software_progress_rates), software_progress_rates, 0)
+    cognitive_outputs = np.where(np.isfinite(cognitive_outputs), cognitive_outputs, 0)
+    research_stocks = np.where(np.isfinite(research_stocks), research_stocks, 0)
+    research_stock_rates = np.where(np.isfinite(research_stock_rates), research_stock_rates, 0)
+    human_only_progress_rates = np.where(np.isfinite(human_only_progress_rates), human_only_progress_rates, 0)
+    ai_labor_contributions = np.where(np.isfinite(ai_labor_contributions), ai_labor_contributions, 0)
+    human_labor_contributions = np.where(np.isfinite(human_labor_contributions), human_labor_contributions, 0)
+    automation_multipliers = np.where(np.isfinite(automation_multipliers), automation_multipliers, 1.0)
     
-    software_progress_rates = None
-    if 'software_progress_rates' in metrics and metrics['software_progress_rates'] is not None and len(metrics['software_progress_rates']) > 0:
-        software_progress_rates = np.array(metrics['software_progress_rates'], dtype=float)[valid_mask]
-        software_progress_rates = np.where(np.isfinite(software_progress_rates), software_progress_rates, 0)
-    
-    cognitive_outputs = None
-    if 'cognitive_outputs' in metrics and metrics['cognitive_outputs'] is not None and len(metrics['cognitive_outputs']) > 0:
-        cognitive_outputs = np.array(metrics['cognitive_outputs'], dtype=float)[valid_mask]
-        cognitive_outputs = np.where(np.isfinite(cognitive_outputs), cognitive_outputs, 0)
-
-    research_stocks = None
-    if 'research_stock' in metrics and metrics['research_stock'] is not None and len(metrics['research_stock']) > 0:
-        research_stocks = np.array(metrics['research_stock'], dtype=float)[valid_mask]
-        research_stocks = np.where(np.isfinite(research_stocks), research_stocks, 0)
-
-    research_stock_rates = None
-    if 'research_stock_rates' in metrics and metrics['research_stock_rates'] is not None and len(metrics['research_stock_rates']) > 0:
-        research_stock_rates = np.array(metrics['research_stock_rates'], dtype=float)[valid_mask]
-        research_stock_rates = np.where(np.isfinite(research_stock_rates), research_stock_rates, 0)
-
-    human_only_progress_rates = None
-    if 'human_only_progress_rates' in metrics and metrics['human_only_progress_rates'] is not None and len(metrics['human_only_progress_rates']) > 0:
-        human_only_progress_rates = np.array(metrics['human_only_progress_rates'], dtype=float)[valid_mask]
-        human_only_progress_rates = np.where(np.isfinite(human_only_progress_rates), human_only_progress_rates, 0)
-
-    ai_labor_contributions = None
-    if 'ai_labor_contributions' in metrics and metrics['ai_labor_contributions'] is not None and len(metrics['ai_labor_contributions']) > 0:
-        ai_labor_contributions = np.array(metrics['ai_labor_contributions'], dtype=float)[valid_mask]
-        ai_labor_contributions = np.where(np.isfinite(ai_labor_contributions), ai_labor_contributions, 0)
-
-    human_labor_contributions = None
-    if 'human_labor_contributions' in metrics and metrics['human_labor_contributions'] is not None and len(metrics['human_labor_contributions']) > 0:
-        human_labor_contributions = np.array(metrics['human_labor_contributions'], dtype=float)[valid_mask]
-        human_labor_contributions = np.where(np.isfinite(human_labor_contributions), human_labor_contributions, 0)
-
-    automation_multipliers = None
-    if 'automation_multipliers' in metrics and metrics['automation_multipliers'] is not None and len(metrics['automation_multipliers']) > 0:
-        automation_multipliers = np.array(metrics['automation_multipliers'], dtype=float)[valid_mask]
-        automation_multipliers = np.where(np.isfinite(automation_multipliers), automation_multipliers, 1.0)
-    
-    # Create subplots - expand to 7x2 layout for input time series and human-only rates
+    # Create subplots - 7x2 layout
     fig = make_subplots(
         rows=7, cols=2,
         subplot_titles=('Cumulative Progress', 'Automation Fraction', 
@@ -211,48 +194,43 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
         row=1, col=2
     )
     
-    # Plot 3: Overall Progress Rate (if available)
-    if progress_rates is not None and len(progress_rates) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=progress_rates.tolist(), 
-                      name='Overall Progress Rate',
-                      line=dict(color='#2ca02c', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=2, col=1
-        )
+    # Plot 3: Overall Progress Rate
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=progress_rates.tolist(), 
+                  name='Overall Progress Rate',
+                  line=dict(color='#2ca02c', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=2, col=1
+    )
     
-    # Plot 4: Software Progress Rate (if available)
-    if software_progress_rates is not None and len(software_progress_rates) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
-                      name='Software Progress Rate',
-                      line=dict(color='#ff7f0e', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=2, col=2
-        )
+    # Plot 4: Software Progress Rate
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
+                  name='Software Progress Rate',
+                  line=dict(color='#ff7f0e', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=2, col=2
+    )
     
-    # Plot 5: Cognitive Output and Experiment Compute (if available)
-    if cognitive_outputs is not None and len(cognitive_outputs) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
-                      name='Cognitive Output',
-                      line=dict(color='#9467bd', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=3, col=1, secondary_y=False
-        )
+    # Plot 5: Cognitive Output and Experiment Compute
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
+                  name='Cognitive Output',
+                  line=dict(color='#9467bd', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=3, col=1, secondary_y=False
+    )
     
     # Add experiment compute on the same plot with secondary y-axis
-    if session_data['time_series'] is not None:
-        time_series = session_data['time_series']
-        # Interpolate experiment compute to match cognitive output time points
-        experiment_compute_interp = np.interp(times, time_series.time, time_series.experiment_compute)
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=experiment_compute_interp.tolist(),
-                      name='Experiment Compute',
-                      line=dict(color='#2ca02c', width=3, dash='dash'),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=3, col=1, secondary_y=True
-        )
+    time_series = session_data['time_series']
+    experiment_compute_interp = np.interp(times, time_series.time, time_series.experiment_compute)
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=experiment_compute_interp.tolist(),
+                  name='Experiment Compute',
+                  line=dict(color='#2ca02c', width=3, dash='dash'),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=3, col=1, secondary_y=True
+    )
     
     # Plot 6: Progress vs Automation scatter
     fig.add_trace(
@@ -263,113 +241,106 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
         row=3, col=2
     )
     
-    # Plot 7: Rate Components Comparison (if both rates available)
-    if progress_rates is not None and software_progress_rates is not None and len(progress_rates) > 0 and len(software_progress_rates) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=progress_rates.tolist(),
-                      name='Overall Rate',
-                      line=dict(color='#2ca02c', width=2, dash='solid'),
-                      mode='lines'),
-            row=4, col=1
-        )
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
-                      name='Software Rate',
-                      line=dict(color='#ff7f0e', width=2, dash='dash'),
-                      mode='lines'),
-            row=4, col=1
-        )
+    # Plot 7: Rate Components Comparison
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=progress_rates.tolist(),
+                  name='Overall Rate',
+                  line=dict(color='#2ca02c', width=2, dash='solid'),
+                  mode='lines'),
+        row=4, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
+                  name='Software Rate',
+                  line=dict(color='#ff7f0e', width=2, dash='dash'),
+                  mode='lines'),
+        row=4, col=1
+    )
     
     # Plot 8: Cognitive Output Components (AI vs Human contribution)
-    if ai_labor_contributions is not None and human_labor_contributions is not None and len(ai_labor_contributions) > 0 and len(human_labor_contributions) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=ai_labor_contributions.tolist(),
-                      name='AI contribution',
-                      line=dict(color='#1f77b4', width=2),
-                      mode='lines'),
-            row=4, col=2
-        )
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=human_labor_contributions.tolist(),
-                      name='Humans only',
-                      line=dict(color='#ff7f0e', width=2),
-                      mode='lines'),
-            row=4, col=2
-        )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_labor_contributions.tolist(),
+                  name='AI contribution',
+                  line=dict(color='#1f77b4', width=2),
+                  mode='lines'),
+        row=4, col=2
+    )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=human_labor_contributions.tolist(),
+                  name='Humans only',
+                  line=dict(color='#ff7f0e', width=2),
+                  mode='lines'),
+        row=4, col=2
+    )
     
     # Plot 9: Human vs AI Labor
-    if session_data['time_series'] is not None:
-        time_series = session_data['time_series']
-        fig.add_trace(
-            go.Scatter(x=time_series.time.tolist(), y=time_series.L_HUMAN.tolist(),
-                      name='Human Labor',
-                      line=dict(color='#ff7f0e', width=2),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=5, col=1
-        )
-        fig.add_trace(
-            go.Scatter(x=time_series.time.tolist(), y=time_series.L_AI.tolist(),
-                      name='AI Labor',
-                      line=dict(color='#1f77b4', width=2),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=5, col=1
-        )
-        
-        # Plot 10: Training Compute
-        fig.add_trace(
-            go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute.tolist(),
-                      name='Training Compute',
-                      line=dict(color='#d62728', width=2),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=5, col=2
-        )
+    time_series = session_data['time_series']
+    fig.add_trace(
+        go.Scatter(x=time_series.time.tolist(), y=time_series.L_HUMAN.tolist(),
+                  name='Human Labor',
+                  line=dict(color='#ff7f0e', width=2),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=5, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=time_series.time.tolist(), y=time_series.L_AI.tolist(),
+                  name='AI Labor',
+                  line=dict(color='#1f77b4', width=2),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=5, col=1
+    )
+    
+    # Plot 10: Training Compute
+    fig.add_trace(
+        go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute.tolist(),
+                  name='Training Compute',
+                  line=dict(color='#d62728', width=2),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=5, col=2
+    )
 
     # Plot 11: Research Stock
-    if research_stocks is not None and len(research_stocks) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=research_stocks.tolist(),
-                      name='Research Stock',
-                      line=dict(color='#8c564b', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=6, col=1
-        )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=research_stocks.tolist(),
+                  name='Research Stock',
+                  line=dict(color='#8c564b', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=6, col=1
+    )
 
     # Plot 12: Research Stock Rate
-    if research_stock_rates is not None and len(research_stock_rates) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=research_stock_rates.tolist(),
-                      name='Research Stock Rate',
-                      line=dict(color='#e377c2', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=6, col=2
-        )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=research_stock_rates.tolist(),
+                  name='Research Stock Rate',
+                  line=dict(color='#e377c2', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=6, col=2
+    )
 
     # Plot 13: Human-Only Progress Rate
-    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=human_only_progress_rates.tolist(),
-                      name='Human-Only Progress Rate',
-                      line=dict(color='#ff7f0e', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=7, col=1
-        )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=human_only_progress_rates.tolist(),
+                  name='Human-Only Progress Rate',
+                  line=dict(color='#ff7f0e', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=7, col=1
+    )
 
     # Plot 14: Automation Progress Multiplier
-    if automation_multipliers is not None and len(automation_multipliers) > 0:
-        fig.add_trace(
-            go.Scatter(x=times.tolist(), y=automation_multipliers.tolist(),
-                      name='Automation Multiplier',
-                      line=dict(color='#d62728', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
-            row=7, col=2
-        )
-        
-        # Add horizontal line at y=1 for reference (no automation benefit)
-        fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=7, col=2)
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=automation_multipliers.tolist(),
+                  name='Automation Multiplier',
+                  line=dict(color='#d62728', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=7, col=2
+    )
+    
+    # Add horizontal line at y=1 for reference (no automation benefit)
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=7, col=2)
     
     # Update layout
     fig.update_layout(
-        height=2100,  # Increased height for 7x2 layout
+        height=2100,  # Height for 7x2 layout
         showlegend=False,
         title_text="AI Progress Metrics",
         title_x=0.5,
@@ -385,24 +356,30 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     fig.update_xaxes(title_text="Cumulative Progress", row=3, col=2, gridcolor='lightgray')
     fig.update_xaxes(title_text="Time", row=4, col=1, gridcolor='lightgray')
     fig.update_xaxes(title_text="Time", row=4, col=2, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=5, col=1, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=5, col=2, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=6, col=1, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=6, col=2, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=7, col=1, gridcolor='lightgray')
+    fig.update_xaxes(title_text="Time", row=7, col=2, gridcolor='lightgray')
     
-    # Use linear scale for progress plots.
+    # Y-axis labels and scaling
     fig.update_yaxes(title_text="Progress", row=1, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Automation (%)", row=1, col=2, gridcolor='lightgray')
     
     # Use log scale for rates if they span multiple orders of magnitude
-    if progress_rates is not None and len(progress_rates) > 0 and np.max(progress_rates) > 0:
+    if np.max(progress_rates) > 0:
         fig.update_yaxes(title_text="Overall Rate (log scale)", type="log", row=2, col=1, gridcolor='lightgray')
     else:
         fig.update_yaxes(title_text="Overall Rate", row=2, col=1, gridcolor='lightgray')
     
-    if software_progress_rates is not None and len(software_progress_rates) > 0 and np.max(software_progress_rates) > 0:
+    if np.max(software_progress_rates) > 0:
         fig.update_yaxes(title_text="Software Rate (log scale)", type="log", row=2, col=2, gridcolor='lightgray')
     else:
         fig.update_yaxes(title_text="Software Rate", row=2, col=2, gridcolor='lightgray')
     
     # Cognitive output and experiment compute scale - dual y-axes
-    if cognitive_outputs is not None and len(cognitive_outputs) > 0 and np.max(cognitive_outputs) > 0:
+    if np.max(cognitive_outputs) > 0:
         fig.update_yaxes(title_text="Cognitive Output (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=False)
         fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=True)
     else:
@@ -412,25 +389,13 @@ def create_plotly_dashboard(metrics: Dict[str, Any]):
     fig.update_yaxes(title_text="Automation (%)", row=3, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Rate (log scale)", type="log", row=4, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Labor Contribution (log scale)", type="log", row=4, col=2, gridcolor='lightgray')
-    
-    # Add axis labels for new input time series plots
-    fig.update_xaxes(title_text="Time", row=5, col=1, gridcolor='lightgray')
-    fig.update_xaxes(title_text="Time", row=5, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Labor (log scale)", type="log", row=5, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Training Compute (log scale)", type="log", row=5, col=2, gridcolor='lightgray')
-
-    # Add axis labels for new research stock plots
-    fig.update_xaxes(title_text="Time", row=6, col=1, gridcolor='lightgray')
-    fig.update_xaxes(title_text="Time", row=6, col=2, gridcolor='lightgray')
     fig.update_yaxes(title_text="Research Stock (log scale)", type="log", row=6, col=1, gridcolor='lightgray')
     fig.update_yaxes(title_text="Research Stock Rate (log scale)", type="log", row=6, col=2, gridcolor='lightgray')
-
-    # Add axis labels for human-only progress rate plots
-    fig.update_xaxes(title_text="Time", row=7, col=1, gridcolor='lightgray')
-    fig.update_xaxes(title_text="Time", row=7, col=2, gridcolor='lightgray')
     
-    # Use log scale for human-only progress rate if it spans multiple orders of magnitude
-    if human_only_progress_rates is not None and len(human_only_progress_rates) > 0 and np.max(human_only_progress_rates) > 0:
+    # Human-only progress rate scaling
+    if np.max(human_only_progress_rates) > 0:
         fig.update_yaxes(title_text="Human-Only Rate (log scale)", type="log", row=7, col=1, gridcolor='lightgray')
     else:
         fig.update_yaxes(title_text="Human-Only Rate", row=7, col=1, gridcolor='lightgray')
