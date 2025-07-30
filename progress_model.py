@@ -1061,224 +1061,6 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         raise RuntimeError(f"Integration succeeded but dense output failed: {e}")
 
 
-def evaluate_anchor_constraint(constraint: AnchorConstraint, time_series_data: TimeSeriesData, params: Parameters, initial_progress: float) -> float:
-    """
-    Evaluate model at specified conditions and compare to target.
-    Returns the error (difference from target).
-    
-    Args:
-        constraint: Constraint specification
-        time_series_data: Input time series
-        params: Model parameters
-        initial_progress: Initial progress value
-    
-    Returns:
-        Error (model_value - target_value)
-    """
-    # Extract conditions
-    conditions = constraint.conditions.copy()
-    
-    # Default values if not specified
-    t = conditions.get('time', 2025.0)
-    L_HUMAN = conditions.get('L_HUMAN', np.interp(t, time_series_data.time, time_series_data.L_HUMAN))
-    L_AI = conditions.get('L_AI', np.interp(t, time_series_data.time, time_series_data.L_AI))
-    experiment_compute = conditions.get('experiment_compute', np.interp(t, time_series_data.time, time_series_data.experiment_compute))
-    training_compute = conditions.get('training_compute', np.interp(t, time_series_data.time, time_series_data.training_compute))
-    
-    # Run unified integration once to get all needed values
-    start_time = time_series_data.time[0]
-    
-    # Get cumulative progress and research stock from integration (or conditions)
-    if 'cumulative_progress' in conditions and 'research_stock' in conditions:
-        # Both values explicitly provided
-        cumulative_progress = conditions['cumulative_progress']
-        research_stock = conditions['research_stock']
-        # Still need integration for initial values if computing progress_rate
-        if constraint.target_variable == 'progress_rate':
-            if t <= start_time:
-                times = np.array([start_time])
-                progress_values = np.array([initial_progress])
-                research_stock_values = np.array([calculate_initial_research_stock(time_series_data, params, initial_progress)])
-            else:
-                try:
-                    time_range = [start_time, t]
-                    times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, time_series_data, params)
-                except Exception as e:
-                    logger.warning(f"Integration failed for time {t}: {e}")
-                    raise e
-    else:
-        # Need integration to get missing values
-        if t <= start_time:
-            cumulative_progress = conditions.get('cumulative_progress', initial_progress)
-            research_stock = conditions.get('research_stock', calculate_initial_research_stock(time_series_data, params, initial_progress))
-            times = np.array([start_time])
-            progress_values = np.array([cumulative_progress])
-            research_stock_values = np.array([research_stock])
-        else:
-            try:
-                time_range = [start_time, t]
-                times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, time_series_data, params)
-                
-                # Extract values at evaluation time (use conditions if provided, otherwise use integration results)
-                cumulative_progress = conditions.get('cumulative_progress', progress_values[-1])
-                research_stock = conditions.get('research_stock', research_stock_values[-1])
-                
-            except Exception as e:
-                logger.warning(f"Integration failed for time {t}: {e}")
-                raise e
-    
-    # Compute automation fraction unless explicitly provided
-    if 'automation_fraction' in conditions:
-        automation_fraction = conditions['automation_fraction']
-    else:
-        automation_fraction = compute_automation_fraction(cumulative_progress, params)
-    
-    # Compute target variable
-    if constraint.target_variable == 'progress_rate':
-        cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
-        
-        # Compute research stock rate at evaluation time
-        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress)
-        
-        # Get initial conditions using utility function
-        initial_conditions = compute_initial_conditions(time_series_data, params, progress_values[0])
-        initial_research_stock_rate = initial_conditions.research_stock_rate
-        
-        # Use initial research stock from integration results
-        initial_research_stock_calc = research_stock_values[0]
-        
-        software_progress_rate = compute_software_progress_rate(
-            research_stock, research_stock_rate, 
-            initial_research_stock_calc, initial_research_stock_rate
-        )
-        
-        model_value = compute_overall_progress_rate(software_progress_rate, training_compute, params.software_progress_share)
-        model_value *= params.progress_rate_normalization
-    elif constraint.target_variable == 'automation_fraction':
-        model_value = automation_fraction
-    elif constraint.target_variable == 'cognitive_output':
-        model_value = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
-    else:
-        raise ValueError(f"Unknown target variable: {constraint.target_variable}")
-    
-    # Use relative error for better scaling across different variable types
-    if constraint.target_value != 0:
-        # Relative error: (model - target) / target
-        error = (model_value - constraint.target_value) / abs(constraint.target_value)
-        # Cap the relative error to prevent numerical issues
-        error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
-    else:
-        # Absolute error if target is zero to avoid division by zero
-        error = model_value - constraint.target_value
-    
-    logger.debug(f"Constraint evaluation: target={constraint.target_variable}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
-    
-    return error
-
-
-def evaluate_anchor_constraint_with_metrics(constraint: AnchorConstraint, all_metrics: Dict[str, Any], params: Parameters) -> float:
-    """
-    Evaluate model at specified conditions using pre-computed metrics.
-    This is a simplified version that avoids redundant integration and computation.
-    
-    Args:
-        constraint: Constraint specification
-        all_metrics: Pre-computed metrics from calculate_all_metrics
-        params: Model parameters
-    
-    Returns:
-        Error (model_value - target_value)
-    """
-    # Extract conditions
-    conditions = constraint.conditions.copy()
-    
-    # Get evaluation time
-    t = conditions.get('time', 2025.0)
-    
-    # Find the closest time point in the metrics
-    times = all_metrics['times']
-    if t <= times[0]:
-        # Use first time point
-        time_idx = 0
-    elif t >= times[-1]:
-        # Use last time point  
-        time_idx = len(times) - 1
-    else:
-        # Interpolate to find closest index
-        time_idx = np.searchsorted(times, t)
-        if time_idx > 0:
-            # Choose closer of the two neighboring points
-            if abs(times[time_idx] - t) > abs(times[time_idx-1] - t):
-                time_idx = time_idx - 1
-    
-    # Extract values at evaluation time, using conditions if explicitly provided
-    cumulative_progress = conditions.get('cumulative_progress', all_metrics['progress'][time_idx])
-    research_stock = conditions.get('research_stock', all_metrics['research_stock'][time_idx])
-    
-    # Get automation fraction (compute if not provided, since it depends on progress)
-    if 'automation_fraction' in conditions:
-        automation_fraction = conditions['automation_fraction']
-    else:
-        automation_fraction = compute_automation_fraction(cumulative_progress, params)
-    
-    # Get input values for the evaluation time
-    input_series = all_metrics['input_time_series']
-    L_HUMAN = conditions.get('L_HUMAN', np.interp(t, input_series['time'], input_series['L_HUMAN']))
-    L_AI = conditions.get('L_AI', np.interp(t, input_series['time'], input_series['L_AI']))
-    experiment_compute = conditions.get('experiment_compute', np.interp(t, input_series['time'], input_series['experiment_compute']))
-    training_compute = conditions.get('training_compute', np.interp(t, input_series['time'], input_series['training_compute']))
-    
-    # Compute target variable
-    if constraint.target_variable == 'progress_rate':
-        # Use pre-computed progress rate if available, otherwise compute it
-        if time_idx < len(all_metrics['progress_rates']):
-            model_value = all_metrics['progress_rates'][time_idx]
-        else:
-            # Fallback computation (shouldn't happen with proper setup)
-            cognitive_output = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
-            research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress)
-            
-            # Need initial values for software progress calculation
-            initial_research_stock = all_metrics['research_stock'][0]
-            initial_research_stock_rate = all_metrics['research_stock_rates'][0]
-            
-            software_progress_rate = compute_software_progress_rate(
-                research_stock, research_stock_rate, 
-                initial_research_stock, initial_research_stock_rate
-            )
-            
-            model_value = compute_overall_progress_rate(software_progress_rate, training_compute, params.software_progress_share)
-            model_value *= params.progress_rate_normalization
-            
-    elif constraint.target_variable == 'automation_fraction':
-        model_value = automation_fraction
-        
-    elif constraint.target_variable == 'cognitive_output':
-        # Use pre-computed cognitive output if available
-        if time_idx < len(all_metrics['cognitive_outputs']):
-            model_value = all_metrics['cognitive_outputs'][time_idx]
-        else:
-            # Fallback computation
-            model_value = compute_cognitive_output(automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
-            
-    else:
-        raise ValueError(f"Unknown target variable: {constraint.target_variable}")
-    
-    # Use relative error for better scaling across different variable types
-    if constraint.target_value != 0:
-        # Relative error: (model - target) / target
-        error = (model_value - constraint.target_value) / abs(constraint.target_value)
-        # Cap the relative error to prevent numerical issues
-        error = np.clip(error, -cfg.RELATIVE_ERROR_CLIP, cfg.RELATIVE_ERROR_CLIP)
-    else:
-        # Absolute error if target is zero to avoid division by zero
-        error = model_value - constraint.target_value
-    
-    logger.debug(f"Constraint evaluation (with metrics): target={constraint.target_variable}, model_value={model_value:.6f}, target_value={constraint.target_value:.6f}, error={error:.6f}")
-    
-    return error
-
-
 def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_data: TimeSeriesData, 
                        initial_params: Parameters, initial_progress: float = 1.0, fixed_params: Optional[List[str]] = None) -> Tuple[Parameters, List[Dict[str, Any]]]:
     """
@@ -1375,15 +1157,6 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                     logger.warning(f"Invalid automation fraction target: {constraint.target_value}")
                     return False
             
-            # Try to evaluate constraint with initial parameters to check for basic feasibility
-            try:
-                error = evaluate_anchor_constraint(constraint, time_series_data, initial_params, initial_progress)
-                if not np.isfinite(error):
-                    logger.warning(f"Constraint evaluation produces non-finite error with initial parameters")
-                    return False
-            except Exception as e:
-                logger.warning(f"Constraint evaluation failed with initial parameters: {e}")
-                return False
             
             return True
             
@@ -1643,23 +1416,57 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
     optimized_params._initial_objective = initial_objective
     optimized_params._final_objective = result.fun
     
-    # Evaluate final constraint satisfaction
+    # Evaluate final constraint satisfaction using ProgressModel
     constraint_evaluations = []
-    for i, constraint in enumerate(anchor_constraints):
-        try:
-            error = evaluate_anchor_constraint(constraint, time_series_data, optimized_params, initial_progress)
-            # Convert relative error to satisfaction percentage
-            # error = (model - target) / target, so satisfaction = 1 - |error|
-            satisfaction = max(0, 1 - abs(error))
-            constraint_evaluations.append({
-                'constraint_index': i,
-                'error': error,
-                'satisfaction': satisfaction,
-                'target_variable': constraint.target_variable,
-                'target_value': constraint.target_value
-            })
-        except Exception as e:
-            logger.warning(f"Error evaluating final constraint {i+1}: {e}")
+    
+    try:
+        # Determine time range needed for all constraints
+        constraint_times = []
+        for constraint in anchor_constraints:
+            t = constraint.conditions.get('time', 2025.0)
+            constraint_times.append(t)
+        
+        start_time = time_series_data.time[0]
+        end_time = max(max(constraint_times), time_series_data.time[-1])
+        time_range = [start_time, end_time]
+        
+        # Set up model with proper normalization
+        normalized_params, initial_conditions = setup_model_with_normalization(
+            time_series_data, optimized_params, initial_progress
+        )
+        
+        # Create ProgressModel and compute trajectory
+        model = ProgressModel(normalized_params, time_series_data)
+        model.compute_progress_trajectory(time_range, initial_progress)
+        
+        # Evaluate each constraint using the model's method
+        for i, constraint in enumerate(anchor_constraints):
+            try:
+                error = model.evaluate_anchor_constraint(constraint)
+                # Convert relative error to satisfaction percentage
+                # error = (model - target) / target, so satisfaction = 1 - |error|
+                satisfaction = max(0, 1 - abs(error))
+                constraint_evaluations.append({
+                    'constraint_index': i,
+                    'error': error,
+                    'satisfaction': satisfaction,
+                    'target_variable': constraint.target_variable,
+                    'target_value': constraint.target_value
+                })
+            except Exception as e:
+                logger.warning(f"Error evaluating final constraint {i+1}: {e}")
+                constraint_evaluations.append({
+                    'constraint_index': i,
+                    'error': float('inf'),
+                    'satisfaction': 0.0,
+                    'target_variable': constraint.target_variable,
+                    'target_value': constraint.target_value
+                })
+                
+    except Exception as e:
+        logger.warning(f"Error setting up ProgressModel for final constraint evaluation: {e}")
+        # Fallback: create empty evaluations for all constraints
+        for i, constraint in enumerate(anchor_constraints):
             constraint_evaluations.append({
                 'constraint_index': i,
                 'error': float('inf'),
