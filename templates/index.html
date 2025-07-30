@@ -500,6 +500,10 @@
             
             const initialParameters = collectParameters();
             const initialProgress = parseFloat($('#initial_progress').val());
+            const timeRange = [
+                parseInt($('#start_year').val()),
+                parseInt($('#end_year').val())
+            ];
             
             showLoading(true);
             
@@ -511,6 +515,7 @@
                     anchors: anchors,
                     initial_parameters: initialParameters,
                     initial_progress: initialProgress,
+                    time_range: timeRange,
                     fixed_params: fixedParams
                 }),
                 success: function(response) {
@@ -524,9 +529,9 @@
                                 let newValue = response.estimated_parameters[key];
                                 
                                 // Apply bounds checking and inverse transformation for UI controls
-                                                                 if (key === 'automation_fraction_at_superhuman_coder') {
-                                     // Direct value handling (no logit transformation needed)
-                                     newValue = Math.max(0.1, Math.min(0.99, newValue)); // Clamp to slider bounds
+                                if (key === 'automation_fraction_at_superhuman_coder') {
+                                    // Direct value handling (no logit transformation needed)
+                                    newValue = Math.max(0.1, Math.min(0.99, newValue)); // Clamp to slider bounds
                                 } else if (key === 'progress_at_half_sc_automation') {
                                     // Ensure progress values are within reasonable UI bounds
                                     const minVal = parseFloat($('#' + key).attr('min')) || 1;
@@ -537,16 +542,18 @@
                                     const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
                                     const maxVal = parseFloat($('#' + key).attr('max')) || 10;
                                     newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
+                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
                                     // Ensure elasticity values are within UI bounds [-1, 1]
                                     newValue = Math.max(-1, Math.min(1, newValue));
                                 } else if (key === 'alpha' || key === 'software_progress_share') {
                                     // Ensure weight parameters are within UI bounds [0.05, 0.95]
                                     newValue = Math.max(0.05, Math.min(0.95, newValue));
                                 } else if (key === 'cognitive_output_normalization') {
-                                    // Ensure normalization is within reasonable bounds
-                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.00001;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 0.1;
+                                    // Convert from actual value to log scale for the slider
+                                    newValue = Math.log10(newValue);
+                                    // Ensure it's within slider bounds
+                                    const minVal = parseFloat($('#' + key).attr('min')) || -5;
+                                    const maxVal = parseFloat($('#' + key).attr('max')) || 1;
                                     newValue = Math.max(minVal, Math.min(maxVal, newValue));
                                 }
                                 
@@ -559,6 +566,19 @@
                                 updatedParams.push(`${key}: ?? → ${response.estimated_parameters[key].toFixed(4)} (no UI control)`);
                             }
                         });
+                        
+                        // Check if we have plot data (new synchronized response)
+                        if (response.plot && response.summary) {
+                            // Clear any existing plot first
+                            Plotly.purge('plotDiv');
+                            // Create new plot with the estimated parameters
+                            Plotly.newPlot('plotDiv', response.plot.data, response.plot.layout, {
+                                responsive: true,
+                                displayModeBar: true,
+                                modeBarButtonsToRemove: ['pan2d', 'lasso2d']
+                            });
+                            updateResultsSummary(response.summary);
+                        }
                         
                         // Show parameter changes in validation area
                         const validationResults = document.getElementById('validationResults');
@@ -608,12 +628,22 @@
                                 </div>
                                 
                                 <div class="alert alert-success mt-2">
-                                    ✓ Parameters estimated successfully! The model will now run with the new values.
+                                    ${response.plot ? '✓ Parameters estimated and model updated successfully! The graph shows the new results.' : '✓ Parameters estimated successfully! Click "Update Model" to see the results.'}
                                 </div>
+                                
+                                ${response.computation_error ? `
+                                    <div class="alert alert-warning mt-2">
+                                        ⚠️ Parameter estimation succeeded, but model computation encountered an issue: ${response.computation_error}
+                                        <br><small>You can try running the model manually or adjust the parameters.</small>
+                                    </div>
+                                ` : ''}
                             </div>
                         `;
                         
-                        computeModel();
+                        // Only call computeModel if we don't already have plot data
+                        if (!response.plot) {
+                            computeModel();
+                        }
                     } else {
                         const validationResults = document.getElementById('validationResults');
                         validationResults.innerHTML += `

@@ -39,7 +39,7 @@ EULER_FALLBACK_STEPS_PER_YEAR = 10
 DENSE_OUTPUT_POINTS = 100
 
 # ODE step size logging configuration
-ODE_STEP_SIZE_LOGGING = True
+ODE_STEP_SIZE_LOGGING = False
 ODE_SMALL_STEP_THRESHOLD = 1e-6  # Threshold for warning about very small steps
 ODE_STEP_VARIATION_THRESHOLD = 100.0  # Threshold for warning about step size variation
 
@@ -63,13 +63,13 @@ PARAMETER_BOUNDS = {
 # Validation thresholds for parameter combinations
 PARAM_VALIDATION_THRESHOLDS = {
     'automation_fraction_superhuman_coder_min': 0.05,
-    'automation_fraction_superhuman_coder_max': 0.99,
+    'automation_fraction_superhuman_coder_max': 1,
     'progress_at_half_automation_min': 0.0, # should be > 0
     'automation_slope_min': 0.0, # should be > 0
     'automation_slope_max': 20.0,
     'rho_extreme_abs': 0.8,
     'rho_product_max': 0.5,
-    'cognitive_output_normalization_max': 0.01
+    'cognitive_output_normalization_max': 10
 }
 
 FEASIBILITY_CHECK_THRESHOLDS = {

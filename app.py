@@ -752,28 +752,92 @@ def estimate_params():
                 anchors, time_series, initial_params, initial_progress, fixed_params=fixed_params
             )
             
-            # Validate the optimization results
-            initial_obj = getattr(estimated_params, '_initial_objective', None)
-            final_obj = getattr(estimated_params, '_final_objective', None)
+            # Calculate initial research stock and set the progress rate normalization for estimated params
+            time_range = data.get('time_range', [time_series.time[0], time_series.time[-1]])
+            initial_research_stock_calc = calculate_initial_research_stock(time_series, estimated_params, initial_progress)
+            estimated_params.progress_rate_normalization = calculate_progress_rate_normalization(
+                estimated_params, time_series, time_range[0], initial_progress, initial_research_stock_calc
+            )
             
-            # Check if optimization actually improved anything
-            if initial_obj is not None and final_obj is not None:
-                improvement = initial_obj - final_obj
-                if improvement < 1e-8:
-                    logger.warning("Parameter estimation made minimal improvement")
-                    # Still return success but with warning
-                    return jsonify({
-                        'success': True,
-                        'estimated_parameters': params_to_dict(estimated_params),
-                        'optimization_info': {
-                            'initial_objective': initial_obj,
-                            'final_objective': final_obj,
-                            'improvement': improvement,
-                            'warning': 'Optimization made minimal improvement. Current parameters may already be near-optimal, or constraints may be conflicting.'
-                        },
-                        'constraint_evaluations': constraint_evals
-                    })
+            # Update session state with the optimized parameters
+            session_data['current_params'] = estimated_params
             
+            # Automatically run the model computation with the estimated parameters
+            try:
+                model = ProgressModel(estimated_params, time_series)
+                times, progress_values, research_stock_values = model.compute_progress_trajectory(
+                    time_range, initial_progress
+                )
+                
+                # Calculate initial research stock rate for metrics
+                start_time = time_series.time[0]
+                initial_automation_at_start = compute_automation_fraction(initial_progress, estimated_params)
+                initial_L_HUMAN_at_start = np.interp(start_time, time_series.time, time_series.L_HUMAN)
+                initial_L_AI_at_start = np.interp(start_time, time_series.time, time_series.L_AI)
+                initial_experiment_compute_at_start = np.interp(start_time, time_series.time, time_series.experiment_compute)
+                
+                initial_cognitive_output_at_start = compute_cognitive_output(
+                    initial_automation_at_start, initial_L_AI_at_start, initial_L_HUMAN_at_start,
+                    estimated_params.rho_cognitive, estimated_params.cognitive_output_normalization
+                )
+                
+                initial_research_stock_rate = compute_research_stock_rate(
+                    initial_experiment_compute_at_start, initial_cognitive_output_at_start,
+                    estimated_params.alpha, estimated_params.rho_progress
+                )
+                
+                if not np.isfinite(initial_research_stock_rate) or initial_research_stock_rate <= 0:
+                    initial_research_stock_rate = 1.0
+                
+                # Calculate all metrics
+                all_metrics = calculate_all_metrics(
+                    model.results, estimated_params, time_series, initial_research_stock_rate, initial_research_stock_calc
+                )
+                
+                # Store results
+                session_data['results'] = all_metrics
+                
+                # Create plot
+                fig = create_plotly_dashboard(all_metrics)
+                
+                # Validate the optimization results
+                initial_obj = getattr(estimated_params, '_initial_objective', None)
+                final_obj = getattr(estimated_params, '_final_objective', None)
+                
+                return jsonify({
+                    'success': True,
+                    'estimated_parameters': params_to_dict(estimated_params),
+                    'optimization_info': {
+                        'initial_objective': initial_obj,
+                        'final_objective': final_obj,
+                        'improvement': initial_obj - final_obj if (initial_obj and final_obj) else None
+                    },
+                    'constraint_evaluations': constraint_evals,
+                    'plot': json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig)),
+                    'summary': {
+                        'final_progress': float(progress_values[-1]),
+                        'final_automation': float(model.results['automation_fraction'][-1]),
+                        'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
+                        'time_range': time_range
+                    }
+                })
+                
+            except Exception as compute_error:
+                logger.error(f"Error computing model with estimated parameters: {compute_error}")
+                # Still return the estimated parameters even if computation fails
+                return jsonify({
+                    'success': True,
+                    'estimated_parameters': params_to_dict(estimated_params),
+                    'optimization_info': {
+                        'initial_objective': getattr(estimated_params, '_initial_objective', None),
+                        'final_objective': getattr(estimated_params, '_final_objective', None),
+                        'warning': f'Parameter estimation succeeded but model computation failed: {str(compute_error)}'
+                    },
+                    'constraint_evaluations': constraint_evals,
+                    'computation_error': str(compute_error)
+                })
+            
+            # This code is now unreachable, but keeping for reference in case of refactoring
             # Check constraint satisfaction
             avg_satisfaction = np.mean([eval.get('satisfaction', 0) for eval in constraint_evals]) if constraint_evals else 0
             if avg_satisfaction < 0.5:
