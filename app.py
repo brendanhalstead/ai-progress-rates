@@ -565,6 +565,77 @@ def compute_model():
         logger.error(f"Error computing model: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/parameter-config', methods=['GET'])
+def get_parameter_config():
+    """Get parameter configuration including bounds, defaults, and metadata"""
+    try:
+        import model_config as cfg
+        
+        parameter_config = {
+            'bounds': cfg.PARAMETER_BOUNDS,
+            'defaults': cfg.DEFAULT_PARAMETERS,
+            'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
+            'descriptions': {
+                'rho_cognitive': {
+                    'name': 'Cognitive Elasticity (ρ_cognitive)',
+                    'description': 'Elasticity of substitution between AI and human cognitive labor',
+                    'units': 'dimensionless'
+                },
+                'rho_progress': {
+                    'name': 'Progress Elasticity (ρ_progress)', 
+                    'description': 'Elasticity of substitution in progress production function',
+                    'units': 'dimensionless'
+                },
+                'alpha': {
+                    'name': 'Compute Weight (α)',
+                    'description': 'Weight of compute vs cognitive output in progress production',
+                    'units': 'dimensionless'
+                },
+                'software_progress_share': {
+                    'name': 'Software Share',
+                    'description': 'Share of progress attributable to software vs hardware',
+                    'units': 'dimensionless'
+                },
+                'automation_fraction_at_superhuman_coder': {
+                    'name': 'Max Automation',
+                    'description': 'Automation fraction when AI reaches superhuman coding ability',
+                    'units': 'fraction'
+                },
+                'progress_at_half_sc_automation': {
+                    'name': 'Half-Max Progress',
+                    'description': 'Progress level at 50% of max automation',
+                    'units': 'dimensionless'
+                },
+                'automation_slope': {
+                    'name': 'Automation Slope',  
+                    'description': 'Steepness of automation curve',
+                    'units': 'dimensionless'
+                },
+                'cognitive_output_normalization': {
+                    'name': 'Cognitive Output Normalization',
+                    'description': 'Normalization factor for cognitive output',
+                    'units': 'dimensionless'
+                },
+                'progress_rate_normalization': {
+                    'name': 'Progress Rate Normalization',
+                    'description': 'Normalization factor for progress rates (auto-calculated)',
+                    'units': 'dimensionless'
+                }
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'config': parameter_config
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting parameter config: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/upload-data', methods=['POST'])
 def upload_data():
     """Upload custom time series data"""

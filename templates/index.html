@@ -302,11 +302,37 @@
     </div>
 
     <script>
+        // Global parameter configuration from server
+        let parameterConfig = null;
+        
+        // Load parameter configuration from server
+        async function loadParameterConfig() {
+            try {
+                const response = await fetch('/api/parameter-config');
+                const data = await response.json();
+                if (data.success) {
+                    parameterConfig = data.config;
+                    console.log('Loaded parameter configuration:', parameterConfig);
+                } else {
+                    console.error('Failed to load parameter config:', data.error);
+                    // Fallback to hardcoded values if API fails
+                    parameterConfig = null;
+                }
+            } catch (error) {
+                console.error('Error loading parameter config:', error);
+                parameterConfig = null;
+            }
+        }
+        
         // Initialize app
         $(document).ready(function() {
-            initializeControls();
-            populateFixedParamsCheckboxes();
-            loadDefaultData();
+            // Load parameter configuration first, then initialize UI
+            loadParameterConfig().then(() => {
+                updateSliderBounds();  // Update slider bounds from config
+                initializeControls();
+                populateFixedParamsCheckboxes();
+                loadDefaultData();
+            });
         });
         
         function initializeControls() {
@@ -593,12 +619,6 @@
                                     const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
                                     const maxVal = parseFloat($('#' + key).attr('max')) || 10;
                                     newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (key === 'rho_cognitive' || key === 'rho_progress') {
-                                    // Ensure elasticity values are within UI bounds [-1, 1]
-                                    newValue = Math.max(-1, Math.min(1, newValue));
-                                } else if (key === 'alpha' || key === 'software_progress_share') {
-                                    // Ensure weight parameters are within UI bounds [0.05, 0.95]
-                                    newValue = Math.max(0.05, Math.min(0.95, newValue));
                                 } else if (key === 'cognitive_output_normalization') {
                                     // Convert from actual value to log scale for the slider
                                     newValue = Math.log10(newValue);
@@ -606,6 +626,19 @@
                                     const minVal = parseFloat($('#' + key).attr('min')) || -5;
                                     const maxVal = parseFloat($('#' + key).attr('max')) || 1;
                                     newValue = Math.max(minVal, Math.min(maxVal, newValue));
+                                } else if (parameterConfig && parameterConfig.bounds && parameterConfig.bounds[key]) {
+                                    // Use bounds from server configuration for other parameters
+                                    const bounds = parameterConfig.bounds[key];
+                                    newValue = Math.max(bounds[0], Math.min(bounds[1], newValue));
+                                } else {
+                                    // Fallback to hardcoded bounds if config not available
+                                    if (key === 'rho_cognitive') {
+                                        newValue = Math.max(-10, Math.min(0, newValue));
+                                    } else if (key === 'rho_progress') {
+                                        newValue = Math.max(-1, Math.min(1, newValue));
+                                    } else if (key === 'alpha' || key === 'software_progress_share') {
+                                        newValue = Math.max(0.05, Math.min(0.95, newValue));
+                                    }
                                 }
                                 
                                 element.val(newValue);
@@ -738,20 +771,57 @@
         
 
         
+        function updateSliderBounds() {
+            // Update slider min/max attributes from parameter configuration
+            if (parameterConfig && parameterConfig.bounds) {
+                Object.entries(parameterConfig.bounds).forEach(([paramName, bounds]) => {
+                    const slider = document.getElementById(paramName);
+                    if (slider && slider.type === 'range') {
+                        const [min, max] = bounds;
+                        
+                        // Special handling for certain parameters
+                        if (paramName === 'cognitive_output_normalization') {
+                            // This slider uses log scale, so convert bounds
+                            slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
+                            slider.max = Math.log10(max);
+                        } else {
+                            slider.min = min;
+                            slider.max = max;
+                        }
+                        
+                        console.log(`Updated ${paramName} slider bounds: [${slider.min}, ${slider.max}]`);
+                    }
+                });
+            }
+        }
+        
         function populateFixedParamsCheckboxes() {
-            const params = {
-                'rho_cognitive': 'Cognitive Elasticity (ρ_cognitive)',
-                'rho_progress': 'Progress Elasticity (ρ_progress)',
-                'alpha': 'Compute Weight (α)',
-                'software_progress_share': 'Software Share',
-                'automation_fraction_at_superhuman_coder': 'Max Automation',
-                'progress_at_half_sc_automation': 'Half-Max Progress',
-                'automation_slope': 'Automation Slope',
-                'cognitive_output_normalization': 'Cognitive Output Normalization'
-            };
-
             const container = $('#fixedParamsCheckboxes');
             container.empty();
+
+            // Use parameter config from server if available, otherwise fallback to hardcoded
+            let params;
+            if (parameterConfig && parameterConfig.descriptions) {
+                params = {};
+                Object.entries(parameterConfig.descriptions).forEach(([id, info]) => {
+                    // Skip progress_rate_normalization as it's auto-calculated
+                    if (id !== 'progress_rate_normalization') {
+                        params[id] = info.name;
+                    }
+                });
+            } else {
+                // Fallback to hardcoded values
+                params = {
+                    'rho_cognitive': 'Cognitive Elasticity (ρ_cognitive)',
+                    'rho_progress': 'Progress Elasticity (ρ_progress)',
+                    'alpha': 'Compute Weight (α)',
+                    'software_progress_share': 'Software Share',
+                    'automation_fraction_at_superhuman_coder': 'Max Automation',
+                    'progress_at_half_sc_automation': 'Half-Max Progress',
+                    'automation_slope': 'Automation Slope',
+                    'cognitive_output_normalization': 'Cognitive Output Normalization'
+                };
+            }
 
             Object.entries(params).forEach(([id, label]) => {
                 const checkboxHtml = `
