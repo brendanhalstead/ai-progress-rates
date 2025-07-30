@@ -14,8 +14,35 @@
     
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .control-panel { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        .plot-container { height: 1800px; border: 1px solid #dee2e6; border-radius: 8px; }
+        
+        /* Fixed height panels with independent scrollbars */
+        .left-panel {
+            height: calc(100vh - 120px); /* Account for navbar height */
+            overflow-y: auto;
+            padding-right: 15px;
+        }
+        
+        .right-panel {
+            height: calc(100vh - 120px); /* Account for navbar height */
+            overflow-y: auto;
+            padding-left: 15px;
+        }
+        
+        .control-panel { 
+            background-color: #f8f9fa; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            min-height: fit-content;
+        }
+        
+        .plot-container { 
+            height: 1800px; 
+            border: 1px solid #dee2e6; 
+            border-radius: 8px; 
+            margin-bottom: 20px;
+        }
+        
         #plotDiv { width: 100%; height: 100%; min-height: 1800px; }
         .param-group { margin-bottom: 20px; }
         .param-label { font-weight: 600; margin-bottom: 5px; }
@@ -26,6 +53,25 @@
         .nav-tabs .nav-link.active { background-color: #667eea; color: white; border-color: #667eea; }
         .btn-primary { background-color: #667eea; border-color: #667eea; }
         .btn-primary:hover { background-color: #5a6fd8; border-color: #5a6fd8; }
+        
+        /* Custom scrollbar styling for webkit browsers */
+        .left-panel::-webkit-scrollbar, .right-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .left-panel::-webkit-scrollbar-track, .right-panel::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .left-panel::-webkit-scrollbar-thumb, .right-panel::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .left-panel::-webkit-scrollbar-thumb:hover, .right-panel::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
     </style>
 </head>
 <body>
@@ -47,7 +93,7 @@
         
         <div class="row">
             <!-- Left Panel: Controls -->
-            <div class="col-lg-4">
+            <div class="col-lg-4 left-panel">
                 <div class="control-panel">
                     <!-- Navigation Tabs -->
                     <ul class="nav nav-tabs mb-3" id="controlTabs">
@@ -237,7 +283,7 @@
             </div>
             
             <!-- Right Panel: Visualization -->
-            <div class="col-lg-8">
+            <div class="col-lg-8 right-panel">
                 <div class="plot-container">
                     <div id="plotDiv" style="width: 100%; height: 100%;"></div>
                     <div class="loading-spinner" id="loadingSpinner">
