@@ -1533,10 +1533,10 @@ class ProgressModel:
                 automation_fractions.append(automation_fraction)
                 
                 # Interpolate input time series to current time
-                L_HUMAN = np.interp(t, self.data.time, self.data.L_HUMAN)
-                L_AI = np.interp(t, self.data.time, self.data.L_AI)
-                experiment_compute = np.interp(t, self.data.time, self.data.experiment_compute)
-                training_compute = np.interp(t, self.data.time, self.data.training_compute)
+                L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
+                L_AI = _log_interp(t, self.data.time, self.data.L_AI)
+                experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
+                training_compute = _log_interp(t, self.data.time, self.data.training_compute)
                 
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
