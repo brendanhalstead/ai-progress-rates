@@ -196,7 +196,7 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
     )
 
 def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, secondary_y=False):
-    """Plot cognitive output with experiment compute on secondary axis"""
+    """Plot cognitive output with experiment compute"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
                   name='Cognitive Output',
@@ -205,15 +205,14 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
         row=row, col=col, secondary_y=False
     )
     
-    # Add experiment compute on secondary y-axis
+    # Add experiment compute directly from time series (no interpolation)
     time_series = session_data['time_series']
-    experiment_compute_interp = np.interp(times, time_series.time, time_series.experiment_compute)
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=experiment_compute_interp.tolist(),
+        go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
                   name='Experiment Compute',
-                  line=dict(color='#2ca02c', width=3, dash='dash'),
+                  line=dict(color='#2ca02c', width=3),
                   mode='lines+markers', marker=dict(size=4)),
-        row=row, col=col, secondary_y=True
+        row=row, col=col, secondary_y=secondary_y
     )
 
 def plot_progress_vs_automation(fig, progress, automation_fraction, row, col):
@@ -380,9 +379,8 @@ def get_tab_configurations():
     output_plots = [
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1,
                   y_axis_title="Progress"),
-        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 2, secondary_y=True,
-                  y_axis_title="Cognitive Output (log scale)", y_axis_type="log",
-                  y_axis_secondary_title="Experiment Compute (log scale)", y_axis_secondary_type="log"),
+        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 2,
+                  y_axis_title="Cognitive Output & Compute (log scale)", y_axis_type="log"),
         PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 2, 1,
                   x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
         PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 2, 2,
@@ -403,7 +401,7 @@ def get_tab_configurations():
         plots=output_plots,
         rows=4,
         cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": True}],
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}]]
