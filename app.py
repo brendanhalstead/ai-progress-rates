@@ -48,12 +48,23 @@ session_data = {
 class PlotConfig:
     """Configuration for a single plot"""
     def __init__(self, title: str, plot_func: Callable, row: int, col: int, 
-                 secondary_y: bool = False, **kwargs):
+                 secondary_y: bool = False, 
+                 x_axis_title: str = "Time",
+                 y_axis_title: str = None,
+                 y_axis_type: str = "linear",
+                 y_axis_secondary_title: str = None,
+                 y_axis_secondary_type: str = "linear",
+                 **kwargs):
         self.title = title
         self.plot_func = plot_func
         self.row = row
         self.col = col
         self.secondary_y = secondary_y
+        self.x_axis_title = x_axis_title
+        self.y_axis_title = y_axis_title or title
+        self.y_axis_type = y_axis_type
+        self.y_axis_secondary_title = y_axis_secondary_title
+        self.y_axis_secondary_type = y_axis_secondary_type
         self.kwargs = kwargs
 
 class TabConfig:
@@ -318,12 +329,18 @@ def get_tab_configurations():
     
     # Input Time Series Tab
     input_plots = [
-        PlotConfig("Human Labor", lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c), 1, 1),
-        PlotConfig("AI Labor", lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c), 1, 2),
-        PlotConfig("Experiment Compute", lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c), 2, 1),
-        PlotConfig("Training Compute", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 2, 2),
-        PlotConfig("Labor Comparison", lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c), 3, 1),
-        PlotConfig("Compute Comparison", lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c), 3, 2),
+        PlotConfig("Human Labor", lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c), 1, 1,
+                  y_axis_title="Human Labor (log scale)", y_axis_type="log"),
+        PlotConfig("AI Labor", lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c), 1, 2,
+                  y_axis_title="AI Labor (log scale)", y_axis_type="log"),
+        PlotConfig("Experiment Compute", lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c), 2, 1,
+                  y_axis_title="Experiment Compute (log scale)", y_axis_type="log"),
+        PlotConfig("Training Compute", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 2, 2,
+                  y_axis_title="Training Compute (log scale)", y_axis_type="log"),
+        PlotConfig("Labor Comparison", lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c), 3, 1,
+                  y_axis_title="Labor (log scale)", y_axis_type="log"),
+        PlotConfig("Compute Comparison", lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c), 3, 2,
+                  y_axis_title="Compute (log scale)", y_axis_type="log"),
     ]
     
     input_tab = TabConfig(
@@ -339,18 +356,31 @@ def get_tab_configurations():
     
     # Output Metrics Tab
     output_plots = [
-        PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1),
-        PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 1, 2),
-        PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1),
-        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2),
-        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 3, 1, secondary_y=True),
-        PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 3, 2),
-        PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 4, 1),
-        PlotConfig("Cognitive Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 4, 2),
-        PlotConfig("Research Stock", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 5, 1),
-        PlotConfig("Research Stock Rate", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 5, 2),
-        PlotConfig("Human-Only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 6, 1),
-        PlotConfig("Automation Multiplier", lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c), 6, 2),
+        PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1,
+                  y_axis_title="Progress"),
+        PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 1, 2,
+                  y_axis_title="Automation (%)"),
+        PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1,
+                  y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
+                  y_axis_title="Software Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 3, 1, secondary_y=True,
+                  y_axis_title="Cognitive Output (log scale)", y_axis_type="log",
+                  y_axis_secondary_title="Experiment Compute (log scale)", y_axis_secondary_type="log"),
+        PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 3, 2,
+                  x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
+        PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 4, 1,
+                  y_axis_title="Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Cognitive Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 4, 2,
+                  y_axis_title="Labor Contribution (log scale)", y_axis_type="log"),
+        PlotConfig("Research Stock", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 5, 1,
+                  y_axis_title="Research Stock (log scale)", y_axis_type="log"),
+        PlotConfig("Research Stock Rate", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 5, 2,
+                  y_axis_title="Research Stock Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Human-Only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 6, 1,
+                  y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Automation Multiplier", lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c), 6, 2,
+                  y_axis_title="Automation Multiplier"),
     ]
     
     output_tab = TabConfig(
@@ -403,74 +433,39 @@ def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
     return fig
 
 def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, Any]):
-    """Update axis labels and scaling for a specific tab"""
+    """Update axis labels and scaling for a specific tab using plot configurations"""
     
-    if tab_config.tab_id == "input_data":
-        # Input data axes
-        for i in range(1, tab_config.rows + 1):
-            for j in range(1, tab_config.cols + 1):
-                fig.update_xaxes(title_text="Time", row=i, col=j, gridcolor='lightgray')
+    # Apply axis configuration from each plot
+    for plot_config in tab_config.plots:
+        row, col = plot_config.row, plot_config.col
         
-        fig.update_yaxes(title_text="Human Labor (log scale)", type="log", row=1, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="AI Labor (log scale)", type="log", row=1, col=2, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=2, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Training Compute (log scale)", type="log", row=2, col=2, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Labor (log scale)", type="log", row=3, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Compute (log scale)", type="log", row=3, col=2, gridcolor='lightgray')
+        # Update x-axis
+        fig.update_xaxes(
+            title_text=plot_config.x_axis_title,
+            row=row, col=col,
+            gridcolor='lightgray'
+        )
         
-    elif tab_config.tab_id == "output_metrics":
-        # Output metrics axes - similar to original dashboard
-        metrics = data.get('metrics', {})
-        times = np.array(metrics.get('times', []))
-        progress_rates = np.array(metrics.get('progress_rates', []))
-        software_progress_rates = np.array(metrics.get('software_progress_rates', []))
-        cognitive_outputs = np.array(metrics.get('cognitive_outputs', []))
-        human_only_progress_rates = np.array(metrics.get('human_only_progress_rates', []))
+        # Update primary y-axis
+        y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
+        fig.update_yaxes(
+            title_text=plot_config.y_axis_title,
+            type=y_axis_type,
+            row=row, col=col,
+            gridcolor='lightgray',
+            secondary_y=False
+        )
         
-        # Set x-axis labels
-        for i in range(1, tab_config.rows + 1):
-            for j in range(1, tab_config.cols + 1):
-                if i == 3 and j == 2:  # Progress vs Automation scatter
-                    fig.update_xaxes(title_text="Cumulative Progress", row=i, col=j, gridcolor='lightgray')
-                else:
-                    fig.update_xaxes(title_text="Time", row=i, col=j, gridcolor='lightgray')
-        
-        # Set y-axis labels and scaling
-        fig.update_yaxes(title_text="Progress", row=1, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Automation (%)", row=1, col=2, gridcolor='lightgray')
-        
-        # Progress rates with log scale if needed
-        if len(progress_rates) > 0 and np.max(progress_rates) > 0:
-            fig.update_yaxes(title_text="Overall Rate (log scale)", type="log", row=2, col=1, gridcolor='lightgray')
-        else:
-            fig.update_yaxes(title_text="Overall Rate", row=2, col=1, gridcolor='lightgray')
-        
-        if len(software_progress_rates) > 0 and np.max(software_progress_rates) > 0:
-            fig.update_yaxes(title_text="Software Rate (log scale)", type="log", row=2, col=2, gridcolor='lightgray')
-        else:
-            fig.update_yaxes(title_text="Software Rate", row=2, col=2, gridcolor='lightgray')
-        
-        # Cognitive output with dual y-axes
-        if len(cognitive_outputs) > 0 and np.max(cognitive_outputs) > 0:
-            fig.update_yaxes(title_text="Cognitive Output (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=False)
-            fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=True)
-        else:
-            fig.update_yaxes(title_text="Cognitive Output", row=3, col=1, gridcolor='lightgray', secondary_y=False)
-            fig.update_yaxes(title_text="Experiment Compute (log scale)", type="log", row=3, col=1, gridcolor='lightgray', secondary_y=True)
-        
-        fig.update_yaxes(title_text="Automation (%)", row=3, col=2, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Rate (log scale)", type="log", row=4, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Labor Contribution (log scale)", type="log", row=4, col=2, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Research Stock (log scale)", type="log", row=5, col=1, gridcolor='lightgray')
-        fig.update_yaxes(title_text="Research Stock Rate (log scale)", type="log", row=5, col=2, gridcolor='lightgray')
-        
-        # Human-only progress rate scaling
-        if len(human_only_progress_rates) > 0 and np.max(human_only_progress_rates) > 0:
-            fig.update_yaxes(title_text="Human-Only Rate (log scale)", type="log", row=6, col=1, gridcolor='lightgray')
-        else:
-            fig.update_yaxes(title_text="Human-Only Rate", row=6, col=1, gridcolor='lightgray')
-        
-        fig.update_yaxes(title_text="Automation Multiplier", row=6, col=2, gridcolor='lightgray')
+        # Update secondary y-axis if present
+        if plot_config.secondary_y and plot_config.y_axis_secondary_title:
+            secondary_type = plot_config.y_axis_secondary_type if plot_config.y_axis_secondary_type != "linear" else None
+            fig.update_yaxes(
+                title_text=plot_config.y_axis_secondary_title,
+                type=secondary_type,
+                row=row, col=col,
+                gridcolor='lightgray',
+                secondary_y=True
+            )
 
 def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
     """Create dashboard with multiple tabs"""
