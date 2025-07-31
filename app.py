@@ -417,7 +417,7 @@ def get_tab_configurations():
                   y_axis_title="AI Labor (log scale)", y_axis_type="log"),
         PlotConfig("Experiment Compute", lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c), 2, 1,
                   y_axis_title="Experiment Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Training Compute", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 2, 2,
+        PlotConfig("Training Compute Growth Rate (normalized)", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 2, 2,
                   y_axis_title="Training Compute (log scale)", y_axis_type="log"),
     ]
     
@@ -472,9 +472,9 @@ def get_tab_configurations():
     software_rd_plots = [
         PlotConfig("Cognitive Output & Discounted Exp. Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
                   y_axis_title="Cognitive Output & Discounted Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Research Stock Rate", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 1, 2,
+        PlotConfig("Research Effort", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 1, 2,
                   y_axis_title="Research Stock Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Research Stock", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 2, 1,
+        PlotConfig("Cumulative Stock of Research Effort", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 2, 1,
                   y_axis_title="Research Stock (log scale)", y_axis_type="log"),
         PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
                   y_axis_title="Software Rate (log scale)", y_axis_type="log"),
@@ -492,9 +492,9 @@ def get_tab_configurations():
     
     # Combined Progress Production Tab
     combined_progress_plots = [
-        PlotConfig("Training Compute", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 1, 1,
+        PlotConfig("Training Compute Growth Rate (Hardware Progress Rate)", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 1, 1,
                   y_axis_title="Training Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 1, 2,
+        PlotConfig("Progress Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 1, 2,
                   y_axis_title="Rate (log scale)", y_axis_type="log"),
         PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1,
                   y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
@@ -524,8 +524,6 @@ def get_tab_configurations():
                   y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
                   y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
-        PlotConfig("All AI Multipliers Comparison", lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c), 3, 2,
-                  y_axis_title="Multipliers (log scale)", y_axis_type="log"),
     ]
     
     other_metrics_tab = TabConfig(
@@ -536,7 +534,7 @@ def get_tab_configurations():
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
+               [{"secondary_y": False, "colspan": 2}, None]]
     )
     
     return [inputs_tab, automation_tab, cognitive_output_tab, software_rd_tab, combined_progress_tab, other_metrics_tab]

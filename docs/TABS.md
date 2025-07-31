@@ -3,7 +3,7 @@ Tabs:
         Human Labor
         Effective Inference Compute (AI Labor)
         Experiment Compute
-        Training Compute
+        Training Compute Growth Rate (normalized)
     Automation:
         Automation Fraction
         Progress vs Automation
@@ -13,12 +13,12 @@ Tabs:
         AI Cognitive Output Multiplier
     Software R&D
         Cognitive Output & Discounted Exp. Compute
-        Research Stock Rate
-        Research Stock
+        Research Effort
+        Cumulative Stock of Research Effort
         Software Progress Rate
     Combined Progress Production
-        Training Compute
-        Rate Components
+        Training Compute Growth Rate (Hardware Progress Rate)
+        Progress Rate Components
         Overall Progress Rate
         Cumulative Progress
     Other Metrics
