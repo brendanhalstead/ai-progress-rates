@@ -1530,9 +1530,15 @@ class ProgressModel:
         automation_fractions = []
         cognitive_outputs = []
         software_progress_rates = []
+        human_only_research_stock_rates = []
+        human_only_software_progress_rates = []
         human_only_progress_rates = []
         ai_labor_contributions = []
         human_labor_contributions = []
+        ai_cognitive_output_multipliers = []
+        ai_research_stock_multipliers = []
+        ai_software_progress_multipliers = []
+        ai_overall_progress_multipliers = []
         discounted_exp_compute = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
@@ -1580,11 +1586,13 @@ class ProgressModel:
                     experiment_compute, human_only_cognitive_output, 
                     self.params.alpha, self.params.rho_progress, self.params.zeta
                 )
+                human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
                     rs, human_only_research_stock_rate,
                     initial_research_stock_val,
                     initial_research_stock_rate_val
                 )
+                human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
                     human_only_software_rate, training_compute, self.params.software_progress_share
                 ) * self.params.progress_rate_normalization
@@ -1599,6 +1607,13 @@ class ProgressModel:
                 
                 human_labor_contributions.append(human_contrib)
                 ai_labor_contributions.append(ai_contrib)
+
+                # Calculate automation multipliers on various quantities
+                ai_cognitive_output_multipliers.append(cognitive_output / human_contrib if ai_contrib > 0 else 0.0)
+                ai_research_stock_multipliers.append(research_stock_rates[i] / human_only_research_stock_rate if human_only_research_stock_rate > 0 else 0.0)
+                ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
+                ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
+
                 
             except Exception as e:
                 logger.warning(f"Error calculating metrics at t={t}: {e}")
@@ -1615,14 +1630,6 @@ class ProgressModel:
                 ai_labor_contributions.append(0.0)
                 discounted_exp_compute.append(0.0)
         
-        # Calculate automation multipliers (overall rate / human-only rate)
-        automation_multipliers = []
-        for i in range(len(progress_rates)):
-            if human_only_progress_rates[i] > 0:
-                multiplier = progress_rates[i] / human_only_progress_rates[i]
-                automation_multipliers.append(multiplier if np.isfinite(multiplier) else 1.0)
-            else:
-                automation_multipliers.append(1.0)  # No multiplier if human-only rate is zero
             
         # Store comprehensive results
         self.results = {
@@ -1637,7 +1644,10 @@ class ProgressModel:
             'human_only_progress_rates': human_only_progress_rates,
             'ai_labor_contributions': ai_labor_contributions,
             'human_labor_contributions': human_labor_contributions,
-            'automation_multipliers': automation_multipliers,
+            'ai_cognitive_output_multipliers': ai_cognitive_output_multipliers,
+            'ai_research_stock_multipliers': ai_research_stock_multipliers,
+            'ai_software_progress_multipliers': ai_software_progress_multipliers,
+            'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
             'input_time_series': {
                 'time': self.data.time,
