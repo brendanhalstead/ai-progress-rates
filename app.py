@@ -196,7 +196,7 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
     )
 
 def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, secondary_y=False):
-    """Plot cognitive output with experiment compute"""
+    """Plot cognitive output with discounted experiment compute"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
                   name='Cognitive Output',
@@ -205,15 +205,16 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
         row=row, col=col, secondary_y=False
     )
     
-    # Add experiment compute directly from time series (no interpolation)
-    time_series = session_data['time_series']
-    fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
-                  name='Experiment Compute',
-                  line=dict(color='#2ca02c', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
-        row=row, col=col, secondary_y=secondary_y
-    )
+    # Add discounted experiment compute from model results
+    results = session_data['results']
+    if results and 'discounted_exp_compute' in results:
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=results['discounted_exp_compute'],
+                      name='Discounted Experiment Compute',
+                      line=dict(color='#2ca02c', width=3),
+                      mode='lines+markers', marker=dict(size=4)),
+            row=row, col=col, secondary_y=secondary_y
+        )
 
 def plot_progress_vs_automation(fig, progress, automation_fraction, row, col):
     """Plot progress vs automation scatter"""
@@ -379,8 +380,8 @@ def get_tab_configurations():
     output_plots = [
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1,
                   y_axis_title="Progress"),
-        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 2,
-                  y_axis_title="Cognitive Output & Compute (log scale)", y_axis_type="log"),
+        PlotConfig("Cognitive Output & Discounted Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 2,
+                  y_axis_title="Cognitive Output & Discounted Compute (log scale)", y_axis_type="log"),
         PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 2, 1,
                   x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
         PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 2, 2,
@@ -599,7 +600,8 @@ def params_to_dict(params: Parameters):
         'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
         'automation_slope': params.automation_slope,
         'progress_rate_normalization': params.progress_rate_normalization,
-        'cognitive_output_normalization': params.cognitive_output_normalization
+        'cognitive_output_normalization': params.cognitive_output_normalization,
+        'zeta': params.zeta
     }
 
 
@@ -823,6 +825,11 @@ def get_parameter_config():
                 'cognitive_output_normalization': {
                     'name': 'Cognitive Output Normalization',
                     'description': 'Normalization factor for cognitive output',
+                    'units': 'dimensionless'
+                },
+                'zeta': {
+                    'name': 'Experiment Compute Discounting (ζ)',
+                    'description': 'Diminishing returns factor for experiment compute',
                     'units': 'dimensionless'
                 },
                 'progress_rate_normalization': {
@@ -1179,7 +1186,8 @@ def get_default_data():
             'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
             'automation_slope': params.automation_slope,
             'progress_rate_normalization': params.progress_rate_normalization,
-            'cognitive_output_normalization': params.cognitive_output_normalization
+            'cognitive_output_normalization': params.cognitive_output_normalization,
+            'zeta': params.zeta
         }
     })
 

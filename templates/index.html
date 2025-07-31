@@ -151,6 +151,12 @@
                                     <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
                                     <small class="text-muted" id="software_progress_share_range">Loading range...</small>
                                 </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="zeta" step="0.05">
+                                    <small class="text-muted">Diminishing returns factor for experiment compute</small>
+                                </div>
                             </div>
                             
                             <!-- Automation Anchors -->
@@ -477,7 +483,7 @@
             const parameterIds = [
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_progress_share',
                 'automation_fraction_at_superhuman_coder', 'progress_at_half_sc_automation',
-                'automation_slope', 'cognitive_output_normalization'
+                'automation_slope', 'cognitive_output_normalization', 'zeta'
             ];
             
             parameterIds.forEach(id => {
@@ -502,7 +508,7 @@
                                 'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
                                 'software_progress_share': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
                                 'progress_at_half_sc_automation': 18.0, 'automation_slope': 1.6,
-                                'cognitive_output_normalization': 1
+                                'cognitive_output_normalization': 1, 'zeta': 0.4
                             };
                             value = fallbacks[id] || 1;
                         }
@@ -1265,7 +1271,8 @@
                         'automation_fraction_at_superhuman_coder': [0.1, 0.99],
                         'progress_at_half_sc_automation': [1, 2000],
                         'automation_slope': [0.1, 10],
-                        'cognitive_output_normalization': [-5, 1]
+                        'cognitive_output_normalization': [-5, 1],
+                        'zeta': [0.1, 1.0]
                     };
                     
                     if (fallbackBounds[key]) {
@@ -1292,7 +1299,8 @@
                 'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
                 'progress_at_half_sc_automation': { min: 1, max: 2000, value: 500 },
                 'automation_slope': { min: 0.1, max: 10, value: 2.0 },
-                'cognitive_output_normalization': { min: -5, max: 1, value: 0 }
+                'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
+                'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' }
             };
             
             Object.entries(fallbackData).forEach(([paramName, config]) => {
@@ -1353,7 +1361,8 @@
                     'automation_fraction_at_superhuman_coder': 'Max Automation',
                     'progress_at_half_sc_automation': 'Half-Max Progress',
                     'automation_slope': 'Automation Slope',
-                    'cognitive_output_normalization': 'Cognitive Output Normalization'
+                    'cognitive_output_normalization': 'Cognitive Output Normalization',
+                    'zeta': 'Experiment Compute Discounting'
                 };
             }
 

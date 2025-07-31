@@ -1533,6 +1533,7 @@ class ProgressModel:
         human_only_progress_rates = []
         ai_labor_contributions = []
         human_labor_contributions = []
+        discounted_exp_compute = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -1552,6 +1553,10 @@ class ProgressModel:
                 L_AI = _log_interp(t, self.data.time, self.data.L_AI)
                 experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
                 training_compute = _log_interp(t, self.data.time, self.data.training_compute)
+                
+                # Compute discounted experiment compute
+                discounted_exp_compute_val = experiment_compute ** self.params.zeta
+                discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
@@ -1608,6 +1613,7 @@ class ProgressModel:
                 human_only_progress_rates.append(0.0)
                 human_labor_contributions.append(0.0)
                 ai_labor_contributions.append(0.0)
+                discounted_exp_compute.append(0.0)
         
         # Calculate automation multipliers (overall rate / human-only rate)
         automation_multipliers = []
@@ -1632,6 +1638,7 @@ class ProgressModel:
             'ai_labor_contributions': ai_labor_contributions,
             'human_labor_contributions': human_labor_contributions,
             'automation_multipliers': automation_multipliers,
+            'discounted_exp_compute': discounted_exp_compute,
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,
