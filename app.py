@@ -302,6 +302,88 @@ def plot_automation_multiplier(fig, times, automation_multipliers, row, col):
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
 
+def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipliers, row, col):
+    """Plot AI cognitive output multiplier over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
+                  name='AI Cognitive Output Multiplier',
+                  line=dict(color='#9467bd', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
+def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers, row, col):
+    """Plot AI research stock multiplier over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_research_stock_multipliers.tolist(),
+                  name='AI Research Stock Multiplier',
+                  line=dict(color='#8c564b', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
+def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multipliers, row, col):
+    """Plot AI software progress multiplier over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_software_progress_multipliers.tolist(),
+                  name='AI Software Progress Multiplier',
+                  line=dict(color='#ff7f0e', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
+def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipliers, row, col):
+    """Plot AI overall progress multiplier over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_overall_progress_multipliers.tolist(),
+                  name='AI Overall Progress Multiplier',
+                  line=dict(color='#2ca02c', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
+def plot_all_ai_multipliers(fig, times, ai_cognitive_output_multipliers, ai_research_stock_multipliers, 
+                           ai_software_progress_multipliers, ai_overall_progress_multipliers, row, col):
+    """Plot all AI multipliers on the same chart for comparison"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
+                  name='Cognitive Output',
+                  line=dict(color='#9467bd', width=2),
+                  mode='lines'),
+        row=row, col=col
+    )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_research_stock_multipliers.tolist(),
+                  name='Research Stock',
+                  line=dict(color='#8c564b', width=2),
+                  mode='lines'),
+        row=row, col=col
+    )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_software_progress_multipliers.tolist(),
+                  name='Software Progress',
+                  line=dict(color='#ff7f0e', width=2),
+                  mode='lines'),
+        row=row, col=col
+    )
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_overall_progress_multipliers.tolist(),
+                  name='Overall Progress',
+                  line=dict(color='#2ca02c', width=2),
+                  mode='lines'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
 # Tab Configuration
 def get_tab_configurations():
     """
@@ -331,12 +413,12 @@ def get_tab_configurations():
     important_plots = [
         PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 1, 1,
                   y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 1, 2,
+        PlotConfig("Software Progress Rate (multiples of start speed)", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 1, 2,
                   y_axis_title="Software Rate (log scale)", y_axis_type="log"),
         PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 2, 1,
                   y_axis_title="Automation (%)"),
-        PlotConfig("Automation Multiplier", lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c), 2, 2,
-                  y_axis_title="Automation Multiplier"),
+        PlotConfig("Software progress rate / instantaneous human counterfactual", lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c), 2, 2,
+                  y_axis_title="AI Software Progress Multiplier"),
     ]
     
     important_tab = TabConfig(
@@ -376,6 +458,31 @@ def get_tab_configurations():
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
+    # AI Multipliers Tab (showcasing all the new AI multipliers)
+    ai_multiplier_plots = [
+        PlotConfig("AI Cognitive Output Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 1, 1,
+                  y_axis_title="Cognitive Output Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("AI Research Stock Multiplier", lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c), 1, 2,
+                  y_axis_title="Research Stock Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("AI Software Progress Multiplier", lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c), 2, 1,
+                  y_axis_title="Software Progress Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("AI Overall Progress Multiplier", lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c), 2, 2,
+                  y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("All AI Multipliers Comparison", lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c), 3, 1,
+                  y_axis_title="Multipliers (log scale)", y_axis_type="log"),
+    ]
+    
+    ai_multiplier_tab = TabConfig(
+        tab_id="ai_multipliers",
+        tab_name="AI Multipliers",
+        plots=ai_multiplier_plots,
+        rows=3,
+        cols=2,
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False, "colspan": 2}, None]]
+    )
+    
     # Output Metrics Tab (remaining plots after moving some to Important Stuff)
     output_plots = [
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1,
@@ -408,7 +515,7 @@ def get_tab_configurations():
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    return [important_tab, input_tab, output_tab]
+    return [important_tab, input_tab, ai_multiplier_tab, output_tab]
 
 def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
     """Create a plotly figure for a specific tab"""
@@ -517,6 +624,22 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
             cleaned_metrics['automation_multipliers'], 
             1.0
         )
+    
+    # Special handling for AI multipliers - default to 1.0 instead of 0
+    ai_multiplier_keys = [
+        'ai_cognitive_output_multipliers',
+        'ai_research_stock_multipliers', 
+        'ai_software_progress_multipliers',
+        'ai_overall_progress_multipliers'
+    ]
+    
+    for key in ai_multiplier_keys:
+        if key in cleaned_metrics:
+            cleaned_metrics[key] = np.where(
+                np.isfinite(cleaned_metrics[key]),
+                cleaned_metrics[key],
+                1.0
+            )
     
     # Prepare data for plotting
     plot_data = {
