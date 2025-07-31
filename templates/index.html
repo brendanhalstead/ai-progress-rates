@@ -44,6 +44,17 @@
         }
         
         #plotDiv { width: 100%; height: 100%; min-height: 1800px; }
+        
+        /* Ensure tab content and plots have proper dimensions */
+        .tab-content { height: 100%; }
+        .tab-pane { height: 100%; }
+        
+        /* Specific styling for plot containers in tabs */
+        [id^="plot-"] { 
+            width: 100% !important; 
+            height: 100% !important; 
+            min-height: 800px !important; 
+        }
         .param-group { margin-bottom: 20px; }
         .param-label { font-weight: 600; margin-bottom: 5px; }
         .range-input { width: 100%; }
@@ -284,8 +295,20 @@
             
             <!-- Right Panel: Visualization -->
             <div class="col-lg-8 right-panel">
+                <!-- Plot Tab Navigation -->
+                <ul class="nav nav-tabs mb-3" id="plotTabs" style="display: none;">
+                    <!-- Tabs will be dynamically populated -->
+                </ul>
+                
                 <div class="plot-container">
-                    <div id="plotDiv" style="width: 100%; height: 100%;"></div>
+                    <!-- Tab content for plots -->
+                    <div class="tab-content" id="plotTabContent">
+                        <!-- Default single plot container for initial load -->
+                        <div class="tab-pane fade show active" id="default-plot">
+                            <div id="plotDiv" style="width: 100%; height: 100%;"></div>
+                        </div>
+                    </div>
+                    
                     <div class="loading-spinner" id="loadingSpinner">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Computing...</span>
@@ -519,31 +542,14 @@
                 success: function(response) {
                     console.log('Model response:', response);
                     if (response.success) {
-                        // Check if plot exists, if not create it, otherwise update it
-                        const plotDiv = document.getElementById('plotDiv');
-                        if (plotDiv.children.length === 0) {
-                            // First time creating the plot - ensure container is ready
-                            setTimeout(() => {
-                                Plotly.newPlot('plotDiv', response.plot.data, response.plot.layout, {
-                                    responsive: true,
-                                    displayModeBar: true,
-                                    modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
-                                    toImageButtonOptions: {
-                                        format: 'png',
-                                        filename: 'ai_progress_model',
-                                        height: 1800,
-                                        width: null,
-                                        scale: 1
-                                    }
-                                });
-                            }, 5);
+                        if (response.plots && response.tabs) {
+                            // Handle multi-tab response
+                            createPlotTabs(response.tabs, response.plots);
+                        } else if (response.plot) {
+                            // Handle legacy single plot response (fallback)
+                            createSinglePlot(response.plot);
                         } else {
-                            // Update existing plot (preserves sizing and is more efficient)
-                            Plotly.react('plotDiv', response.plot.data, response.plot.layout, {
-                                responsive: true,
-                                displayModeBar: true,
-                                modeBarButtonsToRemove: ['pan2d', 'lasso2d']
-                            });
+                            showError('No plot data received from server');
                         }
                     } else {
                         showError(response.error);
@@ -558,6 +564,226 @@
                     showLoading(false);
                 }
             });
+        }
+        
+        function createPlotTabs(tabs, plots, preserveActiveTab = true) {
+            console.log('Creating plot tabs:', tabs, plots);
+            
+            // Store currently active tab before clearing
+            let currentActiveTabId = null;
+            if (preserveActiveTab) {
+                const activeTab = $('#plotTabs .nav-link.active');
+                if (activeTab.length > 0) {
+                    // Extract tab ID from data-bs-target attribute
+                    const target = activeTab.attr('data-bs-target');
+                    if (target) {
+                        currentActiveTabId = target.replace('#', '').replace('-content', '');
+                        console.log('Preserving active tab:', currentActiveTabId);
+                    }
+                }
+            }
+            
+            // Clean up any existing event listeners to prevent memory leaks
+            $(window).off('resize.plotResize');
+            $('#plotTabs button[data-bs-toggle="tab"]').off('shown.bs.tab.plotResize');
+            
+            // Show tab navigation
+            $('#plotTabs').show();
+            
+            // Clear existing tabs and content
+            $('#plotTabs').empty();
+            $('#plotTabContent').empty();
+            
+            // Store plot data for resize handling
+            window.plotData = plots;
+            window.plotIds = {};
+            
+            // Create tab navigation and content
+            let foundActiveTab = false;
+            tabs.forEach((tab, index) => {
+                // Determine if this tab should be active
+                let isActive = false;
+                if (currentActiveTabId && tab.id === currentActiveTabId) {
+                    isActive = true;
+                    foundActiveTab = true;
+                } else if (!currentActiveTabId && index === 0) {
+                    // Default to first tab if no preserved tab
+                    isActive = true;
+                    foundActiveTab = true;
+                }
+                
+                const activeClass = isActive ? 'active' : '';
+                const showActiveClass = isActive ? 'show active' : '';
+                
+                // Create tab navigation item
+                const tabNav = `
+                    <li class="nav-item">
+                        <button class="nav-link ${activeClass}" id="${tab.id}-tab" data-bs-toggle="tab" 
+                                data-bs-target="#${tab.id}-content" type="button">
+                            ${tab.name}
+                        </button>
+                    </li>
+                `;
+                $('#plotTabs').append(tabNav);
+                
+                // Create tab content pane
+                const plotId = `plot-${tab.id}`;
+                window.plotIds[tab.id] = plotId; // Store for resize handling
+                
+                const tabContent = `
+                    <div class="tab-pane fade ${showActiveClass}" id="${tab.id}-content">
+                        <div id="${plotId}" style="width: 100%; height: 100%; min-height: 800px;"></div>
+                    </div>
+                `;
+                $('#plotTabContent').append(tabContent);
+                
+                // Create the plot if data exists
+                if (plots[tab.id]) {
+                    setTimeout(() => {
+                        try {
+                            Plotly.newPlot(plotId, plots[tab.id].data, plots[tab.id].layout, {
+                                responsive: true,
+                                displayModeBar: true,
+                                modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+                                toImageButtonOptions: {
+                                    format: 'png',
+                                    filename: `ai_progress_${tab.id}`,
+                                    height: 800,
+                                    width: null,
+                                    scale: 1
+                                }
+                            });
+                            
+                            // Mark this plot as created
+                            window.plotIds[tab.id + '_created'] = true;
+                        } catch (error) {
+                            console.error(`Failed to create plot for tab ${tab.id}:`, error);
+                        }
+                    }, index * 100); // Stagger plot creation to avoid overwhelming the browser
+                } else {
+                    console.warn(`No plot data found for tab ${tab.id}`);
+                }
+            });
+            
+            // Fallback: if preserved tab wasn't found, activate the first tab
+            if (!foundActiveTab && tabs.length > 0) {
+                console.log('Preserved tab not found, falling back to first tab');
+                const firstTab = tabs[0];
+                $(`#${firstTab.id}-tab`).addClass('active');
+                $(`#${firstTab.id}-content`).addClass('show active');
+            }
+            
+            // Add event listeners for tab changes to handle plot resizing
+            setupTabResizeHandlers(tabs);
+        }
+        
+        function setupTabResizeHandlers(tabs) {
+            // Remove any existing event listeners to avoid duplicates
+            $('#plotTabs button[data-bs-toggle="tab"]').off('shown.bs.tab.plotResize');
+            
+            // Add event listeners for tab shown events
+            $('#plotTabs button[data-bs-toggle="tab"]').on('shown.bs.tab.plotResize', function (e) {
+                const tabId = e.target.getAttribute('data-bs-target').replace('#', '').replace('-content', '');
+                const plotId = window.plotIds[tabId];
+                
+                console.log('Tab shown:', tabId, 'Plot ID:', plotId);
+                
+                if (plotId && window.plotIds[tabId + '_created']) {
+                    setTimeout(() => {
+                        try {
+                            // Resize the plot to fit the container
+                            Plotly.Plots.resize(plotId);
+                            console.log('Resized plot for tab:', tabId);
+                        } catch (error) {
+                            console.warn('Failed to resize plot for tab:', tabId, error);
+                            
+                            // If resize fails, try to recreate the plot
+                            if (window.plotData && window.plotData[tabId]) {
+                                console.log('Attempting to recreate plot for tab:', tabId);
+                                try {
+                                    Plotly.newPlot(plotId, window.plotData[tabId].data, window.plotData[tabId].layout, {
+                                        responsive: true,
+                                        displayModeBar: true,
+                                        modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+                                        toImageButtonOptions: {
+                                            format: 'png',
+                                            filename: `ai_progress_${tabId}`,
+                                            height: 800,
+                                            width: null,
+                                            scale: 1
+                                        }
+                                    });
+                                } catch (recreateError) {
+                                    console.error('Failed to recreate plot for tab:', tabId, recreateError);
+                                }
+                            }
+                        }
+                    }, 50); // Small delay to ensure tab transition is complete
+                }
+            });
+            
+            // Also handle window resize events for all visible plots
+            $(window).off('resize.plotResize').on('resize.plotResize', function() {
+                // Find the currently active tab
+                const activeTab = $('#plotTabs .nav-link.active');
+                if (activeTab.length > 0) {
+                    const tabId = activeTab.attr('data-bs-target').replace('#', '').replace('-content', '');
+                    const plotId = window.plotIds[tabId];
+                    
+                    if (plotId && window.plotIds[tabId + '_created']) {
+                        setTimeout(() => {
+                            try {
+                                Plotly.Plots.resize(plotId);
+                            } catch (error) {
+                                console.warn('Failed to resize plot on window resize:', plotId, error);
+                            }
+                        }, 100);
+                    }
+                }
+            });
+        }
+        
+        function createSinglePlot(plotData) {
+            console.log('Creating single plot (legacy mode)');
+            
+            // Clean up any tab-related event listeners
+            $(window).off('resize.plotResize');
+            $('#plotTabs button[data-bs-toggle="tab"]').off('shown.bs.tab.plotResize');
+            
+            // Hide tab navigation
+            $('#plotTabs').hide();
+            
+            // Clear existing content and create single plot container
+            $('#plotTabContent').html(`
+                <div class="tab-pane fade show active" id="default-plot">
+                    <div id="plotDiv" style="width: 100%; height: 100%; min-height: 1800px;"></div>
+                </div>
+            `);
+            
+            // Create the plot
+            const plotDiv = document.getElementById('plotDiv');
+            if (plotDiv.children.length === 0) {
+                setTimeout(() => {
+                    Plotly.newPlot('plotDiv', plotData.data, plotData.layout, {
+                        responsive: true,
+                        displayModeBar: true,
+                        modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+                        toImageButtonOptions: {
+                            format: 'png',
+                            filename: 'ai_progress_model',
+                            height: 1800,
+                            width: null,
+                            scale: 1
+                        }
+                    });
+                }, 5);
+            } else {
+                Plotly.react('plotDiv', plotData.data, plotData.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d']
+                });
+            }
         }
         
         function initializeSession() {
@@ -731,33 +957,12 @@
                         });
                         
                         // Check if we have plot data (new synchronized response)
-                        if (response.plot && response.summary) {
-                            // Check if plot exists, if not create it, otherwise update it
-                            const plotDiv = document.getElementById('plotDiv');
-                            if (plotDiv.children.length === 0) {
-                                // First time creating the plot - ensure container is ready
-                                setTimeout(() => {
-                                    Plotly.newPlot('plotDiv', response.plot.data, response.plot.layout, {
-                                        responsive: true,
-                                        displayModeBar: true,
-                                        modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
-                                        toImageButtonOptions: {
-                                            format: 'png',
-                                            filename: 'ai_progress_model',
-                                            height: 1800,
-                                            width: null,
-                                            scale: 1
-                                        }
-                                    });
-                                }, 100);
-                            } else {
-                                // Update existing plot (preserves sizing and is more efficient)
-                                Plotly.react('plotDiv', response.plot.data, response.plot.layout, {
-                                    responsive: true,
-                                    displayModeBar: true,
-                                    modeBarButtonsToRemove: ['pan2d', 'lasso2d']
-                                });
-                            }
+                        if (response.plots && response.tabs && response.summary) {
+                            // Handle multi-tab response
+                            createPlotTabs(response.tabs, response.plots);
+                        } else if (response.plot && response.summary) {
+                            // Handle legacy single plot response (fallback)
+                            createSinglePlot(response.plot);
                         }
                         
                         // Show parameter changes in validation area
@@ -808,7 +1013,7 @@
                                 </div>
                                 
                                 <div class="alert alert-success mt-2">
-                                    ${response.plot ? '✓ Parameters estimated and model updated successfully! The graph shows the new results.' : '✓ Parameters estimated successfully! Click "Update Model" to see the results.'}
+                                    ${(response.plots || response.plot) ? '✓ Parameters estimated and model updated successfully! The graphs show the new results.' : '✓ Parameters estimated successfully! Click "Update Model" to see the results.'}
                                 </div>
                                 
                                 ${response.computation_error ? `
@@ -821,7 +1026,7 @@
                         `;
                         
                         // Only call computeModel if we don't already have plot data
-                        if (!response.plot) {
+                        if (!response.plots && !response.plot) {
                             computeModel();
                         }
                     } else {
