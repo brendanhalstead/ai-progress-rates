@@ -430,13 +430,18 @@ def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
             logger.warning(f"Failed to create plot '{plot_config.title}': {e}")
             continue
     
-    # Update layout
+    # Update layout with consistent height per row
+    height_per_row = 400  # pixels per row
+    total_height = height_per_row * tab_config.rows
+    
     fig.update_layout(
-        autosize=True,
+        height=total_height,
+        autosize=True,  # Allow width to be responsive
         showlegend=False,
         title_text=tab_config.tab_name,
         title_x=0.5,
-        plot_bgcolor='white'
+        plot_bgcolor='white',
+        margin=dict(t=60, b=40, l=60, r=40)  # Set consistent margins
     )
     
     # Update axes
@@ -751,9 +756,9 @@ def compute_model():
         for tab_id, fig in figures.items():
             plots[tab_id] = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
         
-        # Get tab metadata
+        # Get tab metadata including row information for proper sizing
         tab_configs = get_tab_configurations()
-        tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name} for tab in tab_configs]
+        tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
         
         return jsonify({
             'success': True,
@@ -944,9 +949,9 @@ def estimate_params():
                 for tab_id, fig in figures.items():
                     plots[tab_id] = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
                 
-                # Get tab metadata
+                # Get tab metadata including row information for proper sizing
                 tab_configs = get_tab_configurations()
-                tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name} for tab in tab_configs]
+                tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
                 
                 # Validate the optimization results
                 initial_obj = getattr(estimated_params, '_initial_objective', None)

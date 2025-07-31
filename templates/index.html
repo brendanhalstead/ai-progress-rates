@@ -37,13 +37,13 @@
         }
         
         .plot-container { 
-            height: 1800px; 
+            height: 0px; 
             border: 1px solid #dee2e6; 
             border-radius: 8px; 
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
         
-        #plotDiv { width: 100%; height: 100%; min-height: 1800px; }
+        #plotDiv { width: 100%; height: 100%; min-height: 1280px; }
         
         /* Ensure tab content and plots have proper dimensions */
         .tab-content { height: 100%; }
@@ -53,7 +53,7 @@
         [id^="plot-"] { 
             width: 100% !important; 
             height: 100% !important; 
-            min-height: 800px !important; 
+            min-height: 600px !important; 
         }
         .param-group { margin-bottom: 20px; }
         .param-label { font-weight: 600; margin-bottom: 5px; }
@@ -383,6 +383,14 @@
         
         // Initialize app
         $(document).ready(function() {
+            // Ensure plot container has consistent height from the start
+            const plotContainer = $('.plot-container')[0];
+            if (plotContainer) {
+                plotContainer.style.setProperty('height', '1280px', 'important');
+                // Force a reflow to ensure the height is applied immediately
+                plotContainer.offsetHeight;
+            }
+            
             // Load parameter configuration first, then initialize everything
             loadParameterConfig().then(() => {
                 // Initialize server session in parallel with UI setup
@@ -594,9 +602,10 @@
             $('#plotTabs').empty();
             $('#plotTabContent').empty();
             
-            // Store plot data for resize handling
+            // Store plot data and tab configuration for resize handling
             window.plotData = plots;
             window.plotIds = {};
+            window.tabConfigurations = tabs;
             
             // Create tab navigation and content
             let foundActiveTab = false;
@@ -610,6 +619,7 @@
                     // Default to first tab if no preserved tab
                     isActive = true;
                     foundActiveTab = true;
+                    currentActiveTabId = tab.id;
                 }
                 
                 const activeClass = isActive ? 'active' : '';
@@ -632,7 +642,7 @@
                 
                 const tabContent = `
                     <div class="tab-pane fade ${showActiveClass}" id="${tab.id}-content">
-                        <div id="${plotId}" style="width: 100%; height: 100%; min-height: 800px;"></div>
+                        <div id="${plotId}" style="width: 100%; height: 100%; min-height: 600px;"></div>
                     </div>
                 `;
                 $('#plotTabContent').append(tabContent);
@@ -641,14 +651,21 @@
                 if (plots[tab.id]) {
                     setTimeout(() => {
                         try {
-                            Plotly.newPlot(plotId, plots[tab.id].data, plots[tab.id].layout, {
+                            // Ensure plot layout uses consistent height
+                            const plotLayout = { ...plots[tab.id].layout };
+                            if (plotLayout.height && plotLayout.height !== 1280) {
+                                console.log(`Adjusting plot layout height from ${plotLayout.height} to match container`);
+                                plotLayout.height = undefined; // Let it use container dimensions
+                            }
+                            
+                            Plotly.newPlot(plotId, plots[tab.id].data, plotLayout, {
                                 responsive: true,
                                 displayModeBar: true,
                                 modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
                                 toImageButtonOptions: {
                                     format: 'png',
                                     filename: `ai_progress_${tab.id}`,
-                                    height: 800,
+                                    height: 600,
                                     width: null,
                                     scale: 1
                                 }
@@ -671,12 +688,51 @@
                 const firstTab = tabs[0];
                 $(`#${firstTab.id}-tab`).addClass('active');
                 $(`#${firstTab.id}-content`).addClass('show active');
+                currentActiveTabId = firstTab.id;
+            }
+            
+            // Set initial container height for the active tab immediately
+            if (currentActiveTabId) {
+                updatePlotContainerHeight(currentActiveTabId);
+            } else if (tabs.length > 0) {
+                // If no active tab ID, use the first tab for height calculation
+                updatePlotContainerHeight(tabs[0].id);
             }
             
             // Add event listeners for tab changes to handle plot resizing
             setupTabResizeHandlers(tabs);
         }
         
+        function updatePlotContainerHeight(tabId) {
+            // Find the tab configuration for the given tabId
+            const tabConfig = window.tabConfigurations?.find(tab => tab.id === tabId);
+            if (tabConfig && tabConfig.rows) {
+                const heightPerRow = 320; // pixels per row (reduced from 400)
+                const totalHeight = heightPerRow * tabConfig.rows;
+                const plotContainer = $('.plot-container')[0];
+                
+                console.log(`Updating plot container height for tab ${tabId}: ${tabConfig.rows} rows = ${totalHeight}px`);
+                // Use !important to override CSS and ensure the change takes effect immediately
+                if (plotContainer) {
+                    plotContainer.style.setProperty('height', totalHeight + 'px', 'important');
+                    // Also trigger a reflow to ensure the change is applied
+                    plotContainer.offsetHeight;
+                }
+            } else {
+                // Fallback: ensure reduced height is applied even without rows config
+                const plotContainer = $('.plot-container');
+                const currentHeight = plotContainer.height();
+                if (currentHeight > 1280) {
+                    console.log(`Applying reduced height fallback: ${currentHeight}px -> 1280px`);
+                    const containerElement = plotContainer[0];
+                    if (containerElement) {
+                        containerElement.style.setProperty('height', '1280px', 'important');
+                        containerElement.offsetHeight;
+                    }
+                }
+            }
+        }
+
         function setupTabResizeHandlers(tabs) {
             // Remove any existing event listeners to avoid duplicates
             $('#plotTabs button[data-bs-toggle="tab"]').off('shown.bs.tab.plotResize');
@@ -687,6 +743,9 @@
                 const plotId = window.plotIds[tabId];
                 
                 console.log('Tab shown:', tabId, 'Plot ID:', plotId);
+                
+                // Update container height for this tab
+                updatePlotContainerHeight(tabId);
                 
                 if (plotId && window.plotIds[tabId + '_created']) {
                     setTimeout(() => {
@@ -701,14 +760,21 @@
                             if (window.plotData && window.plotData[tabId]) {
                                 console.log('Attempting to recreate plot for tab:', tabId);
                                 try {
-                                    Plotly.newPlot(plotId, window.plotData[tabId].data, window.plotData[tabId].layout, {
+                                    // Ensure plot layout uses consistent height during recreation
+                                    const plotLayout = { ...window.plotData[tabId].layout };
+                                    if (plotLayout.height && plotLayout.height !== 1280) {
+                                        console.log(`Adjusting recreated plot layout height from ${plotLayout.height} to match container`);
+                                        plotLayout.height = undefined; // Let it use container dimensions
+                                    }
+                                    
+                                    Plotly.newPlot(plotId, window.plotData[tabId].data, plotLayout, {
                                         responsive: true,
                                         displayModeBar: true,
                                         modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
                                         toImageButtonOptions: {
                                             format: 'png',
                                             filename: `ai_progress_${tabId}`,
-                                            height: 800,
+                                            height: 600,
                                             width: null,
                                             scale: 1
                                         }
@@ -754,9 +820,16 @@
             $('#plotTabs').hide();
             
             // Clear existing content and create single plot container
+            // Set reasonable height for single plot mode - use consistent height calculation
+            const singlePlotContainer = $('.plot-container')[0];
+            if (singlePlotContainer) {
+                singlePlotContainer.style.setProperty('height', '1280px', 'important');
+                // Force a reflow to ensure the height is applied immediately
+                singlePlotContainer.offsetHeight;
+            }
             $('#plotTabContent').html(`
                 <div class="tab-pane fade show active" id="default-plot">
-                    <div id="plotDiv" style="width: 100%; height: 100%; min-height: 1800px;"></div>
+                    <div id="plotDiv" style="width: 100%; height: 100%; min-height: 1280px;"></div>
                 </div>
             `);
             
@@ -764,21 +837,35 @@
             const plotDiv = document.getElementById('plotDiv');
             if (plotDiv.children.length === 0) {
                 setTimeout(() => {
-                    Plotly.newPlot('plotDiv', plotData.data, plotData.layout, {
+                    // Ensure plot layout uses consistent height
+                    const plotLayout = { ...plotData.layout };
+                    if (plotLayout.height && plotLayout.height !== 1280) {
+                        console.log(`Adjusting single plot layout height from ${plotLayout.height} to match container`);
+                        plotLayout.height = undefined; // Let it use container dimensions
+                    }
+                    
+                    Plotly.newPlot('plotDiv', plotData.data, plotLayout, {
                         responsive: true,
                         displayModeBar: true,
                         modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
                         toImageButtonOptions: {
                             format: 'png',
                             filename: 'ai_progress_model',
-                            height: 1800,
+                            height: 1280,
                             width: null,
                             scale: 1
                         }
                     });
                 }, 5);
             } else {
-                Plotly.react('plotDiv', plotData.data, plotData.layout, {
+                // Ensure plot layout uses consistent height for updates too
+                const plotLayout = { ...plotData.layout };
+                if (plotLayout.height && plotLayout.height !== 1280) {
+                    console.log(`Adjusting single plot update layout height from ${plotLayout.height} to match container`);
+                    plotLayout.height = undefined; // Let it use container dimensions
+                }
+                
+                Plotly.react('plotDiv', plotData.data, plotLayout, {
                     responsive: true,
                     displayModeBar: true,
                     modeBarButtonsToRemove: ['pan2d', 'lasso2d']
