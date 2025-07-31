@@ -118,27 +118,27 @@
                                 <h6 class="text-muted">Production Functions</h6>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Cognitive Elasticity (ρ_cognitive): <span id="rho_cognitive_val">-0.2</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_cognitive" min="-10" max="1" step="0.1" value="-2">
-                                    <small class="text-muted">Range: [-10, 0]</small>
+                                    <label class="param-label">Cognitive Elasticity (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
+                                    <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Progress Elasticity (ρ_progress): <span id="rho_progress_val">-0.2</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_progress" min="-1" max="1" step="0.1" value="-0.2">
-                                    <small class="text-muted">Range: [-1, 1]</small>
+                                    <label class="param-label">Progress Elasticity (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
+                                    <small class="text-muted" id="rho_progress_range">Loading range...</small>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">0.5</span></label>
-                                    <input type="range" class="range-input form-range" id="alpha" min="0.05" max="0.95" step="0.05" value="0.5">
+                                    <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="alpha" step="0.05">
                                     <small class="text-muted">Higher values favor compute over cognitive work</small>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">0.7</span></label>
-                                    <input type="range" class="range-input form-range" id="software_progress_share" min="0.05" max="0.95" step="0.05" value="0.7">
-                                    <small class="text-muted">Range: [0.05, 0.95]</small>
+                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
                                 </div>
                             </div>
                             
@@ -148,21 +148,21 @@
                                 
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">Max Automation: <span id="automation_fraction_at_superhuman_coder_val">90%</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" min="0.1" max="0.99" step="0.01" value="0.99">
+                                        <label class="param-label">Max Automation: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
                                         <small class="text-muted">Upper limit of automation fraction</small>
                                     </div>
                                     <div class="col-6">
-                                        <label class="param-label">Half-Max Progress: <span id="progress_at_half_sc_automation_val">50.0</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_half_sc_automation" min="1" max="2000" step="1" value="500">
+                                        <label class="param-label">Half-Max Progress: <span id="progress_at_half_sc_automation_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="progress_at_half_sc_automation" step="1">
                                         <small class="text-muted">Progress where automation = half of maximum</small>
                                     </div>
                                 </div>
                                 
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">Automation Slope: <span id="automation_slope_val">2.0</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_slope" min="0.1" max="10" step="0.1" value="2.0">
+                                        <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_slope" step="0.1">
                                         <small class="text-muted">Steepness of automation transition</small>
                                     </div>
                                     <div class="col-6">
@@ -183,8 +183,8 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">1.0</span></label>
-                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" min="-5" max="1" step="0.1" value="0">
+                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
                                     <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
                                 </div>
                             </div>
@@ -196,15 +196,15 @@
                                 <div class="row">
                                     <div class="col-4">
                                         <label class="param-label">Start Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="start_year" value="2012" min="2000" max="2050">
+                                        <input type="number" class="form-control form-control-sm" id="start_year">
                                     </div>
                                     <div class="col-4">
                                         <label class="param-label">End Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="end_year" value="2030" min="2020" max="2100">
+                                        <input type="number" class="form-control form-control-sm" id="end_year">
                                     </div>
                                     <div class="col-4">
                                         <label class="param-label">Initial Progress</label>
-                                        <input type="number" class="form-control form-control-sm" id="initial_progress" value="1.0" min="0.01" max="100" step="0.01">
+                                        <input type="number" class="form-control form-control-sm" id="initial_progress" step="0.01">
                                     </div>
                                 </div>
                             </div>
@@ -309,29 +309,75 @@
         async function loadParameterConfig() {
             try {
                 const response = await fetch('/api/parameter-config');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
                 if (data.success) {
                     parameterConfig = data.config;
-                    console.log('Loaded parameter configuration:', parameterConfig);
+                    console.log('Successfully loaded parameter configuration:', parameterConfig);
+                    
+                    // Validate config structure
+                    if (!parameterConfig.bounds || !parameterConfig.defaults) {
+                        console.warn('Parameter config is missing expected properties:', parameterConfig);
+                    }
                 } else {
-                    console.error('Failed to load parameter config:', data.error);
-                    // Fallback to hardcoded values if API fails
-                    parameterConfig = null;
+                    throw new Error(data.error || 'Unknown API error');
                 }
             } catch (error) {
-                console.error('Error loading parameter config:', error);
+                console.error('Failed to load parameter configuration:', error.message);
+                console.warn('Falling back to hardcoded parameter values');
                 parameterConfig = null;
+                
+                // Show user-friendly warning if needed
+                showConfigWarning('Parameter configuration could not be loaded from server. Using default values.');
             }
+        }
+        
+        function showConfigWarning(message) {
+            // Show a non-intrusive warning about config loading failure
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'alert alert-warning alert-dismissible fade show';
+            warningDiv.style.position = 'fixed';
+            warningDiv.style.top = '10px';
+            warningDiv.style.right = '10px';
+            warningDiv.style.zIndex = '9999';
+            warningDiv.style.maxWidth = '400px';
+            warningDiv.innerHTML = `
+                <small><strong>Configuration Notice:</strong> ${message}</small>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(warningDiv);
+            
+            // Auto-dismiss after 10 seconds
+            setTimeout(() => {
+                if (warningDiv.parentNode) {
+                    warningDiv.remove();
+                }
+            }, 10000);
         }
         
         // Initialize app
         $(document).ready(function() {
-            // Load parameter configuration first, then initialize UI
+            // Load parameter configuration first, then initialize everything
             loadParameterConfig().then(() => {
-                updateSliderBounds();  // Update slider bounds from config
+                // Initialize server session in parallel with UI setup
+                const sessionPromise = initializeSession();
+                
+                // Set up UI controls from parameter config
+                initializeParameterControls();
                 initializeControls();
                 populateFixedParamsCheckboxes();
-                loadDefaultData();
+                
+                // Wait for session to be ready, then compute model
+                sessionPromise.then(() => {
+                    computeModel();
+                }).catch(() => {
+                    // If session init fails, still try to compute (fallback mode)
+                    console.warn('Computing model without proper session initialization');
+                    computeModel();
+                });
             });
         });
         
@@ -393,29 +439,71 @@
         }
         
         function collectParameters() {
-            const params = {
-                rho_cognitive: parseFloat($('#rho_cognitive').val()),
-                rho_progress: parseFloat($('#rho_progress').val()),
-                alpha: parseFloat($('#alpha').val()),
-                software_progress_share: parseFloat($('#software_progress_share').val()),
-                                 automation_fraction_at_superhuman_coder: parseFloat($('#automation_fraction_at_superhuman_coder').val()),
-                progress_at_half_sc_automation: parseFloat($('#progress_at_half_sc_automation').val()),
-                automation_slope: parseFloat($('#automation_slope').val()),
-                cognitive_output_normalization: Math.pow(10, parseFloat($('#cognitive_output_normalization').val()))
-            };
+            // Collect and validate all parameters with proper type conversion
+            const params = {};
+            
+            // List of expected parameters with their element IDs
+            const parameterIds = [
+                'rho_cognitive', 'rho_progress', 'alpha', 'software_progress_share',
+                'automation_fraction_at_superhuman_coder', 'progress_at_half_sc_automation',
+                'automation_slope', 'cognitive_output_normalization'
+            ];
+            
+            parameterIds.forEach(id => {
+                const element = $('#' + id);
+                if (element.length) {
+                    let value = parseFloat(element.val());
+                    
+                    // Special handling for cognitive output normalization (convert from log scale)
+                    if (id === 'cognitive_output_normalization') {
+                        value = Math.pow(10, value);
+                    }
+                    
+                    // Validate that the value is a finite number
+                    if (!isFinite(value)) {
+                        console.warn(`Invalid value for ${id}: ${element.val()}, using fallback`);
+                        // Use fallback from parameter config or hardcoded value
+                        if (parameterConfig && parameterConfig.defaults && parameterConfig.defaults[id] !== undefined) {
+                            value = parameterConfig.defaults[id];
+                        } else {
+                            // Hardcoded fallbacks as last resort
+                            const fallbacks = {
+                                'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
+                                'software_progress_share': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
+                                'progress_at_half_sc_automation': 18.0, 'automation_slope': 1.6,
+                                'cognitive_output_normalization': 1
+                            };
+                            value = fallbacks[id] || 1;
+                        }
+                    }
+                    
+                    params[id] = value;
+                } else {
+                    console.warn(`Parameter element not found: ${id}`);
+                }
+            });
+            
             console.log('Collected parameters:', params);
             return params;
         }
         
         function computeModel() {
             const parameters = collectParameters();
-            const timeRange = [
-                parseInt($('#start_year').val()),
-                parseInt($('#end_year').val())
-            ];
-            const initialProgress = parseFloat($('#initial_progress').val());
+            
+            // Validate time range inputs
+            let startYear = parseInt($('#start_year').val());
+            let endYear = parseInt($('#end_year').val());
+            let initialProgress = parseFloat($('#initial_progress').val());
+            
+            // Apply fallbacks for invalid inputs
+            if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
+            if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2030);
+            if (!isFinite(initialProgress) || initialProgress <= 0) initialProgress = 1.0;
+            
+            const timeRange = [startYear, endYear];
             
             console.log('Computing model with parameters:', parameters);
+            console.log('Time range:', timeRange, 'Initial progress:', initialProgress);
             showLoading(true);
             hideError();
             
@@ -472,36 +560,60 @@
             });
         }
         
-        function loadDefaultData() {
-            $.ajax({
+        function initializeSession() {
+            // Initialize server-side session data without affecting UI
+            return $.ajax({
                 url: '/api/default-data',
                 method: 'GET',
                 success: function(response) {
-                    // Update parameter controls
-                    Object.keys(response.parameters).forEach(key => {
-                        const element = $('#' + key);
-                        if (element.length) {
-                            let value = response.parameters[key];
-                            
-                            // Only convert cognitive output normalization to log scale for display
-                            if (key === 'cognitive_output_normalization') {
-                                // Convert to log scale for display
-                                value = Math.log10(value);
-                            }
-                            // automation_fraction_at_superhuman_coder is now handled as direct value (no logit conversion)
-                            
-                            element.val(value);
-                            updateDisplayValue(element[0]);
-                        }
-                    });
-                    
-                    // Compute initial model
-                    computeModel();
+                    console.log('Server session initialized successfully');
                 },
                 error: function(xhr) {
-                    showError('Failed to load default data');
+                    console.error('Failed to initialize server session:', xhr);
                 }
             });
+        }
+        
+        function loadDefaultData() {
+            // This function is kept for compatibility but now delegates to the parameter config system
+            if (parameterConfig && parameterConfig.defaults) {
+                console.log('Using parameter config defaults instead of /api/default-data');
+                // Re-initialize controls to ensure they have the latest values
+                initializeParameterControls();
+                computeModel();
+            } else {
+                // Fallback to API call if parameter config is not available
+                console.log('Parameter config not available, fetching from /api/default-data');
+                $.ajax({
+                    url: '/api/default-data',
+                    method: 'GET',
+                    success: function(response) {
+                        // Update parameter controls
+                        Object.keys(response.parameters).forEach(key => {
+                            const element = $('#' + key);
+                            if (element.length) {
+                                let value = response.parameters[key];
+                                
+                                // Only convert cognitive output normalization to log scale for display
+                                if (key === 'cognitive_output_normalization') {
+                                    // Convert to log scale for display
+                                    value = Math.log10(Math.max(value, 1e-5));
+                                }
+                                
+                                element.val(value);
+                                updateDisplayValue(element[0]);
+                            }
+                        });
+                        
+                        // Compute initial model
+                        computeModel();
+                    },
+                    error: function(xhr) {
+                        console.error('Failed to load default data:', xhr);
+                        showError('Failed to load default parameter values');
+                    }
+                });
+            }
         }
         
         function uploadData() {
@@ -606,40 +718,7 @@
                                 let newValue = response.estimated_parameters[key];
                                 
                                 // Apply bounds checking and inverse transformation for UI controls
-                                if (key === 'automation_fraction_at_superhuman_coder') {
-                                    // Direct value handling (no logit transformation needed)
-                                    newValue = Math.max(0.1, Math.min(0.99, newValue)); // Clamp to slider bounds
-                                } else if (key === 'progress_at_half_sc_automation') {
-                                    // Ensure progress values are within reasonable UI bounds
-                                    const minVal = parseFloat($('#' + key).attr('min')) || 1;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 200;
-                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (key === 'automation_slope') {
-                                    // Ensure slope is within reasonable UI bounds
-                                    const minVal = parseFloat($('#' + key).attr('min')) || 0.1;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 10;
-                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (key === 'cognitive_output_normalization') {
-                                    // Convert from actual value to log scale for the slider
-                                    newValue = Math.log10(newValue);
-                                    // Ensure it's within slider bounds
-                                    const minVal = parseFloat($('#' + key).attr('min')) || -5;
-                                    const maxVal = parseFloat($('#' + key).attr('max')) || 1;
-                                    newValue = Math.max(minVal, Math.min(maxVal, newValue));
-                                } else if (parameterConfig && parameterConfig.bounds && parameterConfig.bounds[key]) {
-                                    // Use bounds from server configuration for other parameters
-                                    const bounds = parameterConfig.bounds[key];
-                                    newValue = Math.max(bounds[0], Math.min(bounds[1], newValue));
-                                } else {
-                                    // Fallback to hardcoded bounds if config not available
-                                    if (key === 'rho_cognitive') {
-                                        newValue = Math.max(-10, Math.min(0, newValue));
-                                    } else if (key === 'rho_progress') {
-                                        newValue = Math.max(-1, Math.min(1, newValue));
-                                    } else if (key === 'alpha' || key === 'software_progress_share') {
-                                        newValue = Math.max(0.05, Math.min(0.95, newValue));
-                                    }
-                                }
+                                newValue = applyParameterBounds(key, newValue);
                                 
                                 element.val(newValue);
                                 updateDisplayValue(element[0]);
@@ -771,28 +850,190 @@
         
 
         
-        function updateSliderBounds() {
-            // Update slider min/max attributes from parameter configuration
-            if (parameterConfig && parameterConfig.bounds) {
+        function initializeParameterControls() {
+            // Comprehensive initialization of all parameter controls from config
+            if (!parameterConfig) {
+                console.warn('Parameter config not available, using fallback initialization');
+                initializeFallbackControls();
+                return;
+            }
+            
+            // Initialize range sliders
+            if (parameterConfig.bounds && parameterConfig.defaults) {
                 Object.entries(parameterConfig.bounds).forEach(([paramName, bounds]) => {
                     const slider = document.getElementById(paramName);
+                    const defaultValue = parameterConfig.defaults[paramName];
+                    
                     if (slider && slider.type === 'range') {
                         const [min, max] = bounds;
                         
                         // Special handling for certain parameters
                         if (paramName === 'cognitive_output_normalization') {
-                            // This slider uses log scale, so convert bounds
+                            // This slider uses log scale, so convert bounds and default
                             slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
                             slider.max = Math.log10(max);
+                            slider.value = Math.log10(Math.max(defaultValue, 1e-5));
                         } else {
                             slider.min = min;
                             slider.max = max;
+                            slider.value = defaultValue;
                         }
                         
-                        console.log(`Updated ${paramName} slider bounds: [${slider.min}, ${slider.max}]`);
+                        // Update display value
+                        updateDisplayValue(slider);
+                        
+                        // Update range display text if element exists
+                        const rangeDisplay = document.getElementById(paramName + '_range');
+                        if (rangeDisplay) {
+                            rangeDisplay.textContent = `Range: [${min}, ${max}]`;
+                        }
+                        
+                        console.log(`Initialized ${paramName}: bounds=[${slider.min}, ${slider.max}], value=${slider.value}`);
                     }
                 });
             }
+            
+            // Initialize number inputs (simulation settings)
+            // Use hardcoded defaults since simulation settings aren't in parameter config yet
+            const startYear = document.getElementById('start_year');
+            if (startYear) {
+                startYear.value = startYear.value || 2012;
+                startYear.min = 2000;
+                startYear.max = 2050;
+            }
+            
+            const endYear = document.getElementById('end_year');
+            if (endYear) {
+                endYear.value = endYear.value || 2030;
+                endYear.min = 2020;
+                endYear.max = 2100;
+            }
+            
+            const initialProgress = document.getElementById('initial_progress');
+            if (initialProgress) {
+                initialProgress.value = initialProgress.value || 1.0;
+                initialProgress.min = 0.01;
+                initialProgress.max = 100;
+            }
+            
+            // Update parameter labels from descriptions if available
+            if (parameterConfig.descriptions) {
+                Object.entries(parameterConfig.descriptions).forEach(([paramName, info]) => {
+                    const label = document.querySelector(`label[for="${paramName}"], label:has(#${paramName})`);
+                    if (label && info.name) {
+                        // Update the label text while preserving the span for display value
+                        const span = label.querySelector('span');
+                        const spanHtml = span ? span.outerHTML : '';
+                        const colonIndex = label.innerHTML.indexOf(':');
+                        if (colonIndex !== -1) {
+                            label.innerHTML = `${info.name}: ${spanHtml}`;
+                        }
+                    }
+                });
+            }
+        }
+        
+        function applyParameterBounds(key, value) {
+            // Centralized bounds checking and transformation for UI controls
+            let newValue = value;
+            
+            // Special handling for cognitive_output_normalization (log scale conversion)
+            if (key === 'cognitive_output_normalization') {
+                // Convert from actual value to log scale for the slider
+                newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
+            }
+            
+            // Get bounds from parameter config if available, otherwise use element attributes or fallbacks
+            let minVal, maxVal;
+            if (parameterConfig && parameterConfig.bounds && parameterConfig.bounds[key]) {
+                const bounds = parameterConfig.bounds[key];
+                minVal = bounds[0];
+                maxVal = bounds[1];
+                
+                // Apply log scale conversion to bounds for cognitive_output_normalization
+                if (key === 'cognitive_output_normalization') {
+                    minVal = Math.log10(Math.max(bounds[0], 1e-5));
+                    maxVal = Math.log10(bounds[1]);
+                }
+            } else {
+                // Fall back to element attributes or hardcoded bounds
+                const element = $('#' + key);
+                if (element.length) {
+                    minVal = parseFloat(element.attr('min'));
+                    maxVal = parseFloat(element.attr('max'));
+                }
+                
+                // If still no bounds, use hardcoded fallbacks as last resort
+                if (isNaN(minVal) || isNaN(maxVal)) {
+                    const fallbackBounds = {
+                        'rho_cognitive': [-10, 1],
+                        'rho_progress': [-1, 1],
+                        'alpha': [0.05, 0.95],
+                        'software_progress_share': [0.05, 0.95],
+                        'automation_fraction_at_superhuman_coder': [0.1, 0.99],
+                        'progress_at_half_sc_automation': [1, 2000],
+                        'automation_slope': [0.1, 10],
+                        'cognitive_output_normalization': [-5, 1]
+                    };
+                    
+                    if (fallbackBounds[key]) {
+                        [minVal, maxVal] = fallbackBounds[key];
+                    }
+                }
+            }
+            
+            // Apply bounds if we have them
+            if (!isNaN(minVal) && !isNaN(maxVal)) {
+                newValue = Math.max(minVal, Math.min(maxVal, newValue));
+            }
+            
+            return newValue;
+        }
+        
+        function initializeFallbackControls() {
+            // Fallback initialization with hardcoded values when config is not available
+            const fallbackData = {
+                'rho_cognitive': { min: -10, max: 1, value: -2, range: '[-10, 0]' },
+                'rho_progress': { min: -1, max: 1, value: -0.2, range: '[-1, 1]' },
+                'alpha': { min: 0.05, max: 0.95, value: 0.5 },
+                'software_progress_share': { min: 0.05, max: 0.95, value: 0.7, range: '[0.05, 0.95]' },
+                'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
+                'progress_at_half_sc_automation': { min: 1, max: 2000, value: 500 },
+                'automation_slope': { min: 0.1, max: 10, value: 2.0 },
+                'cognitive_output_normalization': { min: -5, max: 1, value: 0 }
+            };
+            
+            Object.entries(fallbackData).forEach(([paramName, config]) => {
+                const slider = document.getElementById(paramName);
+                if (slider && slider.type === 'range') {
+                    slider.min = config.min;
+                    slider.max = config.max;
+                    slider.value = config.value;
+                    updateDisplayValue(slider);
+                    
+                    // Update range display if available
+                    const rangeDisplay = document.getElementById(paramName + '_range');
+                    if (rangeDisplay && config.range) {
+                        rangeDisplay.textContent = `Range: ${config.range}`;
+                    }
+                }
+            });
+            
+            // Fallback simulation settings
+            const simSettings = {
+                'start_year': { value: 2012, min: 2000, max: 2050 },
+                'end_year': { value: 2030, min: 2020, max: 2100 },
+                'initial_progress': { value: 1.0, min: 0.01, max: 100 }
+            };
+            
+            Object.entries(simSettings).forEach(([inputName, config]) => {
+                const input = document.getElementById(inputName);
+                if (input) {
+                    input.value = config.value;
+                    input.min = config.min;
+                    input.max = config.max;
+                }
+            });
         }
         
         function populateFixedParamsCheckboxes() {
@@ -806,15 +1047,16 @@
                 Object.entries(parameterConfig.descriptions).forEach(([id, info]) => {
                     // Skip progress_rate_normalization as it's auto-calculated
                     if (id !== 'progress_rate_normalization') {
-                        params[id] = info.name;
+                        params[id] = info.name || info.display_name || id;
                     }
                 });
             } else {
-                // Fallback to hardcoded values
+                // Fallback to hardcoded values (reduced reliance on hardcoded data)
+                console.warn('Using fallback parameter names for checkboxes');
                 params = {
-                    'rho_cognitive': 'Cognitive Elasticity (ρ_cognitive)',
-                    'rho_progress': 'Progress Elasticity (ρ_progress)',
-                    'alpha': 'Compute Weight (α)',
+                    'rho_cognitive': 'Cognitive Elasticity',
+                    'rho_progress': 'Progress Elasticity',
+                    'alpha': 'Compute Weight',
                     'software_progress_share': 'Software Share',
                     'automation_fraction_at_superhuman_coder': 'Max Automation',
                     'progress_at_half_sc_automation': 'Half-Max Progress',
@@ -856,7 +1098,15 @@
         }
         
         function resetToDefaults() {
-            loadDefaultData();
+            // Reset to defaults using the most appropriate method
+            if (parameterConfig && parameterConfig.defaults) {
+                console.log('Resetting to parameter config defaults');
+                initializeParameterControls();
+                computeModel();
+            } else {
+                console.log('Resetting using /api/default-data');
+                loadDefaultData();
+            }
         }
         
         let constraintCounter = 0;
