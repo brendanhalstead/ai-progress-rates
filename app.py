@@ -327,6 +327,28 @@ def get_tab_configurations():
     Then add new_tab to the return list.
     """
     
+    # Important Stuff Tab (first tab with key metrics)
+    important_plots = [
+        PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 1, 1,
+                  y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 1, 2,
+                  y_axis_title="Software Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 2, 1,
+                  y_axis_title="Automation (%)"),
+        PlotConfig("Automation Multiplier", lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c), 2, 2,
+                  y_axis_title="Automation Multiplier"),
+    ]
+    
+    important_tab = TabConfig(
+        tab_id="important_stuff",
+        tab_name="Important Stuff",
+        plots=important_plots,
+        rows=2,
+        cols=2,
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}]]
+    )
+    
     # Input Time Series Tab
     input_plots = [
         PlotConfig("Human Labor", lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c), 1, 1,
@@ -354,50 +376,40 @@ def get_tab_configurations():
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    # Output Metrics Tab
+    # Output Metrics Tab (remaining plots after moving some to Important Stuff)
     output_plots = [
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 1, 1,
                   y_axis_title="Progress"),
-        PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 1, 2,
-                  y_axis_title="Automation (%)"),
-        PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1,
-                  y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
-                  y_axis_title="Software Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 3, 1, secondary_y=True,
+        PlotConfig("Cognitive Output & Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 2, secondary_y=True,
                   y_axis_title="Cognitive Output (log scale)", y_axis_type="log",
                   y_axis_secondary_title="Experiment Compute (log scale)", y_axis_secondary_type="log"),
-        PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 3, 2,
+        PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 2, 1,
                   x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
-        PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 4, 1,
+        PlotConfig("Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 2, 2,
                   y_axis_title="Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Cognitive Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 4, 2,
+        PlotConfig("Cognitive Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 3, 1,
                   y_axis_title="Labor Contribution (log scale)", y_axis_type="log"),
-        PlotConfig("Research Stock", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 5, 1,
+        PlotConfig("Research Stock", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 3, 2,
                   y_axis_title="Research Stock (log scale)", y_axis_type="log"),
-        PlotConfig("Research Stock Rate", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 5, 2,
+        PlotConfig("Research Stock Rate", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 4, 1,
                   y_axis_title="Research Stock Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Human-Only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 6, 1,
+        PlotConfig("Human-Only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 4, 2,
                   y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Automation Multiplier", lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c), 6, 2,
-                  y_axis_title="Automation Multiplier"),
     ]
     
     output_tab = TabConfig(
         tab_id="output_metrics",
         tab_name="Output Metrics",
         plots=output_plots,
-        rows=6,
+        rows=4,
         cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": True}, {"secondary_y": False}],
+        specs=[[{"secondary_y": False}, {"secondary_y": True}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    return [input_tab, output_tab]
+    return [important_tab, input_tab, output_tab]
 
 def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
     """Create a plotly figure for a specific tab"""
