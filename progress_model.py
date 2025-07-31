@@ -39,6 +39,7 @@ class Parameters:
     rho_progress: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_progress'])
     alpha: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha'])
     software_progress_share: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_progress_share'])
+    zeta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['zeta'])
     
     # Automation sigmoid parameters
     automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
@@ -80,6 +81,12 @@ class Parameters:
             self.software_progress_share = 0.5
         else:
             self.software_progress_share = np.clip(self.software_progress_share, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+        
+        if not np.isfinite(self.zeta):
+            logger.warning(f"Non-finite zeta: {self.zeta}, setting to {cfg.DEFAULT_PARAMETERS['zeta']}")
+            self.zeta = cfg.DEFAULT_PARAMETERS['zeta']
+        else:
+            self.zeta = np.clip(self.zeta, cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
         
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
@@ -274,7 +281,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     return result * cognitive_normalization
 
 
-def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float) -> float:
+def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float, zeta: float) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
@@ -287,12 +294,13 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
              rho -> 1: perfect substitutes
              rho -> 0: Cobb-Douglas
              rho -> -inf: perfect complements
+        zeta: Discounting factor for experiment compute (see cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
     
     Returns:
         Research stock growth rate RS'(t)
     """
     # Input validation
-    if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho])):
+    if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho, zeta])):
         logger.warning("Non-finite inputs to compute_research_stock_rate")
         return 0.0
     
@@ -300,11 +308,18 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
         logger.warning("Negative inputs to compute_research_stock_rate")
         return 0.0
     
+    if zeta < cfg.ZETA_CLIP_MIN or zeta > cfg.ZETA_CLIP_MAX:
+        logger.warning(f"Invalid zeta value {zeta}, clamping to [{cfg.ZETA_CLIP_MIN}, {cfg.ZETA_CLIP_MAX}]")
+        zeta = np.clip(zeta, cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
+    
     # Clamp alpha to valid range
     alpha = np.clip(alpha, 0.0, 1.0)
     
+    # Apply discounting factor to experiment compute
+    discounted_experiment_compute = np.power(experiment_compute, zeta)
+    
     # Use the generic CES function for computation
-    rate = _ces_function(experiment_compute, cognitive_output, alpha, rho)
+    rate = _ces_function(discounted_experiment_compute, cognitive_output, alpha, rho)
     
     # Cap extremely large rates to prevent numerical issues
     if rate > cfg.MAX_RESEARCH_STOCK_RATE:
@@ -433,7 +448,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
             experiment_compute_0, cognitive_output_0, 
-            params.alpha, params.rho_progress
+            params.alpha, params.rho_progress, params.zeta
         )
         
         # Calculate RS'(dt) for numerical differentiation
@@ -450,7 +465,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         rs_rate_dt = compute_research_stock_rate(
             experiment_compute_dt, cognitive_output_dt,
-            params.alpha, params.rho_progress
+            params.alpha, params.rho_progress, params.zeta
         )
         # logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
@@ -532,7 +547,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     
     research_stock_rate = compute_research_stock_rate(
         experiment_compute, cognitive_output, 
-        params.alpha, params.rho_progress
+        params.alpha, params.rho_progress, params.zeta
     )
     
     # Validate and fallback for research stock rate
@@ -766,7 +781,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         
         # Compute research stock rate (dRS/dt) with validation
         research_stock_rate = compute_research_stock_rate(
-            experiment_compute, cognitive_output, params.alpha, params.rho_progress
+            experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta
         )
         
         if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
@@ -1558,7 +1573,7 @@ class ProgressModel:
                 human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
-                    self.params.alpha, self.params.rho_progress
+                    self.params.alpha, self.params.rho_progress, self.params.zeta
                 )
                 human_only_software_rate = compute_software_progress_rate(
                     rs, human_only_research_stock_rate,

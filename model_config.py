@@ -20,6 +20,8 @@ AUTOMATION_SLOPE_CLIP_MIN = 0.1
 AUTOMATION_SLOPE_CLIP_MAX = 10.0
 RESEARCH_STOCK_START_MIN = 1e-10
 NORMALIZATION_MIN = 1e-10
+ZETA_CLIP_MIN = 0.1
+ZETA_CLIP_MAX = 1.0
 
 # =============================================================================
 # MODEL RATE & VALUE CAPS
@@ -57,7 +59,8 @@ PARAMETER_BOUNDS = {
     'automation_fraction_at_superhuman_coder': (0.1, 0.99),
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
-    'cognitive_output_normalization': (0.00001, 10)
+    'cognitive_output_normalization': (0.00001, 10),
+    'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX)
 }
 
 # Validation thresholds for parameter combinations
@@ -114,4 +117,5 @@ DEFAULT_PARAMETERS = {
     'automation_slope': 1.6,
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
     'cognitive_output_normalization': 1,
+    'zeta': 0.4,
 } 
