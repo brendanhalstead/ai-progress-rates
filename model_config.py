@@ -23,6 +23,14 @@ NORMALIZATION_MIN = 1e-10
 ZETA_CLIP_MIN = 0.1
 ZETA_CLIP_MAX = 1.0
 
+# Aggregate Research Taste configuration
+AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
+AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
+
+# Research Taste Distribution Parameters (Log-Normal)
+TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
+MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
+
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
@@ -60,7 +68,11 @@ PARAMETER_BOUNDS = {
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
     'cognitive_output_normalization': (0.00001, 10),
-    'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX)
+    'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
+    # AI Research Taste parameter bounds
+    'ai_research_taste_at_superhuman_coder': (0.1, 0.99),
+    'progress_at_half_ai_research_taste': (1.0, 500),
+    'ai_research_taste_slope': (0.1, 10.0)
 }
 
 # Validation thresholds for parameter combinations
@@ -118,4 +130,8 @@ DEFAULT_PARAMETERS = {
     'progress_rate_normalization': 1.0,  # This is usually auto-calculated
     'cognitive_output_normalization': 1.26e-3,
     'zeta': 0.2,
+    # AI Research Taste parameters
+    'ai_research_taste_at_superhuman_coder': 0.95,
+    'progress_at_half_ai_research_taste': 30.0,
+    'ai_research_taste_slope': 1.2,
 } 

@@ -46,6 +46,11 @@ class Parameters:
     progress_at_half_sc_automation: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation'])
     automation_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_slope'])
     
+    # AI Research Taste sigmoid parameters
+    ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
+    progress_at_half_ai_research_taste: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste'])
+    ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
+    
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
     cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
@@ -90,14 +95,14 @@ class Parameters:
         
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
-            logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to 0.9")
-            self.automation_fraction_at_superhuman_coder = 0.9
+            logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']}")
+            self.automation_fraction_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']
         else:
             self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         if not np.isfinite(self.progress_at_half_sc_automation) or self.progress_at_half_sc_automation <= 0:
-            logger.warning(f"Invalid progress_at_half_sc_automation: {self.progress_at_half_sc_automation}, setting to 10.0")
-            self.progress_at_half_sc_automation = 10.0
+            logger.warning(f"Invalid progress_at_half_sc_automation: {self.progress_at_half_sc_automation}, setting to {cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation']}")
+            self.progress_at_half_sc_automation = cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation']
         else:
             self.progress_at_half_sc_automation = max(cfg.PARAM_CLIP_MIN, self.progress_at_half_sc_automation)
         
@@ -108,6 +113,26 @@ class Parameters:
             # Clamp slope to reasonable range to prevent numerical instability
             self.automation_slope = np.clip(self.automation_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
         
+        # Sanitize AI research taste parameters
+        if not np.isfinite(self.ai_research_taste_at_superhuman_coder):
+            logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
+            self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
+        else:
+            self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+        
+        if not np.isfinite(self.progress_at_half_ai_research_taste) or self.progress_at_half_ai_research_taste <= 0:
+            logger.warning(f"Invalid progress_at_half_ai_research_taste: {self.progress_at_half_ai_research_taste}, setting to {cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste']}")
+            self.progress_at_half_ai_research_taste = cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste']
+        else:
+            self.progress_at_half_ai_research_taste = max(cfg.PARAM_CLIP_MIN, self.progress_at_half_ai_research_taste)
+        
+        if not np.isfinite(self.ai_research_taste_slope):
+            logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
+            self.ai_research_taste_slope = 1.0
+        else:
+            # Clamp slope to reasonable range to prevent numerical instability
+            self.ai_research_taste_slope = np.clip(self.ai_research_taste_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
+
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
             logger.warning(f"Invalid progress_rate_normalization: {self.progress_rate_normalization}, setting to 1.0")
@@ -281,7 +306,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     return result * cognitive_normalization
 
 
-def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float, zeta: float) -> float:
+def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float, zeta: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
@@ -295,18 +320,23 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
              rho -> 0: Cobb-Douglas
              rho -> -inf: perfect complements
         zeta: Discounting factor for experiment compute (see cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
+        aggregate_research_taste: Multiplier for research effectiveness (default 1.0)
     
     Returns:
         Research stock growth rate RS'(t)
     """
     # Input validation
-    if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho, zeta])):
+    if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho, zeta, aggregate_research_taste])):
         logger.warning("Non-finite inputs to compute_research_stock_rate")
         return 0.0
     
     if experiment_compute < 0 or cognitive_output < 0:
         logger.warning("Negative inputs to compute_research_stock_rate")
         return 0.0
+    
+    if aggregate_research_taste < 0:
+        logger.warning(f"Negative aggregate_research_taste: {aggregate_research_taste}, setting to {cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK}")
+        aggregate_research_taste = cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK
     
     if zeta < cfg.ZETA_CLIP_MIN or zeta > cfg.ZETA_CLIP_MAX:
         logger.warning(f"Invalid zeta value {zeta}, clamping to [{cfg.ZETA_CLIP_MIN}, {cfg.ZETA_CLIP_MAX}]")
@@ -325,8 +355,16 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
     if rate > cfg.MAX_RESEARCH_STOCK_RATE:
         logger.warning(f"Very large research stock rate {rate}, capping to {cfg.MAX_RESEARCH_STOCK_RATE}")
         rate = cfg.MAX_RESEARCH_STOCK_RATE
+    
+    # Apply aggregate research taste multiplier
+    final_rate = rate * aggregate_research_taste
+    
+    # Apply final cap to prevent numerical issues with the multiplied result
+    if final_rate > cfg.MAX_RESEARCH_STOCK_RATE:
+        logger.warning(f"Very large final research stock rate {final_rate}, capping to {cfg.MAX_RESEARCH_STOCK_RATE}")
+        final_rate = cfg.MAX_RESEARCH_STOCK_RATE
         
-    return rate
+    return final_rate
 
 
 def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
@@ -436,6 +474,9 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Get initial conditions at t=0
         initial_automation = 0
+        initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
+        initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+        
         L_HUMAN_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
         L_AI_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_AI)
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
@@ -448,7 +489,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
             experiment_compute_0, cognitive_output_0, 
-            params.alpha, params.rho_progress, params.zeta
+            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
         )
         
         # Calculate RS'(dt) for numerical differentiation
@@ -465,7 +506,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         rs_rate_dt = compute_research_stock_rate(
             experiment_compute_dt, cognitive_output_dt,
-            params.alpha, params.rho_progress, params.zeta
+            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
         )
         # logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
@@ -534,6 +575,9 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     
     # Basic initial conditions
     initial_automation = compute_automation_fraction(initial_progress, params)
+    initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
+    initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+    
     L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
     L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
     experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
@@ -547,7 +591,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     
     research_stock_rate = compute_research_stock_rate(
         experiment_compute, cognitive_output, 
-        params.alpha, params.rho_progress, params.zeta
+        params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
     )
     
     # Validate and fallback for research stock rate
@@ -683,6 +727,152 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
     return np.clip(automation_fraction, 0.0, 1.0)
 
 
+def compute_ai_research_taste(cumulative_progress: float, params: Parameters) -> float:
+    """
+    Sigmoid function for AI research taste based on cumulative progress.
+    Uses a standard sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    
+    This models how AI research taste (ability to identify promising research directions)
+    improves with cumulative progress.
+    
+    Args:
+        cumulative_progress: Current cumulative progress.
+        params: Model parameters containing AI research taste sigmoid parameters.
+    
+    Returns:
+        AI research taste in [0, 1].
+    """
+    # Extract sigmoid parameters
+    L = params.ai_research_taste_at_superhuman_coder  # Upper asymptote
+    x0 = params.progress_at_half_ai_research_taste  # Midpoint (where taste = L/2)
+    k = params.ai_research_taste_slope  # Slope parameter
+    
+    # Input validation
+    if not np.isfinite(cumulative_progress):
+        logger.warning(f"Non-finite cumulative_progress in ai_research_taste: {cumulative_progress}")
+        cumulative_progress = 0.0
+    
+    # Calculate sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    try:
+        exponent = -k * (cumulative_progress - x0)
+        
+        # Handle extreme exponents to prevent overflow/underflow
+        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:  # e^100 is very large, sigmoid ≈ 0
+            ai_research_taste = 0.0
+        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ L
+            ai_research_taste = L
+        else:
+            ai_research_taste = L / (1 + np.exp(exponent))
+            
+    except (OverflowError, ValueError) as e:
+        logger.warning(f"Numerical error in AI research taste sigmoid calculation: {e}")
+        # Fallback: linear interpolation between 0 and L
+        if cumulative_progress <= x0:
+            ai_research_taste = L * 0.5 * (cumulative_progress / x0)
+        else:
+            ai_research_taste = L * (0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / x0))
+    
+    # Clamp to [0, 1] as a final safeguard
+    return np.clip(ai_research_taste, 0.0, 1.0)
+
+
+def compute_aggregate_research_taste(ai_research_taste: float, 
+                                   top_percentile: float = cfg.TOP_PERCENTILE,
+                                   median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
+                                   baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
+    """
+    Compute aggregate research taste using log-normal distribution with floor.
+    
+    This models research taste as a log-normal distribution T ~ LogNormal(μ, σ²)
+    and returns the conditional mean E[T | T ≥ floor] where floor = ai_research_taste.
+    
+    The distribution parameters are inferred from three empirical anchors:
+    - top_percentile (p): fraction classed as "top" researchers
+    - median_to_top_gap (G): threshold taste ÷ median taste  
+    - baseline_mean (M): company-wide mean taste
+    
+    Args:
+        ai_research_taste: Floor value for research taste (minimum taste level)
+        top_percentile: Fraction of researchers classed as "top" (default from config)
+        median_to_top_gap: Ratio of threshold taste to median taste (default from config)
+        baseline_mean: Company-wide mean taste (default from config)
+    
+    Returns:
+        Conditional mean taste E[T | T ≥ ai_research_taste]
+    """
+    from scipy.stats import norm
+    import math
+    
+    # Input validation
+    if not np.isfinite(ai_research_taste):
+        logger.warning(f"Non-finite ai_research_taste: {ai_research_taste}")
+        return cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK
+    
+    if ai_research_taste < 0:
+        logger.warning(f"Negative ai_research_taste: {ai_research_taste}, using 0")
+        ai_research_taste = 0.0
+    
+    # Validate distribution parameters
+    if not (0 < top_percentile < 1):
+        logger.warning(f"Invalid top_percentile: {top_percentile}, using default")
+        top_percentile = cfg.TOP_PERCENTILE
+    
+    if median_to_top_gap <= 1:
+        logger.warning(f"Invalid median_to_top_gap: {median_to_top_gap}, using default")
+        median_to_top_gap = cfg.MEDIAN_TO_TOP_TASTE_GAP
+    
+    if baseline_mean <= 0:
+        logger.warning(f"Invalid baseline_mean: {baseline_mean}, using default")
+        baseline_mean = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE
+    
+    try:
+        # Compute log-normal distribution parameters from empirical anchors
+        # z_p = Φ^(-1)(1-p) where p is top_percentile
+        z_p = norm.ppf(1 - top_percentile)
+        
+        # σ = ln(G) / z_p where G is median_to_top_gap
+        sigma = math.log(median_to_top_gap) / z_p
+        
+        # μ = ln(M) - σ²/2 where M is baseline_mean
+        mu = math.log(baseline_mean) - 0.5 * sigma ** 2
+        
+        # Handle no floor case (floor ≤ 0)
+        if ai_research_taste <= 0:
+            # Return the unconditional mean E[T] = exp(μ + σ²/2)
+            return math.exp(mu + 0.5 * sigma ** 2)
+        
+        # Compute conditional mean E[T | T ≥ floor] using the truncated log-normal formula
+        ln_floor = math.log(ai_research_taste)
+        
+        # Numerator: exp(μ + σ²/2) * Φ̄((ln_floor - μ - σ²)/σ)
+        # where Φ̄(x) = 1 - Φ(x) is the upper-tail normal CDF
+        numerator_arg = (ln_floor - mu - sigma ** 2) / sigma
+        numerator = math.exp(mu + 0.5 * sigma ** 2) * (1 - norm.cdf(numerator_arg))
+        
+        # Denominator: Φ̄((ln_floor - μ)/σ)
+        denominator_arg = (ln_floor - mu) / sigma
+        denominator = 1 - norm.cdf(denominator_arg)
+        
+        # Handle edge cases
+        if denominator <= 0:
+            logger.warning(f"Floor {ai_research_taste} is too high, returning floor value")
+            return ai_research_taste
+        
+        conditional_mean = numerator / denominator
+        
+        # Validate result
+        if not np.isfinite(conditional_mean) or conditional_mean < ai_research_taste:
+            logger.warning(f"Invalid conditional mean: {conditional_mean}, using floor")
+            return max(ai_research_taste, baseline_mean)
+        
+        return conditional_mean
+        
+    except Exception as e:
+        logger.warning(f"Error computing aggregate research taste: {e}")
+        # Fallback: return max of floor and baseline
+        return max(ai_research_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
+
+
 def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSeriesData, params: Parameters, 
                          initial_research_stock_rate: Optional[float] = None, 
                          initial_research_stock: Optional[float] = None) -> List[float]:
@@ -770,6 +960,10 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             logger.warning(f"Invalid automation fraction {automation_fraction} at progress {cumulative_progress}")
             automation_fraction = np.clip(automation_fraction, 0.0, 1.0)
         
+        # Compute AI research taste and aggregate research taste
+        ai_research_taste = compute_ai_research_taste(cumulative_progress, params)
+        aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
+        
         # Compute cognitive output with validation
         cognitive_output = compute_cognitive_output(
             automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
@@ -781,7 +975,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         
         # Compute research stock rate (dRS/dt) with validation
         research_stock_rate = compute_research_stock_rate(
-            experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta
+            experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, aggregate_research_taste
         )
         
         if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
@@ -1528,6 +1722,8 @@ class ProgressModel:
         progress_rates = []
         research_stock_rates = []
         automation_fractions = []
+        ai_research_tastes = []
+        aggregate_research_tastes = []
         cognitive_outputs = []
         software_progress_rates = []
         human_only_research_stock_rates = []
@@ -1553,6 +1749,12 @@ class ProgressModel:
                 # Compute automation fraction
                 automation_fraction = compute_automation_fraction(p, self.params)
                 automation_fractions.append(automation_fraction)
+                
+                # Compute AI research taste and aggregate research taste
+                ai_research_taste = compute_ai_research_taste(p, self.params)
+                aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
+                ai_research_tastes.append(ai_research_taste)
+                aggregate_research_tastes.append(aggregate_research_taste)
                 
                 # Interpolate input time series to current time
                 L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
@@ -1582,9 +1784,10 @@ class ProgressModel:
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
                 human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
+                human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
-                    self.params.alpha, self.params.rho_progress, self.params.zeta
+                    self.params.alpha, self.params.rho_progress, self.params.zeta, human_only_aggregate_research_taste
                 )
                 human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
@@ -1623,11 +1826,19 @@ class ProgressModel:
                 if len(research_stock_rates) <= i:
                     research_stock_rates.append(0.0)
                 automation_fractions.append(0.0)
+                ai_research_tastes.append(0.0)
+                aggregate_research_tastes.append(cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)  # Default to no enhancement
                 cognitive_outputs.append(0.0)
                 software_progress_rates.append(0.0)
                 human_only_progress_rates.append(0.0)
+                human_only_research_stock_rates.append(0.0)
+                human_only_software_progress_rates.append(0.0)
                 human_labor_contributions.append(0.0)
                 ai_labor_contributions.append(0.0)
+                ai_cognitive_output_multipliers.append(0.0)
+                ai_research_stock_multipliers.append(0.0)
+                ai_software_progress_multipliers.append(0.0)
+                ai_overall_progress_multipliers.append(0.0)
                 discounted_exp_compute.append(0.0)
         
             
@@ -1637,6 +1848,8 @@ class ProgressModel:
             'progress': progress_values,
             'research_stock': research_stock_values,
             'automation_fraction': automation_fractions,
+            'ai_research_taste': ai_research_tastes,
+            'aggregate_research_taste': aggregate_research_tastes,
             'progress_rates': progress_rates,
             'research_stock_rates': research_stock_rates,
             'cognitive_outputs': cognitive_outputs,
