@@ -95,7 +95,8 @@
                         <span class="navbar-brand mb-0 h1">AI Progress Model</span>
                         <div class="navbar-nav ms-auto">
                             <button class="btn btn-outline-light me-2" onclick="loadDefaultData()">Reset to Default</button>
-                            <button class="btn btn-outline-light" onclick="exportResults()">Export CSV</button>
+                            <button class="btn btn-outline-light me-2" onclick="exportResults()">Export CSV</button>
+                            <button class="btn btn-outline-light" onclick="exportMETRData()">Export Progress-Adjusted METR Data</button>
                         </div>
                     </div>
                 </nav>
@@ -1144,6 +1145,11 @@
         
         function exportResults() {
             window.location.href = '/api/export-csv';
+        }
+        
+        function exportMETRData() {
+            // Direct download - backend will handle validation
+            window.location.href = '/api/export-metr-data';
         }
         
 

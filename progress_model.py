@@ -1881,6 +1881,36 @@ class ProgressModel:
                 ])
         
         logger.info(f"Results exported to {filename}")
+    
+    def get_progress_at_time(self, time: float) -> float:
+        """
+        Get progress value at a specific time by interpolating computed results.
+        
+        Args:
+            time: Time in decimal years
+            
+        Returns:
+            Interpolated progress value
+            
+        Raises:
+            ValueError: If no results are available or time is outside computed range
+        """
+        if 'times' not in self.results or 'progress' not in self.results:
+            raise ValueError("No results available. Run compute_progress_trajectory first.")
+        
+        times = self.results['times']
+        progress_values = self.results['progress']
+        
+        # Check if time is within the computed range
+        if time < times[0] or time > times[-1]:
+            raise ValueError(f"Time {time} is outside computed range [{times[0]:.3f}, {times[-1]:.3f}]")
+        
+        # Use numpy interpolation
+        interpolated_progress = np.interp(time, times, progress_values)
+        
+        logger.debug(f"Interpolated progress at time {time}: {interpolated_progress:.6f}")
+        
+        return float(interpolated_progress)
 
 
 def load_time_series_data(filename: str) -> TimeSeriesData:

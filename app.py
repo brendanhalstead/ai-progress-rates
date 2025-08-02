@@ -21,6 +21,7 @@ import csv
 from datetime import datetime
 import logging
 from typing import Dict, Any, List, Callable
+import yaml
 
 from progress_model import (
     ProgressModel, Parameters, TimeSeriesData, 
@@ -1309,6 +1310,171 @@ def export_csv():
         
     except Exception as e:
         logger.error(f"Error exporting CSV: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/export-metr-data')
+def export_metr_data():
+    """Export progress-adjusted METR benchmark data as CSV"""
+    try:
+        if session_data['results'] is None:
+            return jsonify({'success': False, 'error': 'No model results to interpolate progress values. Please run the model first.'}), 400
+        
+        # Load benchmark results from YAML
+        try:
+            with open('benchmark_results.yaml', 'r') as f:
+                benchmark_data = yaml.safe_load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'error': 'benchmark_results.yaml file not found'}), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Error reading benchmark_results.yaml: {str(e)}'}), 500
+        
+        results = session_data['results']
+        times = np.array(results['times'])
+        progress_values = np.array(results['progress'])
+        
+        # Calculate progress offset so that progress at start_year equals initial_progress
+        # Use the first time point and progress value from the computed results
+        start_year = times[0]  # First time point in the results
+        target_initial_progress = progress_values[0]  # This should be the initial_progress that was used
+        
+        # Find actual progress at start_year from the computed trajectory
+        progress_at_start = np.interp(start_year, times, progress_values)
+        
+        # Calculate offset to normalize progress so that at start_year, progress = target_initial_progress
+        progress_offset = target_initial_progress - progress_at_start
+        
+        # Apply offset to all progress values
+        adjusted_progress_values = progress_values + progress_offset
+        
+        # Prepare CSV data
+        csv_rows = []
+        
+        for model_name, model_info in benchmark_data['results'].items():
+            # Convert release date to decimal year
+            release_date_obj = model_info['release_date']
+            try:
+                # Handle both string and date objects
+                if isinstance(release_date_obj, str):
+                    # Parse date in YYYY-MM-DD format
+                    release_date = datetime.strptime(release_date_obj, '%Y-%m-%d').date()
+                    release_date_str = release_date_obj
+                else:
+                    # Already a date object (PyYAML auto-parsed it)
+                    release_date = release_date_obj
+                    release_date_str = release_date.strftime('%Y-%m-%d')
+                
+                decimal_year = release_date.year + (release_date.timetuple().tm_yday - 1) / 365.25
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Could not parse release date for {model_name}: {release_date_obj} ({e})")
+                continue
+            
+            # Interpolate progress value at the release date using adjusted progress
+            if decimal_year >= times.min() and decimal_year <= times.max():
+                interpolated_progress = np.interp(decimal_year, times, adjusted_progress_values)
+            elif decimal_year < times.min():
+                # If release date is before our time series, use the first adjusted progress value
+                interpolated_progress = adjusted_progress_values[0]
+            else:
+                # If release date is after our time series, use the last adjusted progress value
+                interpolated_progress = adjusted_progress_values[-1]
+            
+            # Process each agent configuration for this model
+            for agent_name, agent_data in model_info['agents'].items():
+                row = {
+                    'model_name': model_name,
+                    'agent_configuration': agent_name,
+                    'release_date_original': release_date_str,
+                    'release_date_decimal_year': decimal_year,
+                    'is_sota': 1 if agent_data.get('is_sota', False) else 0,
+                    'interpolated_progress': interpolated_progress
+                }
+                
+                # Add performance metrics
+                if 'p50_horizon_length' in agent_data:
+                    p50_data = agent_data['p50_horizon_length']
+                    row.update({
+                        'p50_horizon_length_estimate': p50_data.get('estimate'),
+                        'p50_horizon_length_ci_low': p50_data.get('ci_low'),
+                        'p50_horizon_length_ci_high': p50_data.get('ci_high')
+                    })
+                
+                if 'p80_horizon_length' in agent_data:
+                    p80_data = agent_data['p80_horizon_length']
+                    row.update({
+                        'p80_horizon_length_estimate': p80_data.get('estimate'),
+                        'p80_horizon_length_ci_low': p80_data.get('ci_low'),
+                        'p80_horizon_length_ci_high': p80_data.get('ci_high')
+                    })
+                
+                if 'average_score' in agent_data:
+                    avg_score_data = agent_data['average_score']
+                    if isinstance(avg_score_data, dict):
+                        row.update({
+                            'average_score_estimate': avg_score_data.get('estimate'),
+                            'average_score_ci_low': avg_score_data.get('ci_low'),
+                            'average_score_ci_high': avg_score_data.get('ci_high')
+                        })
+                    else:
+                        # Handle case where average_score is just a number
+                        row['average_score_estimate'] = avg_score_data
+                
+                csv_rows.append(row)
+        
+        if not csv_rows:
+            return jsonify({'success': False, 'error': 'No valid benchmark data found to export'}), 400
+        
+        # Create CSV content
+        output = io.StringIO()
+        
+        # Get all possible column names from all rows
+        all_columns = set()
+        for row in csv_rows:
+            all_columns.update(row.keys())
+        
+        # Define column order for better readability
+        preferred_order = [
+            'model_name', 'agent_configuration', 'release_date_original', 'release_date_decimal_year', 
+            'is_sota', 'interpolated_progress',
+            'p50_horizon_length_estimate', 'p80_horizon_length_estimate',
+            'p50_horizon_length_ci_low', 'p50_horizon_length_ci_high',
+            'p80_horizon_length_ci_low', 'p80_horizon_length_ci_high',
+            'average_score_estimate', 'average_score_ci_low', 'average_score_ci_high'
+        ]
+        
+        # Add any remaining columns not in preferred order
+        columns = [col for col in preferred_order if col in all_columns]
+        remaining_cols = [col for col in all_columns if col not in columns]
+        columns.extend(sorted(remaining_cols))
+        
+        writer = csv.DictWriter(output, fieldnames=columns)
+        
+        # Write header
+        writer.writeheader()
+        
+        # Write data rows
+        for row in csv_rows:
+            # Fill missing values with None/empty
+            complete_row = {col: row.get(col, '') for col in columns}
+            writer.writerow(complete_row)
+        
+        # Prepare file for download
+        mem = io.BytesIO()
+        mem.write(output.getvalue().encode('utf-8'))
+        mem.seek(0)
+        output.close()
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"progress_adjusted_metr_data_{timestamp}.csv"
+        
+        return send_file(
+            mem,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/csv'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting METR data: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/default-data')
