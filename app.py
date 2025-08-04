@@ -787,7 +787,12 @@ def params_to_dict(params: Parameters):
         'automation_slope': params.automation_slope,
         'progress_rate_normalization': params.progress_rate_normalization,
         'cognitive_output_normalization': params.cognitive_output_normalization,
-        'zeta': params.zeta
+        'zeta': params.zeta,
+        'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
+        'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
+        'ai_research_taste_slope': params.ai_research_taste_slope,
+        'taste_schedule_type': params.taste_schedule_type,
+        'progress_at_sc': params.progress_at_sc
     }
 
 
@@ -972,6 +977,7 @@ def get_parameter_config():
             'bounds': cfg.PARAMETER_BOUNDS,
             'defaults': cfg.DEFAULT_PARAMETERS,
             'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
+            'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'descriptions': {
                 'rho_cognitive': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -1021,6 +1027,31 @@ def get_parameter_config():
                 'progress_rate_normalization': {
                     'name': 'Progress Rate Normalization',
                     'description': 'Normalization factor for progress rates (auto-calculated)',
+                    'units': 'dimensionless'
+                },
+                'ai_research_taste_at_superhuman_coder': {
+                    'name': 'Max AI Research Taste',
+                    'description': 'AI research taste when AI reaches superhuman coding ability',
+                    'units': 'fraction'
+                },
+                'progress_at_half_ai_research_taste': {
+                    'name': 'Half-Max AI Research Taste Progress',
+                    'description': 'Progress level at 50% of max AI research taste (sigmoid mode)',
+                    'units': 'dimensionless'
+                },
+                'ai_research_taste_slope': {
+                    'name': 'AI Research Taste Slope',
+                    'description': 'Steepness of AI research taste curve',
+                    'units': 'dimensionless'
+                },
+                'taste_schedule_type': {
+                    'name': 'AI Research Taste Schedule Type',
+                    'description': 'Type of curve for AI research taste evolution',
+                    'units': 'categorical'
+                },
+                'progress_at_sc': {
+                    'name': 'Progress at Superhuman Coder',
+                    'description': 'Progress level where AI reaches superhuman coding ability (exponential mode)',
                     'units': 'dimensionless'
                 }
             }
@@ -1538,7 +1569,12 @@ def get_default_data():
             'automation_slope': params.automation_slope,
             'progress_rate_normalization': params.progress_rate_normalization,
             'cognitive_output_normalization': params.cognitive_output_normalization,
-            'zeta': params.zeta
+            'zeta': params.zeta,
+            'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
+            'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
+            'ai_research_taste_slope': params.ai_research_taste_slope,
+            'taste_schedule_type': params.taste_schedule_type,
+            'progress_at_sc': params.progress_at_sc
         }
     })
 

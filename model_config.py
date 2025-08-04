@@ -31,6 +31,10 @@ AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
 MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
 
+# Research Taste Schedule Configuration
+TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid"]  # Available schedule types
+DEFAULT_TASTE_SCHEDULE_TYPE = "exponential"
+
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
@@ -72,7 +76,8 @@ PARAMETER_BOUNDS = {
     # AI Research Taste parameter bounds
     'ai_research_taste_at_superhuman_coder': (0.1, 0.99),
     'progress_at_half_ai_research_taste': (1.0, 500),
-    'ai_research_taste_slope': (0.1, 10.0)
+    'ai_research_taste_slope': (0.1, 10.0),
+    'progress_at_sc': (1.0, 500)
 }
 
 # Validation thresholds for parameter combinations
@@ -134,4 +139,6 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_at_superhuman_coder': 0.95,
     'progress_at_half_ai_research_taste': 30.0,
     'ai_research_taste_slope': 1.2,
+    'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
+    'progress_at_sc': 50.0,
 } 

@@ -50,6 +50,8 @@ class Parameters:
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     progress_at_half_ai_research_taste: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste'])
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
+    taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
+    progress_at_sc: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_sc'])
     
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
@@ -729,28 +731,41 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
 
 def compute_ai_research_taste(cumulative_progress: float, params: Parameters) -> float:
     """
-    Sigmoid function for AI research taste based on cumulative progress.
-    Uses a standard sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    Compute AI research taste based on cumulative progress using either sigmoid or exponential schedule.
     
     This models how AI research taste (ability to identify promising research directions)
     improves with cumulative progress.
     
     Args:
         cumulative_progress: Current cumulative progress.
-        params: Model parameters containing AI research taste sigmoid parameters.
+        params: Model parameters containing AI research taste parameters.
     
     Returns:
         AI research taste in [0, 1].
+    """
+    # Input validation
+    if not np.isfinite(cumulative_progress):
+        logger.warning(f"Non-finite cumulative_progress in ai_research_taste: {cumulative_progress}")
+        cumulative_progress = 0.0
+    
+    # Choose computation method based on schedule type
+    if params.taste_schedule_type == "sigmoid":
+        return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
+    elif params.taste_schedule_type == "exponential":
+        return _compute_ai_research_taste_exponential(cumulative_progress, params)
+    else:
+        logger.warning(f"Unknown taste_schedule_type: {params.taste_schedule_type}, defaulting to sigmoid")
+        return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
+
+
+def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Parameters) -> float:
+    """
+    Sigmoid function for AI research taste: f(x) = L / (1 + e^(-k*(x-x0)))
     """
     # Extract sigmoid parameters
     L = params.ai_research_taste_at_superhuman_coder  # Upper asymptote
     x0 = params.progress_at_half_ai_research_taste  # Midpoint (where taste = L/2)
     k = params.ai_research_taste_slope  # Slope parameter
-    
-    # Input validation
-    if not np.isfinite(cumulative_progress):
-        logger.warning(f"Non-finite cumulative_progress in ai_research_taste: {cumulative_progress}")
-        cumulative_progress = 0.0
     
     # Calculate sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
     try:
@@ -771,6 +786,45 @@ def compute_ai_research_taste(cumulative_progress: float, params: Parameters) ->
             ai_research_taste = L * 0.5 * (cumulative_progress / x0)
         else:
             ai_research_taste = L * (0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / x0))
+    
+    # Clamp to [0, 1] as a final safeguard
+    return np.clip(ai_research_taste, 0.0, 1.0)
+
+
+def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
+    """
+    Exponential function for AI research taste that passes through 
+    (progress_at_sc, ai_research_taste_at_superhuman_coder) with logplot-slope ai_research_taste_slope.
+    
+    Formula: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
+    where taste_at_sc = ai_research_taste_at_superhuman_coder
+    """
+    taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    progress_at_sc = params.progress_at_sc
+    slope = params.ai_research_taste_slope
+    
+    try:
+        # Calculate exponential: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
+        exponent = slope * (cumulative_progress - progress_at_sc)
+        
+        # Handle extreme exponents to prevent overflow/underflow
+        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:
+            ai_research_taste = min(1.0, taste_at_sc * np.exp(cfg.SIGMOID_EXPONENT_CLAMP))
+        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:
+            ai_research_taste = max(0.0, taste_at_sc * np.exp(-cfg.SIGMOID_EXPONENT_CLAMP))
+        else:
+            ai_research_taste = taste_at_sc * np.exp(exponent)
+            
+    except (OverflowError, ValueError) as e:
+        logger.warning(f"Numerical error in AI research taste exponential calculation: {e}")
+        # Fallback: linear approximation around the anchor point
+        if cumulative_progress <= progress_at_sc:
+            # Use linear approximation for x <= progress_at_sc
+            delta = cumulative_progress - progress_at_sc
+            ai_research_taste = max(0.0, taste_at_sc + taste_at_sc * slope * delta)
+        else:
+            # Use saturated value for x > progress_at_sc
+            ai_research_taste = min(1.0, taste_at_sc * 2.0)
     
     # Clamp to [0, 1] as a final safeguard
     return np.clip(ai_research_taste, 0.0, 1.0)
