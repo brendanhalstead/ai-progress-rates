@@ -407,6 +407,16 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
     # Add horizontal reference line at y=1 (no research taste enhancement)
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
 
+def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_research_taste, row, col):
+    """Plot aggregate research taste vs AI research taste as a scatter plot"""
+    fig.add_trace(
+        go.Scatter(x=ai_research_taste.tolist(), y=aggregate_research_taste.tolist(),
+                  name='Aggregate vs AI Research Taste',
+                  mode='markers',
+                  marker=dict(color='#d62728', size=6, opacity=0.7)),
+        row=row, col=col
+    )
+
 # Tab Configuration
 def get_tab_configurations():
     """
@@ -505,17 +515,20 @@ def get_tab_configurations():
                   y_axis_title="AI Research Taste"),
         PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
                   y_axis_title="Aggregate Research Taste"),
+        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
+                  x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
     ]
     
     software_rd_tab = TabConfig(
         tab_id="software_rd",
         tab_name="Software R&D",
         plots=software_rd_plots,
-        rows=3,
+        rows=4,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
+               [{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False, "colspan": 2}, None]]
     )
     
     # Combined Progress Production Tab

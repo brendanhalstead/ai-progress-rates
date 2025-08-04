@@ -781,24 +781,29 @@ def compute_aggregate_research_taste(ai_research_taste: float,
                                    median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
                                    baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
-    Compute aggregate research taste using log-normal distribution with floor.
+    Compute aggregate research taste using the log-normal distribution with a *clip-and-keep* floor.
     
-    This models research taste as a log-normal distribution T ~ LogNormal(μ, σ²)
-    and returns the conditional mean E[T | T ≥ floor] where floor = ai_research_taste.
+    The research taste of individuals is modeled as T ~ LogNormal(μ, σ²).  A hard floor F
+    (given by `ai_research_taste`) lifts every draw below F up to F while leaving the
+    upper tail unchanged, i.e. we consider Y = max(T, F).  The aggregate research taste
+    is therefore the closed-form expectation
+        E[Y] = F·Φ(a) + exp(μ + σ²/2) · Φ(σ − a),  a = (ln F − μ)/σ,
+    where Φ is the standard normal CDF.
     
-    The distribution parameters are inferred from three empirical anchors:
-    - top_percentile (p): fraction classed as "top" researchers
-    - median_to_top_gap (G): threshold taste ÷ median taste  
-    - baseline_mean (M): company-wide mean taste
+    The distribution parameters (μ, σ) are recovered from three empirical anchors:
+      • top_percentile (p): fraction classified as "top" researchers
+      • median_to_top_gap (G): threshold taste ÷ median taste
+      • baseline_mean (M): company-wide mean taste
+    following the equations σ = ln(G)/zₚ with zₚ = Φ⁻¹(1 − p) and μ = ln(M) − σ²/2.
     
     Args:
-        ai_research_taste: Floor value for research taste (minimum taste level)
+        ai_research_taste: Floor value F for research taste (any draw below this is lifted)
         top_percentile: Fraction of researchers classed as "top" (default from config)
         median_to_top_gap: Ratio of threshold taste to median taste (default from config)
         baseline_mean: Company-wide mean taste (default from config)
     
     Returns:
-        Conditional mean taste E[T | T ≥ ai_research_taste]
+        Mean taste after clipping, E[max(T, F)].
     """
     from scipy.stats import norm
     import math
@@ -836,37 +841,30 @@ def compute_aggregate_research_taste(ai_research_taste: float,
         # μ = ln(M) - σ²/2 where M is baseline_mean
         mu = math.log(baseline_mean) - 0.5 * sigma ** 2
         
-        # Handle no floor case (floor ≤ 0)
+        # Return the unconditional mean if floor ≤ 0 (no clipping needed)
         if ai_research_taste <= 0:
-            # Return the unconditional mean E[T] = exp(μ + σ²/2)
             return math.exp(mu + 0.5 * sigma ** 2)
         
-        # Compute conditional mean E[T | T ≥ floor] using the truncated log-normal formula
-        ln_floor = math.log(ai_research_taste)
-        
-        # Numerator: exp(μ + σ²/2) * Φ̄((ln_floor - μ - σ²)/σ)
-        # where Φ̄(x) = 1 - Φ(x) is the upper-tail normal CDF
-        numerator_arg = (ln_floor - mu - sigma ** 2) / sigma
-        numerator = math.exp(mu + 0.5 * sigma ** 2) * (1 - norm.cdf(numerator_arg))
-        
-        # Denominator: Φ̄((ln_floor - μ)/σ)
-        denominator_arg = (ln_floor - mu) / sigma
-        denominator = 1 - norm.cdf(denominator_arg)
-        
-        # Handle edge cases
-        if denominator <= 0:
-            logger.warning(f"Floor {ai_research_taste} is too high, returning floor value")
-            return ai_research_taste
-        
-        conditional_mean = numerator / denominator
+        # --- Clip-and-keep expectation -----------------------------------
+        try:
+            F = ai_research_taste  # Floor value
+            a = (math.log(F) - mu) / sigma
+            # Upper tail unchanged
+            upper = math.exp(mu + 0.5 * sigma ** 2) * norm.cdf(sigma - a)
+            # Lower tail lifted to the floor
+            lower = F * norm.cdf(a)
+            clipped_mean = upper + lower
+        except (ValueError, OverflowError) as e:
+            logger.warning(f"Numerical error in clipped-mean calculation: {e}")
+            return max(ai_research_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
         
         # Validate result
-        if not np.isfinite(conditional_mean) or conditional_mean < ai_research_taste:
-            logger.warning(f"Invalid conditional mean: {conditional_mean}, using floor")
-            return max(ai_research_taste, baseline_mean)
+        if not np.isfinite(clipped_mean):
+            logger.warning(f"Invalid clipped mean: {clipped_mean}, returning fallback")
+            return max(ai_research_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
         
-        return conditional_mean
-        
+        return clipped_mean
+    
     except Exception as e:
         logger.warning(f"Error computing aggregate research taste: {e}")
         # Fallback: return max of floor and baseline

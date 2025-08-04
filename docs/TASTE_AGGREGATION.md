@@ -61,6 +61,9 @@ $$
        {\overline\Phi\!\left(\dfrac{\ln a-\mu}{\sigma}\right)}.
 $$
 
+$$
+\exp\left(m+\frac{1}{2}s^{2}\right)\phi\left(s-\frac{\ln x-m}{s}\right)+x\phi\left(\frac{\ln x-m}{s}\right)
+$$
 As $a$ rises you are lopping off more of the lower tail, so the conditional mean climbs roughly *exponentially* once $a$ exceeds the mode.
 
 ---
