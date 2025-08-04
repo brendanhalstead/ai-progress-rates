@@ -16,6 +16,9 @@ from typing import List, Tuple, Optional, Dict, Any, Union
 from scipy import optimize, integrate, interpolate
 import logging
 import model_config as cfg
+import yaml
+import copy
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1982,10 +1985,121 @@ class ProgressModel:
         self.params = params
         self.data = time_series_data
         self.results = {}
+        self.horizon_trajectory = None
         
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution()
+    
+    def estimate_horizon_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None):
+        """
+        Estimate horizon trajectory by fitting a line to log(p80_horizon_length) vs progress.
+        Uses a backcast model with zero AI contributions to get progress values at model release dates.
         
+        Args:
+            time_range: [start_time, end_time] for trajectory computation
+            initial_progress: Initial progress value (defaults to 1.0)
+            
+        Returns:
+            Function that maps progress to horizon length
+        """
+        if initial_progress is None:
+            initial_progress = 1.0
+        
+        # Create backcast parameters with zero AI contributions
+        backcast_params = copy.deepcopy(self.params)
+        # zero out AI contributions via automation fraction and taste
+        backcast_params.progress_at_half_automation_fraction = 100
+        backcast_params.ai_research_taste_at_superhuman_coder = 0
+        backcast_params.ai_research_taste_slope = 1
+        backcast_params.taste_schedule_type = "sd_per_progress"
+        backcast_params.progress_at_sc = 100.0
+        
+        # Create backcast model and compute trajectory
+        backcast_model = ProgressModel(backcast_params, self.data)
+        backcast_times, backcast_progress, _ = backcast_model.compute_progress_trajectory(time_range, initial_progress)
+        
+        # Load METR benchmark data
+        try:
+            with open('benchmark_results.yaml', 'r') as f:
+                benchmark_data = yaml.safe_load(f)
+        except FileNotFoundError:
+            logger.error("benchmark_results.yaml file not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error reading benchmark_results.yaml: {e}")
+            return None
+        
+        # Extract (progress, horizon) pairs from METR data
+        progress_horizon_pairs = []
+        
+        for model_name, model_info in benchmark_data['results'].items():
+            # Convert release date to decimal year
+            release_date_obj = model_info['release_date']
+            try:
+                # Handle both string and date objects
+                if isinstance(release_date_obj, str):
+                    release_date = datetime.strptime(release_date_obj, '%Y-%m-%d').date()
+                else:
+                    release_date = release_date_obj
+                
+                decimal_year = release_date.year + (release_date.timetuple().tm_yday - 1) / 365.25
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Could not parse release date for {model_name}: {release_date_obj} ({e})")
+                continue
+            
+            # Interpolate progress value at the release date using backcast results
+            if decimal_year >= backcast_times.min() and decimal_year <= backcast_times.max():
+                interpolated_progress = np.interp(decimal_year, backcast_times, backcast_progress)
+            elif decimal_year < backcast_times.min():
+                interpolated_progress = backcast_progress[0]
+            else:
+                interpolated_progress = backcast_progress[-1]
+            
+            # Extract p80_horizon_length estimates for each agent configuration
+            for agent_name, agent_data in model_info['agents'].items():
+                if 'p80_horizon_length' in agent_data:
+                    p80_data = agent_data['p80_horizon_length']
+                    p80_estimate = p80_data.get('estimate')
+                    
+                    if p80_estimate is not None and p80_estimate > 0:  # Must be positive for log transform
+                        progress_horizon_pairs.append((interpolated_progress, p80_estimate))
+        
+        if len(progress_horizon_pairs) < 2:
+            logger.error("Not enough valid (progress, horizon) pairs for regression")
+            return None
+        
+        # Convert to arrays for regression
+        progress_values = np.array([pair[0] for pair in progress_horizon_pairs])
+        horizon_values = np.array([pair[1] for pair in progress_horizon_pairs])
+        
+        # Fit linear regression to log(horizon) vs progress
+        log_horizon_values = np.log(horizon_values)
+        
+        # Use scipy.optimize.curve_fit for linear regression: log(horizon) = a * progress + b
+        def linear_func(x, a, b):
+            return a * x + b
+        
+        try:
+            popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
+            slope, intercept = popt
+            
+            logger.info(f"Fitted horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
+            logger.info(f"R-squared: {1 - np.sum((log_horizon_values - linear_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+            
+            # Create horizon trajectory function: progress -> horizon
+            def horizon_trajectory(progress):
+                """Map progress to horizon length using fitted linear model"""
+                return np.exp(slope * progress + intercept)
+            
+            # Store the function for later use
+            self.horizon_trajectory = horizon_trajectory
+            
+            return horizon_trajectory
+            
+        except Exception as e:
+            logger.error(f"Error fitting horizon trajectory: {e}")
+            return None
+    
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute progress over specified time range with comprehensive metrics
@@ -2026,6 +2140,7 @@ class ProgressModel:
         ai_software_progress_multipliers = []
         ai_overall_progress_multipliers = []
         discounted_exp_compute = []
+        horizon_lengths = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -2109,6 +2224,19 @@ class ProgressModel:
                 ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
 
+                # Compute horizon length using the fitted trajectory function
+                horizon_length = 0.0  # Default fallback
+                if self.horizon_trajectory is not None:
+                    try:
+                        horizon_length = self.horizon_trajectory(p)
+                        if not np.isfinite(horizon_length) or horizon_length < 0:
+                            horizon_length = 0.0
+                    except Exception as horizon_e:
+                        logger.warning(f"Error computing horizon at progress {p}: {horizon_e}")
+                        horizon_length = 0.0
+                
+                horizon_lengths.append(horizon_length)
+
                 
             except Exception as e:
                 logger.warning(f"Error calculating metrics at t={t}: {e}")
@@ -2133,6 +2261,7 @@ class ProgressModel:
                 ai_software_progress_multipliers.append(0.0)
                 ai_overall_progress_multipliers.append(0.0)
                 discounted_exp_compute.append(0.0)
+                horizon_lengths.append(0.0)
         
             
         # Store comprehensive results
@@ -2156,6 +2285,7 @@ class ProgressModel:
             'ai_software_progress_multipliers': ai_software_progress_multipliers,
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
+            'horizon_lengths': horizon_lengths,
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

@@ -429,6 +429,66 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
         row=row, col=col
     )
 
+def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None):
+    """Plot horizon lengths over time with METR benchmark points"""
+    # Plot the model trajectory
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=horizon_lengths.tolist(),
+                  name='Model Prediction',
+                  line=dict(color='#17becf', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    
+    # Add METR data points if available
+    if metr_data is not None and len(metr_data) > 0:
+        # Only plot p80 horizon length for SOTA points
+        sota_p80_points = [p for p in metr_data if p.get('is_sota', False) and p.get('p80_horizon_length') is not None]
+        if sota_p80_points:
+            sota_p80_times = [p['decimal_year'] for p in sota_p80_points]
+            sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
+            sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            
+            fig.add_trace(
+                go.Scatter(x=sota_p80_times, y=sota_p80,
+                          name='METR SOTA (p80)',
+                          mode='markers',
+                          marker=dict(color='#2ca02c', size=8, symbol='diamond'),
+                          text=sota_p80_labels,
+                          hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
+                row=row, col=col
+            )
+
+def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None):
+    """Plot horizon lengths vs progress with METR benchmark points"""
+    # Plot the model trajectory
+    fig.add_trace(
+        go.Scatter(x=progress_values.tolist(), y=horizon_lengths.tolist(),
+                  name='Model Prediction',
+                  line=dict(color='#17becf', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    
+    # Add METR data points if available
+    if metr_data is not None and len(metr_data) > 0:
+        # Only plot p80 horizon length for SOTA points
+        sota_p80_points = [p for p in metr_data if p.get('is_sota', False) and p.get('p80_horizon_length') is not None]
+        if sota_p80_points:
+            sota_p80_progress = [p['interpolated_progress'] for p in sota_p80_points]
+            sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
+            sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            
+            fig.add_trace(
+                go.Scatter(x=sota_p80_progress, y=sota_p80,
+                          name='METR SOTA (p80)',
+                          mode='markers',
+                          marker=dict(color='#2ca02c', size=8, symbol='diamond'),
+                          text=sota_p80_labels,
+                          hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
+                row=row, col=col
+            )
+
 # Tab Configuration
 def get_tab_configurations():
     """
@@ -579,15 +639,20 @@ def get_tab_configurations():
                   y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
                   y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
+        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data')), 3, 2,
+                  y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
+        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data')), 4, 1,
+                  x_axis_title="Cumulative Progress", y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
     ]
     
     other_metrics_tab = TabConfig(
         tab_id="other_metrics",
         tab_name="Other Metrics",
         plots=other_metrics_plots,
-        rows=3,
+        rows=4,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False, "colspan": 2}, None]]
     )
@@ -718,10 +783,14 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
                 1.0
             )
     
+    # Process METR data for plotting
+    metr_data = process_metr_data()
+    
     # Prepare data for plotting
     plot_data = {
         'time_series': session_data['time_series'],
-        'metrics': cleaned_metrics
+        'metrics': cleaned_metrics,
+        'metr_data': metr_data
     }
     
     # Get tab configurations
@@ -853,6 +922,15 @@ def compute_model():
         # Compute model with comprehensive validation and error handling
         try:
             model = ProgressModel(params, time_series)
+            
+            # First, estimate horizon trajectory from METR data to enable horizon length tracking
+            try:
+                horizon_func = model.estimate_horizon_trajectory(time_range, initial_progress)
+                if horizon_func is None:
+                    logger.warning("Failed to estimate horizon trajectory - horizon lengths will be zero")
+            except Exception as e:
+                logger.warning(f"Error estimating horizon trajectory: {e} - horizon lengths will be zero")
+            
             times, progress_values, research_stock_values = model.compute_progress_trajectory(
                 time_range, initial_progress
             )
@@ -1167,6 +1245,15 @@ def estimate_params():
             # Automatically run the model computation with the estimated parameters
             try:
                 model = ProgressModel(estimated_params, time_series)
+                
+                # First, estimate horizon trajectory from METR data to enable horizon length tracking
+                try:
+                    horizon_func = model.estimate_horizon_trajectory(time_range, initial_progress)
+                    if horizon_func is None:
+                        logger.warning("Failed to estimate horizon trajectory - horizon lengths will be zero")
+                except Exception as e:
+                    logger.warning(f"Error estimating horizon trajectory: {e} - horizon lengths will be zero")
+                
                 times, progress_values, research_stock_values = model.compute_progress_trajectory(
                     time_range, initial_progress
                 )
@@ -1397,22 +1484,24 @@ def export_csv():
         logger.error(f"Error exporting CSV: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/export-metr-data')
-def export_metr_data():
-    """Export progress-adjusted METR benchmark data as CSV"""
+def process_metr_data():
+    """Process METR benchmark data and return structured data for plotting"""
     try:
-        if session_data['results'] is None:
-            return jsonify({'success': False, 'error': 'No model results to interpolate progress values. Please run the model first.'}), 400
-        
         # Load benchmark results from YAML
         try:
             with open('benchmark_results.yaml', 'r') as f:
                 benchmark_data = yaml.safe_load(f)
         except FileNotFoundError:
-            return jsonify({'success': False, 'error': 'benchmark_results.yaml file not found'}), 400
+            logger.warning('benchmark_results.yaml file not found')
+            return None
         except Exception as e:
-            return jsonify({'success': False, 'error': f'Error reading benchmark_results.yaml: {str(e)}'}), 500
+            logger.warning(f'Error reading benchmark_results.yaml: {str(e)}')
+            return None
         
+        if session_data['results'] is None:
+            logger.warning('No model results available for METR data processing')
+            return None
+            
         results = session_data['results']
         times = np.array(results['times'])
         progress_values = np.array(results['progress'])
@@ -1431,8 +1520,8 @@ def export_metr_data():
         # Apply offset to all progress values
         adjusted_progress_values = progress_values + progress_offset
         
-        # Prepare CSV data
-        csv_rows = []
+        # Process METR data points
+        metr_points = []
         
         for model_name, model_info in benchmark_data['results'].items():
             # Convert release date to decimal year
@@ -1465,45 +1554,90 @@ def export_metr_data():
             
             # Process each agent configuration for this model
             for agent_name, agent_data in model_info['agents'].items():
-                row = {
+                point = {
                     'model_name': model_name,
                     'agent_configuration': agent_name,
-                    'release_date_original': release_date_str,
-                    'release_date_decimal_year': decimal_year,
-                    'is_sota': 1 if agent_data.get('is_sota', False) else 0,
-                    'interpolated_progress': interpolated_progress
+                    'release_date': release_date_str,
+                    'decimal_year': decimal_year,
+                    'interpolated_progress': interpolated_progress,
+                    'is_sota': agent_data.get('is_sota', False)
                 }
                 
-                # Add performance metrics
+                # Add horizon length data if available
                 if 'p50_horizon_length' in agent_data:
                     p50_data = agent_data['p50_horizon_length']
-                    row.update({
-                        'p50_horizon_length_estimate': p50_data.get('estimate'),
-                        'p50_horizon_length_ci_low': p50_data.get('ci_low'),
-                        'p50_horizon_length_ci_high': p50_data.get('ci_high')
-                    })
+                    point['p50_horizon_length'] = p50_data.get('estimate')
+                    point['p50_horizon_length_ci_low'] = p50_data.get('ci_low')
+                    point['p50_horizon_length_ci_high'] = p50_data.get('ci_high')
                 
                 if 'p80_horizon_length' in agent_data:
                     p80_data = agent_data['p80_horizon_length']
-                    row.update({
-                        'p80_horizon_length_estimate': p80_data.get('estimate'),
-                        'p80_horizon_length_ci_low': p80_data.get('ci_low'),
-                        'p80_horizon_length_ci_high': p80_data.get('ci_high')
-                    })
+                    point['p80_horizon_length'] = p80_data.get('estimate')
+                    point['p80_horizon_length_ci_low'] = p80_data.get('ci_low')
+                    point['p80_horizon_length_ci_high'] = p80_data.get('ci_high')
                 
                 if 'average_score' in agent_data:
                     avg_score_data = agent_data['average_score']
                     if isinstance(avg_score_data, dict):
-                        row.update({
-                            'average_score_estimate': avg_score_data.get('estimate'),
-                            'average_score_ci_low': avg_score_data.get('ci_low'),
-                            'average_score_ci_high': avg_score_data.get('ci_high')
-                        })
+                        point['average_score'] = avg_score_data.get('estimate')
+                        point['average_score_ci_low'] = avg_score_data.get('ci_low')
+                        point['average_score_ci_high'] = avg_score_data.get('ci_high')
                     else:
                         # Handle case where average_score is just a number
-                        row['average_score_estimate'] = avg_score_data
+                        point['average_score'] = avg_score_data
                 
-                csv_rows.append(row)
+                metr_points.append(point)
+        
+        return metr_points
+        
+    except Exception as e:
+        logger.warning(f"Error processing METR data: {e}")
+        return None
+
+@app.route('/api/export-metr-data')
+def export_metr_data():
+    """Export progress-adjusted METR benchmark data as CSV"""
+    try:
+        metr_points = process_metr_data()
+        if metr_points is None:
+            return jsonify({'success': False, 'error': 'No model results to interpolate progress values. Please run the model first.'}), 400
+        
+        # Convert processed METR points to CSV rows
+        csv_rows = []
+        
+        for point in metr_points:
+            row = {
+                'model_name': point['model_name'],
+                'agent_configuration': point['agent_configuration'],
+                'release_date_original': point['release_date'],
+                'release_date_decimal_year': point['decimal_year'],
+                'is_sota': 1 if point['is_sota'] else 0,
+                'interpolated_progress': point['interpolated_progress']
+            }
+            
+            # Add performance metrics if available
+            if 'p50_horizon_length' in point and point['p50_horizon_length'] is not None:
+                row.update({
+                    'p50_horizon_length_estimate': point['p50_horizon_length'],
+                    'p50_horizon_length_ci_low': point.get('p50_horizon_length_ci_low'),
+                    'p50_horizon_length_ci_high': point.get('p50_horizon_length_ci_high')
+                })
+            
+            if 'p80_horizon_length' in point and point['p80_horizon_length'] is not None:
+                row.update({
+                    'p80_horizon_length_estimate': point['p80_horizon_length'],
+                    'p80_horizon_length_ci_low': point.get('p80_horizon_length_ci_low'),
+                    'p80_horizon_length_ci_high': point.get('p80_horizon_length_ci_high')
+                })
+            
+            if 'average_score' in point and point['average_score'] is not None:
+                row.update({
+                    'average_score_estimate': point['average_score'],
+                    'average_score_ci_low': point.get('average_score_ci_low'),
+                    'average_score_ci_high': point.get('average_score_ci_high')
+                })
+            
+            csv_rows.append(row)
         
         if not csv_rows:
             return jsonify({'success': False, 'error': 'No valid benchmark data found to export'}), 400
