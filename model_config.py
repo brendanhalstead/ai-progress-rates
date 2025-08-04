@@ -32,7 +32,7 @@ TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
 MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration
-TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid"]  # Available schedule types
+TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid", "sd_per_progress"]  # Available schedule types
 DEFAULT_TASTE_SCHEDULE_TYPE = "exponential"
 
 # =============================================================================

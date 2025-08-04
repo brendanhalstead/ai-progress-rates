@@ -395,6 +395,18 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
         row=row, col=col
     )
 
+def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
+    """Plot AI research taste level in human-range standard deviations over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_research_taste_sd.tolist(),
+                  name='AI Research Taste (SD)',
+                  line=dict(color='#ff7f0e', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=0 (mean of human distribution)
+    fig.add_hline(y=0.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+
 def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col):
     """Plot aggregate research taste over time"""
     fig.add_trace(
@@ -513,9 +525,11 @@ def get_tab_configurations():
                   y_axis_title="Software Rate (log scale)", y_axis_type="log"),
         PlotConfig("AI Research Taste", lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c), 3, 1,
                   y_axis_title="AI Research Taste"),
-        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
+        PlotConfig("AI Research Taste (SD)", lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c), 3, 2,
+                  y_axis_title="AI Research Taste (Standard Deviations)"),
+        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
                   y_axis_title="Aggregate Research Taste"),
-        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
+        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 2,
                   x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
     ]
     
@@ -528,7 +542,7 @@ def get_tab_configurations():
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False, "colspan": 2}, None]]
+               [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
     # Combined Progress Production Tab

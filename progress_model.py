@@ -31,6 +31,214 @@ class TimeSeriesData:
     training_compute: np.ndarray  # Training compute budget
 
 
+class TasteDistribution:
+    """
+    Manages human research taste distribution and provides methods for working
+    with taste values in terms of quantiles and standard deviations.
+    
+    The distribution is modeled as T ~ LogNormal(μ, σ²), where the parameters
+    are derived from empirical anchors:
+    - top_percentile: fraction of researchers classified as "top"
+    - median_to_top_gap: ratio of threshold taste to median taste  
+    - baseline_mean: company-wide mean taste
+    
+    Example usage:
+        # Create distribution with default parameters
+        taste_dist = TasteDistribution()
+        
+        # Get taste at 90th percentile
+        top_taste = taste_dist.get_taste_at_quantile(0.9)
+        
+        # Get taste at 2 standard deviations above mean in normal space
+        ai_taste = taste_dist.get_taste_at_sd(2.0)
+        
+        # Compute aggregate taste with AI floor growing at 0.5 SD per progress unit
+        progress = 10.0
+        ai_research_taste = taste_dist.get_taste_at_sd(0.5 * progress)
+        aggregate_taste = taste_dist.get_mean_with_floor(ai_research_taste)
+    """
+    
+    def __init__(self, 
+                 top_percentile: float = cfg.TOP_PERCENTILE,
+                 median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
+                 baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE):
+        """
+        Initialize the taste distribution with empirical anchors.
+        
+        Args:
+            top_percentile: Fraction of researchers classified as "top"
+            median_to_top_gap: Ratio of threshold taste to median taste
+            baseline_mean: Company-wide mean taste
+        """
+        from scipy.stats import norm
+        import math
+        
+        # Store parameters
+        self.top_percentile = top_percentile
+        self.median_to_top_gap = median_to_top_gap
+        self.baseline_mean = baseline_mean
+        
+        # Validate parameters
+        if not (0 < top_percentile < 1):
+            raise ValueError(f"top_percentile must be between 0 and 1, got {top_percentile}")
+        if median_to_top_gap <= 1:
+            raise ValueError(f"median_to_top_gap must be > 1, got {median_to_top_gap}")
+        if baseline_mean <= 0:
+            raise ValueError(f"baseline_mean must be > 0, got {baseline_mean}")
+        
+        # Compute log-normal distribution parameters
+        z_p = norm.ppf(1 - top_percentile)
+        self.sigma = math.log(median_to_top_gap) / z_p
+        self.mu = math.log(baseline_mean) - 0.5 * self.sigma ** 2
+        
+        logger.debug(f"TasteDistribution initialized: μ={self.mu:.4f}, σ={self.sigma:.4f}")
+    
+    def get_taste_at_quantile(self, quantile: float) -> float:
+        """
+        Get the taste value at a given quantile of the distribution.
+        
+        Args:
+            quantile: Quantile (0 to 1)
+            
+        Returns:
+            Taste value at the specified quantile
+        """
+        from scipy.stats import norm
+        import math
+        
+        if not (0 <= quantile <= 1):
+            raise ValueError(f"quantile must be between 0 and 1, got {quantile}")
+        
+        if quantile == 0:
+            return 0.0
+        if quantile == 1:
+            return float('inf')
+        
+        # For LogNormal(μ, σ²), quantile function is exp(μ + σ * Φ^(-1)(quantile))
+        return math.exp(self.mu + self.sigma * norm.ppf(quantile))
+    
+    def get_quantile_of_taste(self, taste: float) -> float:
+        """
+        Get the quantile of a given taste value in the distribution.
+        
+        Args:
+            taste: Taste value
+            
+        Returns:
+            Quantile (0 to 1) of the taste value
+        """
+        from scipy.stats import norm
+        import math
+        
+        if taste <= 0:
+            return 0.0
+        
+        # For LogNormal(μ, σ²), if X = taste, then Φ((ln(X) - μ)/σ) gives the quantile
+        return norm.cdf((math.log(taste) - self.mu) / self.sigma)
+    
+    def get_taste_at_sd(self, num_sds: float) -> float:
+        """
+        Get taste value at a given number of standard deviations in the underlying normal distribution.
+        
+        Since T ~ LogNormal(μ, σ²), we have ln(T) ~ Normal(μ, σ²).
+        This method returns exp(μ + num_sds * σ).
+        
+        Args:
+            num_sds: Number of standard deviations (can be negative)
+            
+        Returns:
+            Taste value at the specified standard deviation
+        """
+        import math
+        return math.exp(self.mu + num_sds * self.sigma)
+    
+    def get_sd_of_taste(self, taste: float) -> float:
+        """
+        Get how many standard deviations a taste value is in the underlying normal distribution.
+        
+        Args:
+            taste: Taste value
+            
+        Returns:
+            Number of standard deviations (can be negative)
+        """
+        import math
+        
+        if taste <= 0:
+            return float('-inf')
+        
+        return (math.log(taste) - self.mu) / self.sigma
+    
+    def get_mean_with_floor(self, floor_taste: float) -> float:
+        """
+        Compute the mean of the distribution with a floor applied using clip-and-keep logic.
+        
+        This implements the closed-form expectation for the clipped distribution:
+        E[max(T, F)] = F·Φ(a) + exp(μ + σ²/2) · Φ(σ − a),  a = (ln F − μ)/σ
+        where T ~ LogNormal(μ, σ²) and F is the floor value.
+        
+        Args:
+            floor_taste: Floor value (any draw below this is lifted to this value)
+            
+        Returns:
+            Mean taste after applying the floor
+        """
+        from scipy.stats import norm
+        import math
+        
+        # Input validation
+        if not np.isfinite(floor_taste):
+            logger.warning(f"Non-finite floor_taste: {floor_taste}")
+            return cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK
+        
+        if floor_taste < 0:
+            logger.warning(f"Negative floor_taste: {floor_taste}, using 0")
+            floor_taste = 0.0
+        
+        try:
+            # Return the unconditional mean if floor ≤ 0 (no clipping needed)
+            if floor_taste <= 0:
+                return math.exp(self.mu + 0.5 * self.sigma ** 2)
+            
+            # --- Clip-and-keep expectation -----------------------------------
+            try:
+                F = floor_taste  # Floor value
+                a = (math.log(F) - self.mu) / self.sigma
+                # Upper tail unchanged
+                upper = math.exp(self.mu + 0.5 * self.sigma ** 2) * norm.cdf(self.sigma - a)
+                # Lower tail lifted to the floor
+                lower = F * norm.cdf(a)
+                clipped_mean = upper + lower
+            except (ValueError, OverflowError) as e:
+                logger.warning(f"Numerical error in clipped-mean calculation: {e}")
+                return max(floor_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
+            
+            # Validate result
+            if not np.isfinite(clipped_mean):
+                logger.warning(f"Invalid clipped mean: {clipped_mean}, returning fallback")
+                return max(floor_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
+            
+            return clipped_mean
+        
+        except Exception as e:
+            logger.warning(f"Error computing mean with floor: {e}")
+            # Fallback: return max of floor and baseline
+            return max(floor_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
+    
+    def get_median(self) -> float:
+        """Get the median of the distribution."""
+        return self.get_taste_at_quantile(0.5)
+    
+    def get_mean(self) -> float:
+        """Get the unconditional mean of the distribution."""
+        return self.baseline_mean
+    
+    def __repr__(self) -> str:
+        return (f"TasteDistribution(top_percentile={self.top_percentile:.3f}, "
+                f"median_to_top_gap={self.median_to_top_gap:.2f}, "
+                f"baseline_mean={self.baseline_mean:.2f})")
+
+
 @dataclass
 class Parameters:
     """Model parameters with validation"""
@@ -753,6 +961,8 @@ def compute_ai_research_taste(cumulative_progress: float, params: Parameters) ->
         return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
     elif params.taste_schedule_type == "exponential":
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
+    elif params.taste_schedule_type == "sd_per_progress":
+        return _compute_ai_research_taste_sd_per_progress(cumulative_progress, params)
     else:
         logger.warning(f"Unknown taste_schedule_type: {params.taste_schedule_type}, defaulting to sigmoid")
         return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
@@ -830,12 +1040,69 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
     return np.clip(ai_research_taste, 0.0, 1.0)
 
 
+def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, params: Parameters) -> float:
+    """
+    Standard deviation per progress schedule for AI research taste.
+    
+    This schedule interprets the slope parameter as the number of standard deviations
+    per progress unit in the underlying log-normal taste distribution. The curve
+    passes through (progress_at_sc, ai_research_taste_at_superhuman_coder).
+    
+    Formula: taste(x) = taste_dist.get_taste_at_sd(slope * x + offset)
+    where offset is computed to ensure the curve passes through the anchor point.
+    """
+    # Create taste distribution with default parameters
+    try:
+        taste_distribution = TasteDistribution()
+    except Exception as e:
+        logger.warning(f"Error creating TasteDistribution: {e}")
+        # Fallback to exponential schedule
+        return _compute_ai_research_taste_exponential(cumulative_progress, params)
+    
+    # Extract parameters
+    taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    progress_at_sc = params.progress_at_sc
+    slope = params.ai_research_taste_slope  # SD per progress unit
+    
+    try:
+        # Compute offset so curve passes through (progress_at_sc, taste_at_sc)
+        # We want: taste_at_sc = taste_distribution.get_taste_at_sd(slope * progress_at_sc + offset)
+        # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_sc
+        
+        # Clamp taste_at_sc to valid range to avoid log(0) issues
+        taste_at_sc_clamped = max(1e-10, min(taste_at_sc, 1.0))
+        
+        target_sd = taste_distribution.get_sd_of_taste(taste_at_sc_clamped)
+        offset = target_sd - slope * progress_at_sc
+        
+        # Compute AI research taste at current progress
+        current_sd = slope * cumulative_progress + offset
+        ai_research_taste = taste_distribution.get_taste_at_sd(current_sd)
+        
+    except Exception as e:
+        logger.warning(f"Error in SD per progress calculation: {e}")
+        # Fallback: use linear approximation around anchor point
+        if cumulative_progress <= progress_at_sc:
+            # Linear decrease for progress < anchor
+            delta = cumulative_progress - progress_at_sc
+            ai_research_taste = max(0.0, taste_at_sc + taste_at_sc * slope * 0.1 * delta)
+        else:
+            # Linear increase for progress > anchor
+            delta = cumulative_progress - progress_at_sc
+            ai_research_taste = min(1.0, taste_at_sc * (1 + slope * 0.1 * delta))
+    
+    # Clamp to [0, 1] as a final safeguard
+    return np.clip(ai_research_taste, 0.0, 1.0)
+
+
 def compute_aggregate_research_taste(ai_research_taste: float, 
                                    top_percentile: float = cfg.TOP_PERCENTILE,
                                    median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
                                    baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     Compute aggregate research taste using the log-normal distribution with a *clip-and-keep* floor.
+    
+    This is a wrapper around TasteDistribution.get_mean_with_floor() to maintain backward compatibility.
     
     The research taste of individuals is modeled as T ~ LogNormal(μ, σ²).  A hard floor F
     (given by `ai_research_taste`) lifts every draw below F up to F while leaving the
@@ -859,9 +1126,6 @@ def compute_aggregate_research_taste(ai_research_taste: float,
     Returns:
         Mean taste after clipping, E[max(T, F)].
     """
-    from scipy.stats import norm
-    import math
-    
     # Input validation
     if not np.isfinite(ai_research_taste):
         logger.warning(f"Non-finite ai_research_taste: {ai_research_taste}")
@@ -885,39 +1149,9 @@ def compute_aggregate_research_taste(ai_research_taste: float,
         baseline_mean = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE
     
     try:
-        # Compute log-normal distribution parameters from empirical anchors
-        # z_p = Φ^(-1)(1-p) where p is top_percentile
-        z_p = norm.ppf(1 - top_percentile)
-        
-        # σ = ln(G) / z_p where G is median_to_top_gap
-        sigma = math.log(median_to_top_gap) / z_p
-        
-        # μ = ln(M) - σ²/2 where M is baseline_mean
-        mu = math.log(baseline_mean) - 0.5 * sigma ** 2
-        
-        # Return the unconditional mean if floor ≤ 0 (no clipping needed)
-        if ai_research_taste <= 0:
-            return math.exp(mu + 0.5 * sigma ** 2)
-        
-        # --- Clip-and-keep expectation -----------------------------------
-        try:
-            F = ai_research_taste  # Floor value
-            a = (math.log(F) - mu) / sigma
-            # Upper tail unchanged
-            upper = math.exp(mu + 0.5 * sigma ** 2) * norm.cdf(sigma - a)
-            # Lower tail lifted to the floor
-            lower = F * norm.cdf(a)
-            clipped_mean = upper + lower
-        except (ValueError, OverflowError) as e:
-            logger.warning(f"Numerical error in clipped-mean calculation: {e}")
-            return max(ai_research_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
-        
-        # Validate result
-        if not np.isfinite(clipped_mean):
-            logger.warning(f"Invalid clipped mean: {clipped_mean}, returning fallback")
-            return max(ai_research_taste, cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)
-        
-        return clipped_mean
+        # Create taste distribution and use its get_mean_with_floor method
+        taste_distribution = TasteDistribution(top_percentile, median_to_top_gap, baseline_mean)
+        return taste_distribution.get_mean_with_floor(ai_research_taste)
     
     except Exception as e:
         logger.warning(f"Error computing aggregate research taste: {e}")
@@ -1749,6 +1983,9 @@ class ProgressModel:
         self.data = time_series_data
         self.results = {}
         
+        # Initialize taste distribution for working with research taste
+        self.taste_distribution = TasteDistribution()
+        
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute progress over specified time range with comprehensive metrics
@@ -1775,6 +2012,7 @@ class ProgressModel:
         research_stock_rates = []
         automation_fractions = []
         ai_research_tastes = []
+        ai_research_taste_sds = []
         aggregate_research_tastes = []
         cognitive_outputs = []
         software_progress_rates = []
@@ -1804,8 +2042,10 @@ class ProgressModel:
                 
                 # Compute AI research taste and aggregate research taste
                 ai_research_taste = compute_ai_research_taste(p, self.params)
+                ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
                 ai_research_tastes.append(ai_research_taste)
+                ai_research_taste_sds.append(ai_research_taste_sd if np.isfinite(ai_research_taste_sd) else 0.0)
                 aggregate_research_tastes.append(aggregate_research_taste)
                 
                 # Interpolate input time series to current time
@@ -1879,6 +2119,7 @@ class ProgressModel:
                     research_stock_rates.append(0.0)
                 automation_fractions.append(0.0)
                 ai_research_tastes.append(0.0)
+                ai_research_taste_sds.append(0.0)
                 aggregate_research_tastes.append(cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)  # Default to no enhancement
                 cognitive_outputs.append(0.0)
                 software_progress_rates.append(0.0)
@@ -1901,6 +2142,7 @@ class ProgressModel:
             'research_stock': research_stock_values,
             'automation_fraction': automation_fractions,
             'ai_research_taste': ai_research_tastes,
+            'ai_research_taste_sd': ai_research_taste_sds,
             'aggregate_research_taste': aggregate_research_tastes,
             'progress_rates': progress_rates,
             'research_stock_rates': research_stock_rates,
@@ -2176,6 +2418,30 @@ class ProgressModel:
         logger.debug(f"Interpolated progress at time {time}: {interpolated_progress:.6f}")
         
         return float(interpolated_progress)
+    
+    def compute_aggregate_taste_with_sd_schedule(self, progress: float, sd_per_progress_unit: float = 0.5) -> float:
+        """
+        Compute aggregate research taste with AI research taste specified in standard deviations.
+        
+        This is a convenience method that implements the pattern:
+        ai_research_taste = taste_dist.get_taste_at_sd(sd_per_progress_unit * progress)
+        aggregate_taste = taste_dist.get_mean_with_floor(ai_research_taste)
+        
+        Args:
+            progress: Current progress level
+            sd_per_progress_unit: How many standard deviations AI research taste grows per progress unit
+            
+        Returns:
+            Aggregate research taste with the AI floor applied
+            
+        Example:
+            # AI research taste grows at 0.5 SD per progress unit
+            model = ProgressModel(params, data) 
+            progress = 10.0
+            aggregate_taste = model.compute_aggregate_taste_with_sd_schedule(progress, 0.5)
+        """
+        ai_research_taste = self.taste_distribution.get_taste_at_sd(sd_per_progress_unit * progress)
+        return self.taste_distribution.get_mean_with_floor(ai_research_taste)
 
 
 def load_time_series_data(filename: str) -> TimeSeriesData:
