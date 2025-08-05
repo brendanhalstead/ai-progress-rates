@@ -163,28 +163,22 @@
                             <!-- Automation Anchors -->
                             <div class="param-group">
                                 <h6 class="text-muted">Automation Anchors</h6>
-                                
-                                <div class="row">
-                                    <div class="col-6">
-                                        <label class="param-label">Max Automation: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
-                                        <small class="text-muted">Upper limit of automation fraction</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="param-label">Half-Max Progress: <span id="progress_at_half_sc_automation_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_half_sc_automation" step="1">
-                                        <small class="text-muted">Progress where automation = half of maximum</small>
-                                    </div>
+                                                                
+                                <div class="mb-3">
+                                    <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
+                                    <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
+                                    <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
                                 </div>
-                                
                                 <div class="row">
+                                    <div class="col-6">
+                                        <label class="param-label">SC Automation Fraction: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
+                                        <small class="text-muted">SWE tasks automated at SC</small>
+                                    </div>
                                     <div class="col-6">
                                         <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="automation_slope" step="0.1">
                                         <small class="text-muted">Steepness of automation transition</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <!-- Placeholder for balance, could add another parameter later -->
                                     </div>
                                 </div>
                             </div>
@@ -205,34 +199,15 @@
                                 
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">Max AI Research Taste: <span id="ai_research_taste_at_superhuman_coder_val">Loading...</span></label>
+                                        <label class="param-label">SC Research Taste: <span id="ai_research_taste_at_superhuman_coder_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="ai_research_taste_at_superhuman_coder" step="0.01">
-                                        <small class="text-muted">Upper limit of AI research taste (units: multiplier on research effort)</small>
+                                        <small class="text-muted">Research Taste at SC (units: multiplier on research effort)</small>
                                     </div>
-                                    <div class="col-6">
-                                        <label class="param-label">Half-Max Progress (Sigmoid): <span id="progress_at_half_ai_research_taste_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_half_ai_research_taste" step="1">
-                                        <small class="text-muted">Progress where taste = half of maximum (sigmoid mode)</small>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
                                     <div class="col-6">
                                         <label class="param-label">AI Research Taste Slope: <span id="ai_research_taste_slope_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="ai_research_taste_slope" step="0.1">
                                         <small class="text-muted">Steepness of research taste curve</small>
                                     </div>
-                                    <div class="col-6">
-                                        <label class="param-label">Progress at Superhuman Coder (Exp): <span id="progress_at_sc_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="progress_at_sc" step="1">
-                                        <small class="text-muted">Progress where AI reaches superhuman coding (exponential mode)</small>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Time Horizon to Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
-                                    <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
                                 </div>
                             </div>
 
@@ -539,11 +514,9 @@
             // List of expected parameters with their element IDs
             const parameterIds = [
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_progress_share',
-                'automation_fraction_at_superhuman_coder', 'progress_at_half_sc_automation',
-                'automation_slope', 'cognitive_output_normalization', 'zeta',
-                'ai_research_taste_at_superhuman_coder', 'progress_at_half_ai_research_taste',
-                'ai_research_taste_slope', 'taste_schedule_type', 'progress_at_sc',
-                'sc_time_horizon_minutes'
+                'automation_fraction_at_superhuman_coder', 'automation_slope', 
+                'cognitive_output_normalization', 'zeta', 'ai_research_taste_at_superhuman_coder',
+                'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes'
             ];
             
             parameterIds.forEach(id => {
@@ -576,10 +549,8 @@
                             const fallbacks = {
                                 'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
                                 'software_progress_share': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
-                                'progress_at_half_sc_automation': 18.0, 'automation_slope': 1.6,
-                                'cognitive_output_normalization': 1, 'zeta': 0.4,
-                                'ai_research_taste_at_superhuman_coder': 0.95, 'progress_at_half_ai_research_taste': 30.0,
-                                'ai_research_taste_slope': 1.2, 'progress_at_sc': 50.0,
+                                'automation_slope': 1.6, 'cognitive_output_normalization': 1, 'zeta': 0.4,
+                                'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_slope': 1.2,
                                 'sc_time_horizon_minutes': 50000.0
                             };
                             value = fallbacks[id] || 1;
@@ -1383,14 +1354,11 @@
                         'alpha': [0.05, 0.95],
                         'software_progress_share': [0.05, 0.95],
                         'automation_fraction_at_superhuman_coder': [0.1, 0.99],
-                        'progress_at_half_sc_automation': [1, 2000],
                         'automation_slope': [0.1, 10],
                         'cognitive_output_normalization': [-5, 1],
                         'zeta': [0.1, 1.0],
                         'ai_research_taste_at_superhuman_coder': [0.1, 5],
-                        'progress_at_half_ai_research_taste': [1, 500],
                         'ai_research_taste_slope': [0.1, 10],
-                        'progress_at_sc': [1, 500],
                         'sc_time_horizon_minutes': [3, 6]  // Log scale bounds
                     };
                     
@@ -1416,14 +1384,11 @@
                 'alpha': { min: 0.05, max: 0.95, value: 0.5 },
                 'software_progress_share': { min: 0.05, max: 0.95, value: 0.7, range: '[0.05, 0.95]' },
                 'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
-                'progress_at_half_sc_automation': { min: 1, max: 2000, value: 500 },
                 'automation_slope': { min: 0.1, max: 10, value: 2.0 },
                 'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
                 'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' },
                 'ai_research_taste_at_superhuman_coder': { min: 0.1, max: 5, value: 0.95 },
-                'progress_at_half_ai_research_taste': { min: 1, max: 500, value: 30.0 },
                 'ai_research_taste_slope': { min: 0.1, max: 10, value: 1.2 },
-                'progress_at_sc': { min: 1, max: 500, value: 20.0 },
                 'sc_time_horizon_minutes': { min: 3, max: 6, value: 4.7 }  // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
             };
             
@@ -1487,15 +1452,12 @@
                     'rho_progress': 'Progress Elasticity',
                     'alpha': 'Compute Weight',
                     'software_progress_share': 'Software Share',
-                    'automation_fraction_at_superhuman_coder': 'Max Automation',
-                    'progress_at_half_sc_automation': 'Half-Max Progress',
+                    'automation_fraction_at_superhuman_coder': 'SC Automation Fraction:',
                     'automation_slope': 'Automation Slope',
                     'cognitive_output_normalization': 'Cognitive Output Normalization',
                     'zeta': 'Experiment Compute Discounting',
-                    'ai_research_taste_at_superhuman_coder': 'Max AI Research Taste',
-                    'progress_at_half_ai_research_taste': 'Half-Max AI Research Taste Progress',
+                    'ai_research_taste_at_superhuman_coder': 'SC Research Taste',
                     'ai_research_taste_slope': 'AI Research Taste Slope',
-                    'progress_at_sc': 'Progress at Superhuman Coder',
                     'sc_time_horizon_minutes': 'Time Horizon to Superhuman Coder'
                 };
             }
