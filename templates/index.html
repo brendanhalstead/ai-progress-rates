@@ -124,67 +124,20 @@
                         <!-- Parameters Panel -->
                         <div class="tab-pane fade show active" id="params-panel">
                             <h5>Model Parameters</h5>
-                            
-                            <!-- Production Function Parameters -->
-                            <div class="param-group">
-                                <h6 class="text-muted">Cognitive Output CES Parameters</h6>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Cognitive Elasticity (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
-                                    <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
-                                </div>
+                            <div class="mb-3">
+                                <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
+                                <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
+                                <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
                             </div>
-                            <div class="param-group">
-                                <h6 class="text-muted">Experiment Capacity CES Parameters</h6>
 
-                                <div class="mb-3">
-                                    <label class="param-label">Progress Elasticity (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
-                                    <small class="text-muted" id="rho_progress_range">Loading range...</small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="alpha" step="0.05">
-                                    <small class="text-muted">Higher values favor compute over cognitive work</small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="zeta" step="0.05">
-                                    <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
-                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
-                                </div>
-                            </div>
+                            <!-- Coding Automation Anchors -->
                             <div class="param-group">
-                                <h6 class="text-muted">Software Progress Share</h6>
-                                <div class="mb-3">
-                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
-                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
-                                </div>
-                            </div>
-                            
-                            <!-- Automation Anchors -->
-                            <div class="param-group">
-                                <h6 class="text-muted">Automation Anchors</h6>
-                                                                
-                                <div class="mb-3">
-                                    <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
-                                    <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
-                                    <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
-                                </div>
+                                <h6 class="text-muted">Coding Automation Anchors</h6>
                                 <div class="row">
                                     <div class="col-6">
-                                        <label class="param-label">SC Automation Fraction: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
+                                        <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
-                                        <small class="text-muted">SWE tasks automated at SC</small>
+                                        <small class="text-muted">Fraction of SWE tasks automated at the moment SC is achieved</small>
                                     </div>
                                     <div class="col-6">
                                         <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
@@ -194,9 +147,49 @@
                                 </div>
                             </div>
                             
-                            <!-- AI Research Taste Parameters -->
+                            <!-- Cognitive Output Parameters -->
                             <div class="param-group">
-                                <h6 class="text-muted">AI Research Taste</h6>
+                                <h6 class="text-muted">Cognitive Output CES Parameters</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Task Substitutibility (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
+                                    <small class="text-muted">Substitutability between automated and non-automated SWE tasks.</small>
+                                    <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
+                                </div>
+                                                                
+                                <div class="mb-3">
+                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
+                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                </div>
+                            </div>
+                            <div class="param-group">
+                                <h6 class="text-muted">Experiment Capacity CES Parameters</h6>
+
+                                <div class="mb-3">
+                                    <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
+                                    <small class="text-muted">Substitutability between exp. compute and cognitive output.</small>
+                                    <small class="text-muted" id="rho_progress_range">Loading range...</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="alpha" step="0.05">
+                                    <small class="text-muted">Higher values favor experiment compute over cognitive work</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="zeta" step="0.05">
+                                    <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
+                                </div>
+                            </div>
+                            
+                            <!-- AI Research Taste Anchors -->
+                            <div class="param-group">
+                                <h6 class="text-muted">AI Research Taste Anchors</h6>
                                 
                                 <div class="mb-3">
                                     <label class="param-label">Schedule Type:</label>
@@ -221,7 +214,15 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <div class="param-group">
+                                <h6 class="text-muted">Overall Progress Rate Parameters</h6>
+                                <div class="mb-3">
+                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                    <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
+                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
+                                </div>
+                            </div>
 
                             <!-- Normalization Parameters -->
                             <div class="param-group">

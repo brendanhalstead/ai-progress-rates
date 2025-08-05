@@ -2164,7 +2164,7 @@ class ProgressModel:
             params_to_use.progress_at_sc = self.sc_progress
             logger.info(f"Using bootstrap-calculated SC progress: {self.sc_progress:.4f} (overriding config value: {self.params.progress_at_sc:.4f})")
         else:
-            logger.info(f"Using config SC progress: {self.params.progress_at_sc:.4f} (bootstrap not available)")
+            logger.info(f"Using config SC progress: {self.params.progress_at_sc:.4f} (not bootstrapped yet)")
         
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, params_to_use)
         
