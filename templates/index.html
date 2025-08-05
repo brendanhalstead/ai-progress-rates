@@ -127,14 +127,17 @@
                             
                             <!-- Production Function Parameters -->
                             <div class="param-group">
-                                <h6 class="text-muted">Production Functions</h6>
+                                <h6 class="text-muted">Cognitive Output CES Parameters</h6>
                                 
                                 <div class="mb-3">
                                     <label class="param-label">Cognitive Elasticity (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
                                     <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
                                     <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
                                 </div>
-                                
+                            </div>
+                            <div class="param-group">
+                                <h6 class="text-muted">Experiment Capacity CES Parameters</h6>
+
                                 <div class="mb-3">
                                     <label class="param-label">Progress Elasticity (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
                                     <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
@@ -148,15 +151,23 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
-                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
-                                </div>
-                                
-                                <div class="mb-3">
                                     <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
                                     <input type="range" class="range-input form-range" id="zeta" step="0.05">
                                     <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
+                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                </div>
+                            </div>
+                            <div class="param-group">
+                                <h6 class="text-muted">Software Progress Share</h6>
+                                <div class="mb-3">
+                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
                                 </div>
                             </div>
                             
@@ -219,12 +230,6 @@
                                 <div class="mb-3">
                                     <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
                                     <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
-                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
                                 </div>
                             </div>
                             
