@@ -613,6 +613,19 @@
                 }
             });
             
+            // Add event listeners to select dropdowns
+            $('select').on('change', function() {
+                // Auto-update if enabled
+                if ($('#autoUpdate').is(':checked')) {
+                    clearTimeout(window.updateTimer);
+                    window.updateTimer = setTimeout(computeModel, 300);
+                } else {
+                    // For dropdowns, always trigger recompute regardless of auto-update setting
+                    // since dropdown changes are typically intentional parameter changes
+                    computeModel();
+                }
+            });
+            
             // Initialize display values
             $('input[type="range"]').each(function() {
                 updateDisplayValue(this);
