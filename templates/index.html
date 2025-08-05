@@ -228,6 +228,12 @@
                                         <small class="text-muted">Progress where AI reaches superhuman coding (exponential mode)</small>
                                     </div>
                                 </div>
+                                
+                                <div class="mb-3">
+                                    <label class="param-label">Time Horizon to Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span></label>
+                                    <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
+                                    <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
+                                </div>
                             </div>
 
 
@@ -498,6 +504,16 @@
                 // Convert log scale value to actual value
                 const actualValue = Math.pow(10, value);
                 displayValue = actualValue.toExponential(2);
+            } else if (input.id === 'sc_time_horizon_minutes') {
+                // Convert log scale value to actual value and format nicely
+                const actualValue = Math.pow(10, value);
+                if (actualValue >= 1000000) {
+                    displayValue = (actualValue / 1000000).toFixed(1) + 'M';
+                } else if (actualValue >= 1000) {
+                    displayValue = (actualValue / 1000).toFixed(0) + 'k';
+                } else {
+                    displayValue = actualValue.toFixed(0);
+                }
             } else if (input.id.includes('normalization')) {
                 if (value < 0.001) {
                     displayValue = value.toExponential(2);
@@ -526,7 +542,8 @@
                 'automation_fraction_at_superhuman_coder', 'progress_at_half_sc_automation',
                 'automation_slope', 'cognitive_output_normalization', 'zeta',
                 'ai_research_taste_at_superhuman_coder', 'progress_at_half_ai_research_taste',
-                'ai_research_taste_slope', 'taste_schedule_type', 'progress_at_sc'
+                'ai_research_taste_slope', 'taste_schedule_type', 'progress_at_sc',
+                'sc_time_horizon_minutes'
             ];
             
             parameterIds.forEach(id => {
@@ -540,8 +557,10 @@
                     } else {
                         value = parseFloat(element.val());
                         
-                        // Special handling for cognitive output normalization (convert from log scale)
+                        // Special handling for log scale parameters
                         if (id === 'cognitive_output_normalization') {
+                            value = Math.pow(10, value);
+                        } else if (id === 'sc_time_horizon_minutes') {
                             value = Math.pow(10, value);
                         }
                     }
@@ -560,7 +579,8 @@
                                 'progress_at_half_sc_automation': 18.0, 'automation_slope': 1.6,
                                 'cognitive_output_normalization': 1, 'zeta': 0.4,
                                 'ai_research_taste_at_superhuman_coder': 0.95, 'progress_at_half_ai_research_taste': 30.0,
-                                'ai_research_taste_slope': 1.2, 'progress_at_sc': 50.0
+                                'ai_research_taste_slope': 1.2, 'progress_at_sc': 50.0,
+                                'sc_time_horizon_minutes': 50000.0
                             };
                             value = fallbacks[id] || 1;
                         }
@@ -1237,6 +1257,11 @@
                             slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
                             slider.max = Math.log10(max);
                             slider.value = Math.log10(Math.max(defaultValue, 1e-5));
+                        } else if (paramName === 'sc_time_horizon_minutes') {
+                            // This slider uses log scale for better usability with large range
+                            slider.min = Math.log10(Math.max(min, 1));
+                            slider.max = Math.log10(max);
+                            slider.value = Math.log10(Math.max(defaultValue, 1));
                         } else {
                             slider.min = min;
                             slider.max = max;
@@ -1361,7 +1386,12 @@
                         'progress_at_half_sc_automation': [1, 2000],
                         'automation_slope': [0.1, 10],
                         'cognitive_output_normalization': [-5, 1],
-                        'zeta': [0.1, 1.0]
+                        'zeta': [0.1, 1.0],
+                        'ai_research_taste_at_superhuman_coder': [0.1, 5],
+                        'progress_at_half_ai_research_taste': [1, 500],
+                        'ai_research_taste_slope': [0.1, 10],
+                        'progress_at_sc': [1, 500],
+                        'sc_time_horizon_minutes': [3, 6]  // Log scale bounds
                     };
                     
                     if (fallbackBounds[key]) {
@@ -1389,7 +1419,12 @@
                 'progress_at_half_sc_automation': { min: 1, max: 2000, value: 500 },
                 'automation_slope': { min: 0.1, max: 10, value: 2.0 },
                 'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
-                'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' }
+                'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' },
+                'ai_research_taste_at_superhuman_coder': { min: 0.1, max: 5, value: 0.95 },
+                'progress_at_half_ai_research_taste': { min: 1, max: 500, value: 30.0 },
+                'ai_research_taste_slope': { min: 0.1, max: 10, value: 1.2 },
+                'progress_at_sc': { min: 1, max: 500, value: 20.0 },
+                'sc_time_horizon_minutes': { min: 3, max: 6, value: 4.7 }  // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
             };
             
             Object.entries(fallbackData).forEach(([paramName, config]) => {
@@ -1404,6 +1439,11 @@
                     const rangeDisplay = document.getElementById(paramName + '_range');
                     if (rangeDisplay && config.range) {
                         rangeDisplay.textContent = `Range: ${config.range}`;
+                    } else if (paramName === 'sc_time_horizon_minutes') {
+                        // Special display for log scale parameter
+                        if (rangeDisplay) {
+                            rangeDisplay.textContent = 'Range: [1k, 1M minutes]';
+                        }
                     }
                 }
             });
@@ -1451,7 +1491,12 @@
                     'progress_at_half_sc_automation': 'Half-Max Progress',
                     'automation_slope': 'Automation Slope',
                     'cognitive_output_normalization': 'Cognitive Output Normalization',
-                    'zeta': 'Experiment Compute Discounting'
+                    'zeta': 'Experiment Compute Discounting',
+                    'ai_research_taste_at_superhuman_coder': 'Max AI Research Taste',
+                    'progress_at_half_ai_research_taste': 'Half-Max AI Research Taste Progress',
+                    'ai_research_taste_slope': 'AI Research Taste Slope',
+                    'progress_at_sc': 'Progress at Superhuman Coder',
+                    'sc_time_horizon_minutes': 'Time Horizon to Superhuman Coder'
                 };
             }
 

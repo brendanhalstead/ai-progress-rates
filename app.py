@@ -166,6 +166,22 @@ def plot_cumulative_progress(fig, times, progress, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[progress.min(), progress.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_automation_fraction(fig, times, automation_fraction, row, col):
     """Plot automation fraction over time"""
@@ -195,6 +211,22 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[software_progress_rates.min(), software_progress_rates.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, secondary_y=False):
     """Plot cognitive output with discounted experiment compute"""
@@ -216,6 +248,23 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
                       mode='lines+markers', marker=dict(size=4)),
             row=row, col=col, secondary_y=secondary_y
         )
+    
+    # Add vertical line for SC time if available
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            y_min = min(cognitive_outputs.min(), min(results.get('discounted_exp_compute', [cognitive_outputs.min()])))
+            y_max = max(cognitive_outputs.max(), max(results.get('discounted_exp_compute', [cognitive_outputs.max()])))
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[y_min, y_max],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_progress_vs_automation(fig, progress, automation_fraction, row, col):
     """Plot progress vs automation scatter"""
@@ -270,6 +319,22 @@ def plot_research_stock(fig, times, research_stocks, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[research_stocks.min(), research_stocks.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
     """Plot research stock rate over time"""
@@ -280,6 +345,22 @@ def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[research_stock_rates.min(), research_stock_rates.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_human_only_progress_rate(fig, times, human_only_progress_rates, row, col):
     """Plot human-only progress rate over time"""
@@ -394,6 +475,22 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_research_taste.min(), ai_research_taste.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
     """Plot AI research taste level in human-range standard deviations over time"""
@@ -406,6 +503,22 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
     )
     # Add horizontal reference line at y=0 (mean of human distribution)
     fig.add_hline(y=0.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_research_taste_sd.min(), ai_research_taste_sd.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col):
     """Plot aggregate research taste over time"""
@@ -418,6 +531,22 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
     )
     # Add horizontal reference line at y=1 (no research taste enhancement)
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[aggregate_research_taste.min(), aggregate_research_taste.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_research_taste, row, col):
     """Plot aggregate research taste vs AI research taste as a scatter plot"""
@@ -429,7 +558,7 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
         row=row, col=col
     )
 
-def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None):
+def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None):
     """Plot horizon lengths over time with METR benchmark points"""
     # Plot the model trajectory
     fig.add_trace(
@@ -458,8 +587,20 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None):
                           hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
                 row=row, col=col
             )
+    
+    # Add horizontal dashed line for superhuman coder time horizon
+    if sc_time_horizon_minutes is not None:
+        fig.add_trace(
+            go.Scatter(x=[times.min(), times.max()], 
+                      y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
+                      name='SC Time Horizon',
+                      line=dict(color='#d62728', width=2, dash='dash'),
+                      mode='lines',
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes:.0f} minutes<extra></extra>'),
+            row=row, col=col
+        )
 
-def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None):
+def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None, progress_at_sc=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
     # Plot the model trajectory
     fig.add_trace(
@@ -488,6 +629,30 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                           hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
                 row=row, col=col
             )
+    
+    # Add horizontal dashed line for superhuman coder time horizon
+    if sc_time_horizon_minutes is not None:
+        fig.add_trace(
+            go.Scatter(x=[progress_values.min(), progress_values.max()], 
+                      y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
+                      name='SC Time Horizon',
+                      line=dict(color='#d62728', width=2, dash='dash'),
+                      mode='lines',
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes:.0f} minutes<extra></extra>'),
+            row=row, col=col
+        )
+    
+    # Add vertical dashed line for progress at superhuman coder
+    if progress_at_sc is not None:
+        fig.add_trace(
+            go.Scatter(x=[progress_at_sc, progress_at_sc], 
+                      y=[horizon_lengths.min(), horizon_lengths.max()],
+                      name='Progress at SC',
+                      line=dict(color='#ff7f0e', width=2, dash='dash'),
+                      mode='lines',
+                      hovertemplate=f'Progress at Superhuman Coder: {progress_at_sc:.1f}<extra></extra>'),
+            row=row, col=col
+        )
 
 # Tab Configuration
 def get_tab_configurations():
@@ -639,9 +804,9 @@ def get_tab_configurations():
                   y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
                   y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data')), 3, 2,
+        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')), 3, 2,
                   y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
-        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data')), 4, 1,
+        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('parameters', {}).get('progress_at_sc')), 4, 1,
                   x_axis_title="Cumulative Progress", y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
     ]
     
@@ -790,7 +955,8 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
     plot_data = {
         'time_series': session_data['time_series'],
         'metrics': cleaned_metrics,
-        'metr_data': metr_data
+        'metr_data': metr_data,
+        'parameters': params_to_dict(session_data.get('current_params', Parameters())) if session_data.get('current_params') else {}
     }
     
     # Get tab configurations
@@ -859,8 +1025,8 @@ def time_series_to_dict(data: TimeSeriesData):
     }
 
 def params_to_dict(params: Parameters):
-    """Convert parameters to dictionary for JSON serialization"""
-    return {
+    """Convert parameters to dictionary for JSON serialization""" 
+    param_dict = {
         'rho_cognitive': params.rho_cognitive,
         'rho_progress': params.rho_progress,
         'alpha': params.alpha,
@@ -875,8 +1041,19 @@ def params_to_dict(params: Parameters):
         'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
         'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
-        'progress_at_sc': params.progress_at_sc
+        'progress_at_sc': params.progress_at_sc,
+        'sc_time_horizon_minutes': params.sc_time_horizon_minutes
     }
+    
+    # Add calculated SC information if available from the current session
+    if session_data.get('results'):
+        results = session_data['results']
+        if results.get('sc_time') is not None:
+            param_dict['calculated_sc_time'] = float(results['sc_time'])
+        if results.get('sc_progress_level') is not None:
+            param_dict['calculated_sc_progress_level'] = float(results['sc_progress_level'])
+            
+    return param_dict
 
 
 
@@ -1043,16 +1220,24 @@ def compute_model():
         tab_configs = get_tab_configurations()
         tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
         
+        # Prepare summary with SC information
+        summary = {
+            'final_progress': float(progress_values[-1]),
+            'final_automation': float(model.results['automation_fraction'][-1]),
+            'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
+            'time_range': time_range
+        }
+        
+        # Add SC timing information if available
+        if model.results.get('sc_time') is not None:
+            summary['sc_time'] = float(model.results['sc_time'])
+            summary['sc_progress_level'] = float(model.results['sc_progress_level']) if model.results.get('sc_progress_level') is not None else None
+        
         return jsonify({
             'success': True,
             'plots': plots,
             'tabs': tabs_info,
-            'summary': {
-                'final_progress': float(progress_values[-1]),
-                'final_automation': float(model.results['automation_fraction'][-1]),
-                'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
-                'time_range': time_range
-            }
+            'summary': summary
         })
         
     except Exception as e:
@@ -1145,6 +1330,11 @@ def get_parameter_config():
                     'name': 'Progress at Superhuman Coder',
                     'description': 'Progress level where AI reaches superhuman coding ability (exponential mode)',
                     'units': 'dimensionless'
+                },
+                'sc_time_horizon_minutes': {
+                    'name': 'Time Horizon to Superhuman Coder',
+                    'description': 'Time horizon length corresponding to superhuman coder achievement',
+                    'units': 'minutes'
                 }
             }
         }
@@ -1280,6 +1470,19 @@ def estimate_params():
                 initial_obj = getattr(estimated_params, '_initial_objective', None)
                 final_obj = getattr(estimated_params, '_final_objective', None)
                 
+                # Prepare summary with SC information
+                summary = {
+                    'final_progress': float(progress_values[-1]),
+                    'final_automation': float(model.results['automation_fraction'][-1]),
+                    'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
+                    'time_range': time_range
+                }
+                
+                # Add SC timing information if available
+                if model.results.get('sc_time') is not None:
+                    summary['sc_time'] = float(model.results['sc_time'])
+                    summary['sc_progress_level'] = float(model.results['sc_progress_level']) if model.results.get('sc_progress_level') is not None else None
+                
                 return jsonify({
                     'success': True,
                     'estimated_parameters': params_to_dict(estimated_params),
@@ -1291,12 +1494,7 @@ def estimate_params():
                     'constraint_evaluations': constraint_evals,
                     'plots': plots,
                     'tabs': tabs_info,
-                    'summary': {
-                        'final_progress': float(progress_values[-1]),
-                        'final_automation': float(model.results['automation_fraction'][-1]),
-                        'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
-                        'time_range': time_range
-                    }
+                    'summary': summary
                 })
                 
             except Exception as compute_error:
@@ -1413,6 +1611,11 @@ def export_csv():
         
         # Write header
         writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
+        
+        # Write metadata header with SC information if available
+        if results.get('sc_time') is not None:
+            writer.writerow(['# Superhuman Coder Level Reached at:', f"Time: {results['sc_time']:.4f}", f"Progress Level: {results.get('sc_progress_level', 'N/A'):.4f}" if results.get('sc_progress_level') is not None else 'Progress Level: N/A'])
+            writer.writerow([])  # Empty row for separation
         
         # Write data
         for i in range(len(results['times'])):
@@ -1722,7 +1925,8 @@ def get_default_data():
             'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
-            'progress_at_sc': params.progress_at_sc
+            'progress_at_sc': params.progress_at_sc,
+            'sc_time_horizon_minutes': params.sc_time_horizon_minutes
         }
     })
 

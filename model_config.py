@@ -33,7 +33,11 @@ MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration
 TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid", "sd_per_progress"]  # Available schedule types
-DEFAULT_TASTE_SCHEDULE_TYPE = "exponential"
+DEFAULT_TASTE_SCHEDULE_TYPE = "sd_per_progress"
+
+# AI Research Taste clipping bounds
+AI_RESEARCH_TASTE_MIN = 0.0
+AI_RESEARCH_TASTE_MAX = 10000000000.0  # Match the upper bound from PARAMETER_BOUNDS
 
 # =============================================================================
 # MODEL RATE & VALUE CAPS
@@ -74,10 +78,11 @@ PARAMETER_BOUNDS = {
     'cognitive_output_normalization': (0.00001, 10),
     'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
     # AI Research Taste parameter bounds
-    'ai_research_taste_at_superhuman_coder': (0.1, 0.99),
+    'ai_research_taste_at_superhuman_coder': (0.1, 5),
     'progress_at_half_ai_research_taste': (1.0, 500),
     'ai_research_taste_slope': (0.1, 10.0),
-    'progress_at_sc': (1.0, 500)
+    'progress_at_sc': (1.0, 500),
+    'sc_time_horizon_minutes': (1000, 1000000)
 }
 
 # Validation thresholds for parameter combinations
@@ -140,5 +145,6 @@ DEFAULT_PARAMETERS = {
     'progress_at_half_ai_research_taste': 30.0,
     'ai_research_taste_slope': 1.2,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
-    'progress_at_sc': 50.0,
+    'progress_at_sc': 20.0,
+    'sc_time_horizon_minutes': 50000.0,
 } 

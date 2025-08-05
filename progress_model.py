@@ -263,6 +263,7 @@ class Parameters:
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_sc'])
+    sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
     
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
@@ -331,7 +332,7 @@ class Parameters:
             logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
             self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
         else:
-            self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+            self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, cfg.AI_RESEARCH_TASTE_MAX)
         
         if not np.isfinite(self.progress_at_half_ai_research_taste) or self.progress_at_half_ai_research_taste <= 0:
             logger.warning(f"Invalid progress_at_half_ai_research_taste: {self.progress_at_half_ai_research_taste}, setting to {cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste']}")
@@ -345,6 +346,14 @@ class Parameters:
         else:
             # Clamp slope to reasonable range to prevent numerical instability
             self.ai_research_taste_slope = np.clip(self.ai_research_taste_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
+        
+        # Sanitize time horizon parameter
+        if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
+            logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
+            self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
+        else:
+            # Clamp to reasonable bounds (1k to 1M minutes)
+            self.sc_time_horizon_minutes = np.clip(self.sc_time_horizon_minutes, 1000.0, 1000000.0)
 
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
@@ -891,12 +900,11 @@ def setup_model_with_normalization(time_series_data: TimeSeriesData, params: Par
 def compute_automation_fraction(cumulative_progress: float, params: Parameters) -> float:
     """
     Sigmoid function for automation fraction based on cumulative progress.
-    Uses a standard sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    Uses a standard sigmoid: f(x) = 1 / (1 + e^(-k*(x-x0)))
     
-    This replaces the previous confusing approach that used 2025-based anchor points.
-    The new parameters are more intuitive:
-    - automation_fraction_at_superhuman_coder: Maximum automation level (L)
-    - progress_at_half_sc_automation: Progress where automation = L/2 (x0) 
+    The automation fraction always asymptotes at 1.0. The parameters are:
+    - automation_fraction_at_superhuman_coder: Automation fraction at progress_at_sc
+    - progress_at_sc: Progress level where automation = automation_fraction_at_superhuman_coder
     - automation_slope: Controls transition steepness (k)
     
     Args:
@@ -907,8 +915,8 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
         Automation fraction in [0, 1].
     """
     # Extract sigmoid parameters
-    L = params.automation_fraction_at_superhuman_coder  # Upper asymptote
-    x0 = params.progress_at_half_sc_automation  # Midpoint (where automation = L/2)
+    automation_at_sc = params.automation_fraction_at_superhuman_coder
+    progress_sc = params.progress_at_sc
     k = params.automation_slope  # Slope parameter
     
     # Input validation
@@ -916,25 +924,48 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
         logger.warning(f"Non-finite cumulative_progress: {cumulative_progress}")
         cumulative_progress = 0.0
     
-    # Calculate sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    # Validate automation_at_sc is in valid range
+    if automation_at_sc <= 0.0 or automation_at_sc >= 1.0:
+        logger.warning(f"automation_fraction_at_superhuman_coder must be in (0, 1), got {automation_at_sc}")
+        automation_at_sc = np.clip(automation_at_sc, 0.01, 0.99)
+    
+    # Calculate x0 such that f(progress_at_sc) = automation_fraction_at_superhuman_coder
+    # From: automation_at_sc = 1 / (1 + e^(-k*(progress_sc - x0)))
+    # Solving: x0 = progress_sc + ln((1 - automation_at_sc) / automation_at_sc) / k
+    try:
+        if k == 0:
+            logger.warning("automation_slope is zero, returning constant automation fraction")
+            return automation_at_sc
+            
+        ratio = (1 - automation_at_sc) / automation_at_sc
+        if ratio <= 0:
+            logger.warning(f"Invalid ratio in x0 calculation: {ratio}")
+            x0 = progress_sc
+        else:
+            x0 = progress_sc + np.log(ratio) / k
+    except (ValueError, OverflowError) as e:
+        logger.warning(f"Error calculating x0: {e}")
+        x0 = progress_sc
+    
+    # Calculate sigmoid: f(x) = 1 / (1 + e^(-k*(x-x0)))
     try:
         exponent = -k * (cumulative_progress - x0)
         
         # Handle extreme exponents to prevent overflow/underflow
         if exponent > cfg.SIGMOID_EXPONENT_CLAMP:  # e^100 is very large, sigmoid ≈ 0
             automation_fraction = 0.0
-        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ L
-            automation_fraction = L
+        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ 1
+            automation_fraction = 1.0
         else:
-            automation_fraction = L / (1 + np.exp(exponent))
+            automation_fraction = 1.0 / (1 + np.exp(exponent))
             
     except (OverflowError, ValueError) as e:
         logger.warning(f"Numerical error in sigmoid calculation: {e}")
-        # Fallback: linear interpolation between 0 and L
+        # Fallback: linear interpolation between 0 and 1
         if cumulative_progress <= x0:
-            automation_fraction = L * 0.5 * (cumulative_progress / x0)
+            automation_fraction = 0.5 * (cumulative_progress / x0) if x0 > 0 else 0.0
         else:
-            automation_fraction = L * (0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / x0))
+            automation_fraction = 0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / max(x0, 1e-6))
     
     # Clamp to [0, 1] as a final safeguard
     return np.clip(automation_fraction, 0.0, 1.0)
@@ -998,10 +1029,10 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
         if cumulative_progress <= x0:
             ai_research_taste = L * 0.5 * (cumulative_progress / x0)
         else:
-            ai_research_taste = L * (0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / x0))
+            ai_research_taste = L * (0.5 + 0.5 * (cumulative_progress - x0) / x0)
     
-    # Clamp to [0, 1] as a final safeguard
-    return np.clip(ai_research_taste, 0.0, 1.0)
+    # Clamp to valid range as a final safeguard
+    return np.clip(ai_research_taste, cfg.AI_RESEARCH_TASTE_MIN, cfg.AI_RESEARCH_TASTE_MAX)
 
 
 def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
@@ -1022,7 +1053,7 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
         
         # Handle extreme exponents to prevent overflow/underflow
         if exponent > cfg.SIGMOID_EXPONENT_CLAMP:
-            ai_research_taste = min(1.0, taste_at_sc * np.exp(cfg.SIGMOID_EXPONENT_CLAMP))
+            ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * np.exp(cfg.SIGMOID_EXPONENT_CLAMP))
         elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:
             ai_research_taste = max(0.0, taste_at_sc * np.exp(-cfg.SIGMOID_EXPONENT_CLAMP))
         else:
@@ -1037,10 +1068,10 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
             ai_research_taste = max(0.0, taste_at_sc + taste_at_sc * slope * delta)
         else:
             # Use saturated value for x > progress_at_sc
-            ai_research_taste = min(1.0, taste_at_sc * 2.0)
+            ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * 2.0)
     
-    # Clamp to [0, 1] as a final safeguard
-    return np.clip(ai_research_taste, 0.0, 1.0)
+    # Clamp to valid range as a final safeguard
+    return np.clip(ai_research_taste, cfg.AI_RESEARCH_TASTE_MIN, cfg.AI_RESEARCH_TASTE_MAX)
 
 
 def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, params: Parameters) -> float:
@@ -1073,7 +1104,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_sc
         
         # Clamp taste_at_sc to valid range to avoid log(0) issues
-        taste_at_sc_clamped = max(1e-10, min(taste_at_sc, 1.0))
+        taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
         target_sd = taste_distribution.get_sd_of_taste(taste_at_sc_clamped)
         offset = target_sd - slope * progress_at_sc
@@ -1092,10 +1123,10 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         else:
             # Linear increase for progress > anchor
             delta = cumulative_progress - progress_at_sc
-            ai_research_taste = min(1.0, taste_at_sc * (1 + slope * 0.1 * delta))
+            ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * (1 + slope * 0.1 * delta))
     
-    # Clamp to [0, 1] as a final safeguard
-    return np.clip(ai_research_taste, 0.0, 1.0)
+    # Clamp to valid range as a final safeguard
+    return np.clip(ai_research_taste, cfg.AI_RESEARCH_TASTE_MIN, cfg.AI_RESEARCH_TASTE_MAX)
 
 
 def compute_aggregate_research_taste(ai_research_taste: float, 
@@ -2094,6 +2125,17 @@ class ProgressModel:
             # Store the function for later use
             self.horizon_trajectory = horizon_trajectory
             
+            # Calculate progress level where horizon reaches sc_time_horizon_minutes
+            if self.params.sc_time_horizon_minutes > 0:
+                try:
+                    # Solve: sc_time_horizon_minutes = exp(slope * progress + intercept)
+                    # Therefore: progress = (log(sc_time_horizon_minutes) - intercept) / slope
+                    self.sc_progress = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
+                    logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
+                except (ValueError, ZeroDivisionError) as e:
+                    logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                    self.sc_progress = None
+            
             return horizon_trajectory
             
         except Exception as e:
@@ -2264,6 +2306,30 @@ class ProgressModel:
                 horizon_lengths.append(0.0)
         
             
+        # Calculate time when superhuman coder level is reached
+        sc_time = None
+        if hasattr(self, 'sc_progress') and self.sc_progress is not None:
+            # Find the time when progress reaches sc_progress
+            sc_progress_target = self.sc_progress
+            
+            # Check if SC is reached within the trajectory
+            if progress_values[-1] >= sc_progress_target:
+                # Find the exact time by interpolation
+                if progress_values[0] >= sc_progress_target:
+                    # SC level already reached at start
+                    sc_time = times[0]
+                else:
+                    # Interpolate to find when progress crosses sc_progress_target
+                    try:
+                        sc_time = np.interp(sc_progress_target, progress_values, times)
+                    except Exception as e:
+                        logger.warning(f"Error interpolating SC time: {e}")
+                        sc_time = None
+                        
+                logger.info(f"Superhuman Coder level ({sc_progress_target:.3f}) reached at time {sc_time:.3f}")
+            else:
+                logger.info(f"Superhuman Coder level ({sc_progress_target:.3f}) not reached within trajectory (final progress: {progress_values[-1]:.3f})")
+        
         # Store comprehensive results
         self.results = {
             'times': times,
@@ -2286,6 +2352,8 @@ class ProgressModel:
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
+            'sc_time': sc_time,  # Time when superhuman coder level is reached
+            'sc_progress_level': self.sc_progress if hasattr(self, 'sc_progress') else None,  # Progress level for SC
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,
