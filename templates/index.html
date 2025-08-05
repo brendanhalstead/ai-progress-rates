@@ -83,6 +83,29 @@
         .left-panel::-webkit-scrollbar-thumb:hover, .right-panel::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+        
+        /* Collapsible parameter groups styling */
+        .param-group .btn-outline-secondary {
+            border: none;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+        }
+        
+        .param-group .btn-outline-secondary:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        
+        .param-group .btn-outline-secondary i {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .param-group .btn-outline-secondary[aria-expanded="false"] i {
+            transform: rotate(-90deg);
+        }
+        
+        .param-group .collapse {
+            transition: all 0.2s ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -124,141 +147,195 @@
                         <!-- Parameters Panel -->
                         <div class="tab-pane fade show active" id="params-panel">
                             <h5>Model Parameters</h5>
-                            <div class="mb-3">
-                                <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
-                                <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
-                                <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
-                            </div>
 
-                            <div class="mb-3">
-                                <label class="param-label">Horizon Extrapolation Type:</label>
-                                <select class="form-select form-select-sm" id="horizon_extrapolation_type">
-                                    <option value="exponential">Exponential</option>
-                                    <option value="decaying doubling time">Decaying Doubling Time</option>
-                                </select>
-                                <small class="text-muted">Method for extrapolating progress beyond the time horizon</small>
+                            <div class="param-group">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Time Horizon Parameters</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#timeHorizonParams" aria-expanded="false" aria-controls="timeHorizonParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="timeHorizonParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
+                                        <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
+                                        <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="param-label">Horizon Extrapolation Type:</label>
+                                        <select class="form-select form-select-sm" id="horizon_extrapolation_type">
+                                            <option value="exponential">Exponential</option>
+                                            <option value="decaying doubling time">Decaying Doubling Time</option>
+                                        </select>
+                                        <small class="text-muted">Method for extrapolating progress beyond the time horizon</small>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Coding Automation Anchors -->
                             <div class="param-group">
-                                <h6 class="text-muted">Coding Automation Anchors</h6>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
-                                        <small class="text-muted">Fraction of SWE tasks automated at the moment SC is achieved</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="automation_slope" step="0.1">
-                                        <small class="text-muted">Steepness of automation transition</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Coding Automation Anchors</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#codingAutomationParams" aria-expanded="false" aria-controls="codingAutomationParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="codingAutomationParams">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
+                                            <small class="text-muted">Fraction of SWE tasks automated at the moment SC is achieved</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="automation_slope" step="0.1">
+                                            <small class="text-muted">Steepness of automation transition</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
                             <!-- Cognitive Output Parameters -->
                             <div class="param-group">
-                                <h6 class="text-muted">Cognitive Output CES Parameters</h6>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Task Substitutibility (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
-                                    <small class="text-muted">Substitutability between automated and non-automated SWE tasks.</small>
-                                    <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Cognitive Output CES Parameters</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#cognitiveOutputParams" aria-expanded="false" aria-controls="cognitiveOutputParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
                                 </div>
-                                                                
-                                <div class="mb-3">
-                                    <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
-                                    <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                <div class="collapse" id="cognitiveOutputParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Task Substitutibility (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="rho_cognitive" step="0.1">
+                                        <small class="text-muted">Substitutability between automated and non-automated SWE tasks.</small>
+                                        <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
+                                    </div>
+                                                                    
+                                    <div class="mb-3">
+                                        <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
+                                        <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                    </div>
                                 </div>
                             </div>
                             <div class="param-group">
-                                <h6 class="text-muted">Experiment Capacity CES Parameters</h6>
-
-                                <div class="mb-3">
-                                    <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
-                                    <small class="text-muted">Substitutability between exp. compute and cognitive output.</small>
-                                    <small class="text-muted" id="rho_progress_range">Loading range...</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Experiment Capacity CES Parameters</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#experimentCapacityParams" aria-expanded="false" aria-controls="experimentCapacityParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
                                 </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="alpha" step="0.05">
-                                    <small class="text-muted">Higher values favor experiment compute over cognitive work</small>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="zeta" step="0.05">
-                                    <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
+                                <div class="collapse" id="experimentCapacityParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
+                                        <small class="text-muted">Substitutability between exp. compute and cognitive output.</small>
+                                        <small class="text-muted" id="rho_progress_range">Loading range...</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="alpha" step="0.05">
+                                        <small class="text-muted">Higher values favor experiment compute over cognitive work</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="zeta" step="0.05">
+                                        <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
+                                    </div>
                                 </div>
                             </div>
                             
                             <!-- AI Research Taste Anchors -->
                             <div class="param-group">
-                                <h6 class="text-muted">AI Research Taste Anchors</h6>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Schedule Type:</label>
-                                    <select class="form-select form-select-sm" id="taste_schedule_type">
-                                        <option value="exponential">Exponential</option>
-                                        <option value="sigmoid">Sigmoid</option>
-                                        <option value="sd_per_progress">SD per Progress</option>
-                                    </select>
-                                    <small class="text-muted">Type of curve for AI research taste evolution</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">AI Research Taste Anchors</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#aiResearchTasteParams" aria-expanded="false" aria-controls="aiResearchTasteParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
                                 </div>
-                                
-                                <div class="row">
-                                    <div class="col-6">
-                                        <label class="param-label">SC Research Taste: <span id="ai_research_taste_at_superhuman_coder_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="ai_research_taste_at_superhuman_coder" step="0.01">
-                                        <small class="text-muted">Research Taste at SC (units: multiplier on research effort)</small>
+                                <div class="collapse" id="aiResearchTasteParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Schedule Type:</label>
+                                        <select class="form-select form-select-sm" id="taste_schedule_type">
+                                            <option value="exponential">Exponential</option>
+                                            <option value="sigmoid">Sigmoid</option>
+                                            <option value="sd_per_progress">SD per Progress</option>
+                                        </select>
+                                        <small class="text-muted">Type of curve for AI research taste evolution</small>
                                     </div>
-                                    <div class="col-6">
-                                        <label class="param-label">AI Research Taste Slope: <span id="ai_research_taste_slope_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="ai_research_taste_slope" step="0.1">
-                                        <small class="text-muted">Steepness of research taste curve</small>
+                                    
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <label class="param-label">SC Research Taste: <span id="ai_research_taste_at_superhuman_coder_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="ai_research_taste_at_superhuman_coder" step="0.01">
+                                            <small class="text-muted">Research Taste at SC (units: multiplier on research effort)</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="param-label">AI Research Taste Slope: <span id="ai_research_taste_slope_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="ai_research_taste_slope" step="0.1">
+                                            <small class="text-muted">Steepness of research taste curve</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="param-group">
-                                <h6 class="text-muted">Overall Progress Rate Parameters</h6>
-                                <div class="mb-3">
-                                    <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
-                                    <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
-                                    <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
-                                    <small class="text-muted" id="software_progress_share_range">Loading range...</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Overall Progress Rate Parameters</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#overallProgressParams" aria-expanded="false" aria-controls="overallProgressParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="overallProgressParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                        <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
+                                        <small class="text-muted" id="software_progress_share_range">Loading range...</small>
+                                    </div>
                                 </div>
                             </div>
 
                             <!-- Normalization Parameters -->
                             <div class="param-group">
-                                <h6 class="text-muted">Normalization Constants</h6>
-                                
-                                <div class="mb-3">
-                                    <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
-                                    <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Normalization Constants</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationParams" aria-expanded="false" aria-controls="normalizationParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="normalizationParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
+                                        <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
+                                    </div>
                                 </div>
                             </div>
                             
                             <!-- Simulation Settings -->
                             <div class="param-group">
-                                <h6 class="text-muted">Simulation Settings</h6>
-                                
-                                <div class="row">
-                                    <div class="col-4">
-                                        <label class="param-label">Start Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="start_year">
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="param-label">End Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="end_year">
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="param-label">Initial Progress</label>
-                                        <input type="number" class="form-control form-control-sm" id="initial_progress" step="0.01">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Simulation Settings</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#simulationSettingsParams" aria-expanded="false" aria-controls="simulationSettingsParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="simulationSettingsParams">
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <label class="param-label">Start Year</label>
+                                            <input type="number" class="form-control form-control-sm" id="start_year">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="param-label">End Year</label>
+                                            <input type="number" class="form-control form-control-sm" id="end_year">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="param-label">Initial Progress</label>
+                                            <input type="number" class="form-control form-control-sm" id="initial_progress" step="0.01">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
