@@ -130,6 +130,15 @@
                                 <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
                             </div>
 
+                            <div class="mb-3">
+                                <label class="param-label">Horizon Extrapolation Type:</label>
+                                <select class="form-select form-select-sm" id="horizon_extrapolation_type">
+                                    <option value="exponential">Exponential</option>
+                                    <option value="decaying doubling time">Decaying Doubling Time</option>
+                                </select>
+                                <small class="text-muted">Method for extrapolating progress beyond the time horizon</small>
+                            </div>
+
                             <!-- Coding Automation Anchors -->
                             <div class="param-group">
                                 <h6 class="text-muted">Coding Automation Anchors</h6>
@@ -522,7 +531,8 @@
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_progress_share',
                 'automation_fraction_at_superhuman_coder', 'automation_slope', 
                 'cognitive_output_normalization', 'zeta', 'ai_research_taste_at_superhuman_coder',
-                'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes'
+                'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
+                'horizon_extrapolation_type'
             ];
             
             parameterIds.forEach(id => {
@@ -531,7 +541,7 @@
                     let value;
                     
                     // Special handling for string parameters
-                    if (id === 'taste_schedule_type') {
+                    if (id === 'taste_schedule_type' || id === 'horizon_extrapolation_type') {
                         value = element.val(); // Keep as string
                     } else {
                         value = parseFloat(element.val());
@@ -545,7 +555,7 @@
                     }
                     
                     // Validate numeric parameters only
-                    if (id !== 'taste_schedule_type' && !isFinite(value)) {
+                    if (id !== 'taste_schedule_type' && id !== 'horizon_extrapolation_type' && !isFinite(value)) {
                         console.warn(`Invalid value for ${id}: ${element.val()}, using fallback`);
                         // Use fallback from parameter config or hardcoded value
                         if (parameterConfig && parameterConfig.defaults && parameterConfig.defaults[id] !== undefined) {
@@ -569,6 +579,12 @@
                         if (!allowedTypes.includes(value)) {
                             console.warn(`Invalid taste_schedule_type: ${value}, using default`);
                             value = parameterConfig?.defaults?.taste_schedule_type || 'exponential';
+                        }
+                    } else if (id === 'horizon_extrapolation_type') {
+                        const allowedTypes = parameterConfig?.horizon_extrapolation_types || ['exponential', 'decaying doubling time'];
+                        if (!allowedTypes.includes(value)) {
+                            console.warn(`Invalid horizon_extrapolation_type: ${value}, using default`);
+                            value = parameterConfig?.defaults?.horizon_extrapolation_type || 'exponential';
                         }
                     }
                     
@@ -1279,6 +1295,28 @@
                     tasteScheduleSelect.value = defaultType;
                     
                     console.log(`Initialized taste_schedule_type dropdown with options: ${parameterConfig.taste_schedule_types.join(', ')}, default: ${defaultType}`);
+                }
+            }
+            
+            if (parameterConfig.horizon_extrapolation_types && parameterConfig.defaults) {
+                const horizonExtrapolationSelect = document.getElementById('horizon_extrapolation_type');
+                if (horizonExtrapolationSelect) {
+                    // Clear existing options
+                    horizonExtrapolationSelect.innerHTML = '';
+                    
+                    // Add options from config
+                    parameterConfig.horizon_extrapolation_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                        horizonExtrapolationSelect.appendChild(option);
+                    });
+                    
+                    // Set default value
+                    const defaultType = parameterConfig.defaults.horizon_extrapolation_type || 'exponential';
+                    horizonExtrapolationSelect.value = defaultType;
+                    
+                    console.log(`Initialized horizon_extrapolation_type dropdown with options: ${parameterConfig.horizon_extrapolation_types.join(', ')}, default: ${defaultType}`);
                 }
             }
             

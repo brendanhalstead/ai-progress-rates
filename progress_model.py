@@ -264,6 +264,7 @@ class Parameters:
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_sc'])
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
+    horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
@@ -354,6 +355,11 @@ class Parameters:
         else:
             # Clamp to reasonable bounds (1k to 1M minutes)
             self.sc_time_horizon_minutes = np.clip(self.sc_time_horizon_minutes, 1000.0, 1000000.0)
+        
+        # Sanitize categorical parameters
+        if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
+            logger.warning(f"Invalid horizon_extrapolation_type: {self.horizon_extrapolation_type}, setting to default")
+            self.horizon_extrapolation_type = cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE
 
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:

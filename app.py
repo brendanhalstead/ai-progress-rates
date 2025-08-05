@@ -1173,7 +1173,8 @@ def params_to_dict(params: Parameters):
         'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
-        'sc_time_horizon_minutes': params.sc_time_horizon_minutes
+        'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
+        'horizon_extrapolation_type': params.horizon_extrapolation_type
     }
     
     # Add calculated SC information if available from the current session
@@ -1386,6 +1387,7 @@ def get_parameter_config():
             'defaults': cfg.DEFAULT_PARAMETERS,
             'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
+            'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'descriptions': {
                 'rho_cognitive': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -1466,6 +1468,11 @@ def get_parameter_config():
                     'name': 'Time Horizon to Superhuman Coder',
                     'description': 'Time horizon length corresponding to superhuman coder achievement',
                     'units': 'minutes'
+                },
+                'horizon_extrapolation_type': {
+                    'name': 'Horizon Extrapolation Type',
+                    'description': 'Method for extrapolating progress beyond the time horizon',
+                    'units': 'categorical'
                 }
             }
         }
@@ -2057,7 +2064,8 @@ def get_default_data():
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
             'progress_at_sc': params.progress_at_sc,
-            'sc_time_horizon_minutes': params.sc_time_horizon_minutes
+            'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
+            'horizon_extrapolation_type': params.horizon_extrapolation_type
         }
     })
 

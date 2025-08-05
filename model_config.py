@@ -35,6 +35,10 @@ MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
 TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid", "sd_per_progress"]  # Available schedule types
 DEFAULT_TASTE_SCHEDULE_TYPE = "sd_per_progress"
 
+# Horizon Extrapolation Configuration
+HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
+DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "exponential"
+
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
 AI_RESEARCH_TASTE_MAX = 10000000000.0  # Match the upper bound from PARAMETER_BOUNDS
@@ -147,4 +151,5 @@ DEFAULT_PARAMETERS = {
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': 20.0,
     'sc_time_horizon_minutes': 10000.0,
+    'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
 } 
