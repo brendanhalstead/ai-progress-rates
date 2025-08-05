@@ -799,21 +799,31 @@ def get_tab_configurations():
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    # Automation Tab
+    # SWE Automation and Taste Tab
     automation_plots = [
         PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 1, 1,
                   y_axis_title="Automation (%)"),
         PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 1, 2,
                   x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
+        PlotConfig("AI Research Taste", lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c), 2, 1,
+                  y_axis_title="AI Research Taste"),
+        PlotConfig("AI Research Taste (SD)", lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c), 2, 2,
+                  y_axis_title="AI Research Taste (Standard Deviations)"),
+        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 1,
+                  y_axis_title="Aggregate Research Taste"),
+        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
+                  x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
     ]
     
     automation_tab = TabConfig(
         tab_id="automation",
-        tab_name="Automation",
+        tab_name="SWE Automation and Taste",
         plots=automation_plots,
-        rows=1,
+        rows=3,
         cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}]]
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
     # Cognitive Output Production Tab
@@ -846,25 +856,15 @@ def get_tab_configurations():
                   y_axis_title="Research Stock (log scale)", y_axis_type="log"),
         PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
                   y_axis_title="Software Rate (log scale)", y_axis_type="log"),
-        PlotConfig("AI Research Taste", lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c), 3, 1,
-                  y_axis_title="AI Research Taste"),
-        PlotConfig("AI Research Taste (SD)", lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c), 3, 2,
-                  y_axis_title="AI Research Taste (Standard Deviations)"),
-        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
-                  y_axis_title="Aggregate Research Taste"),
-        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 2,
-                  x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
     ]
     
     software_rd_tab = TabConfig(
         tab_id="software_rd",
         tab_name="Software R&D",
         plots=software_rd_plots,
-        rows=4,
+        rows=2,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
