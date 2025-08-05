@@ -266,6 +266,12 @@ class Parameters:
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
+    # Manual horizon fitting parameters
+    anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_time'])
+    anchor_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_horizon'])
+    anchor_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_doubling_time'])
+    doubling_decay_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_decay_rate'])
+    
     # Normalization
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
     cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
@@ -360,6 +366,36 @@ class Parameters:
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
             logger.warning(f"Invalid horizon_extrapolation_type: {self.horizon_extrapolation_type}, setting to default")
             self.horizon_extrapolation_type = cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE
+        
+        # Sanitize manual horizon fitting parameters
+        if not np.isfinite(self.anchor_time):
+            logger.warning(f"Non-finite anchor_time: {self.anchor_time}, setting to default")
+            self.anchor_time = cfg.DEFAULT_ANCHOR_TIME
+        else:
+            # Clamp to reasonable time range
+            self.anchor_time = np.clip(self.anchor_time, 2020.0, 2030.0)
+        
+        # Validate optional parameters - if provided, ensure they're finite and positive
+        if self.anchor_horizon is not None:
+            if not np.isfinite(self.anchor_horizon) or self.anchor_horizon <= 0:
+                logger.warning(f"Invalid anchor_horizon: {self.anchor_horizon}, setting to None for optimization")
+                self.anchor_horizon = None
+            else:
+                self.anchor_horizon = np.clip(self.anchor_horizon, 0.01, 10000.0)
+        
+        if self.anchor_doubling_time is not None:
+            if not np.isfinite(self.anchor_doubling_time) or self.anchor_doubling_time <= 0:
+                logger.warning(f"Invalid anchor_doubling_time: {self.anchor_doubling_time}, setting to None for optimization")
+                self.anchor_doubling_time = None
+            else:
+                self.anchor_doubling_time = np.clip(self.anchor_doubling_time, 0.01, 100.0)
+        
+        if self.doubling_decay_rate is not None:
+            if not np.isfinite(self.doubling_decay_rate) or self.doubling_decay_rate <= 0:
+                logger.warning(f"Invalid doubling_decay_rate: {self.doubling_decay_rate}, setting to None for optimization")
+                self.doubling_decay_rate = None
+            else:
+                self.doubling_decay_rate = np.clip(self.doubling_decay_rate, 0.001, 1.0)
 
         # Sanitize normalization parameters
         if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
@@ -2129,7 +2165,7 @@ class ProgressModel:
                 
                 # Ensure parameters are within valid ranges
                 if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
-                    fallback = np.full_like(t_arr, np.log(1e6))
+                    fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
                 
                 # Calculate the base term (1 - A_0 * t / T_0)
@@ -2137,13 +2173,13 @@ class ProgressModel:
                 
                 # Check for negative or zero base terms
                 if np.any(base_term <= 0):
-                    fallback = np.full_like(t_arr, np.log(1e6))
+                    fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
                 
                 # Calculate the exponent
                 log_denominator = np.log(1 - A_0)
                 if log_denominator >= 0:  # This should be negative for valid A_0
-                    fallback = np.full_like(t_arr, np.log(1e6))
+                    fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
                 
                 exponent = np.log(2) / log_denominator
@@ -2153,7 +2189,7 @@ class ProgressModel:
                 
                 # Check for invalid results
                 if np.any(~np.isfinite(result)) or np.any(result <= 0):
-                    fallback = np.full_like(t_arr, np.log(1e6))
+                    fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
                 
                 log_result = np.log(result)
@@ -2161,17 +2197,43 @@ class ProgressModel:
                 
             except (ValueError, ZeroDivisionError, OverflowError):
                 t_arr = np.atleast_1d(t)
-                fallback = np.full_like(t_arr, np.log(1e6))
+                fallback = np.full_like(t_arr, np.log(1e12))
                 return fallback[0] if np.isscalar(t) else fallback
         
         try:
             if self.params.horizon_extrapolation_type == "exponential":
-                # Linear regression: log(horizon) = a * progress + b
-                popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
-                slope, intercept = popt
-                
-                logger.info(f"Fitted exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
-                logger.info(f"R-squared: {1 - np.sum((log_horizon_values - linear_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+                # Check if manual parameters are provided
+                if self.params.anchor_horizon is not None:
+                    # Use manual fitting with anchor point
+                    # Get progress at anchor_time
+                    anchor_progress = np.interp(self.params.anchor_time, backcast_times, backcast_progress)
+                    
+                    # If anchor_doubling_time is provided, use it to calculate slope
+                    if self.params.anchor_doubling_time is not None:
+                        # slope = log(2) / doubling_time (in progress units)
+                        slope = np.log(2) / self.params.anchor_doubling_time
+                    else:
+                        # Optimize slope using data, but fix intercept using anchor point
+                        def fit_slope_only(slope_val):
+                            intercept_val = np.log(self.params.anchor_horizon) - slope_val * anchor_progress
+                            predicted = linear_func(progress_values, slope_val, intercept_val)
+                            return np.sum((log_horizon_values - predicted)**2)
+                        
+                        result = optimize.minimize_scalar(fit_slope_only, bounds=(-10, 10), method='bounded')
+                        slope = result.x
+                    
+                    # Calculate intercept from anchor point: log(anchor_horizon) = slope * anchor_progress + intercept
+                    intercept = np.log(self.params.anchor_horizon) - slope * anchor_progress
+                    
+                    logger.info(f"Manual exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
+                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}, horizon={self.params.anchor_horizon:.4f}")
+                else:
+                    # Use automatic curve fitting
+                    popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
+                    slope, intercept = popt
+                    
+                    logger.info(f"Fitted exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
+                    logger.info(f"R-squared: {1 - np.sum((log_horizon_values - linear_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
                 
                 # Create horizon trajectory function: progress -> horizon
                 def horizon_trajectory(progress):
@@ -2190,23 +2252,125 @@ class ProgressModel:
                         self.sc_progress = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
-                # Decaying doubling time functional form
-                # Initial parameter guesses
-                H_0_init = 0.00001  
-                A_0_init = 0.05
-                T_0_init = 1.35
-                
-                popt, pcov = optimize.curve_fit(
-                    decaying_doubling_time_func, 
-                    progress_values, 
-                    log_horizon_values,
-                    p0=[H_0_init, A_0_init, T_0_init],
-                    bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])  # Reasonable bounds
-                )
-                H_0, A_0, T_0 = popt
-                
-                logger.info(f"Fitted decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
-                logger.info(f"R-squared: {1 - np.sum((log_horizon_values - decaying_doubling_time_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+                # Check if manual parameters are provided
+                if self.params.anchor_horizon is not None:
+                    # Use manual fitting with anchor point
+                    # Get progress at anchor_time
+                    anchor_progress = np.interp(self.params.anchor_time, backcast_times, backcast_progress)
+                    
+                    # Determine which parameters to optimize vs. fix
+                    params_to_optimize = []
+                    fixed_params = {}
+                    param_names = ['H_0', 'A_0', 'T_0']
+                    
+                    # H_0 is determined by anchor point if we have anchor_horizon
+                    # We'll calculate it after getting A_0 and T_0
+                    
+                    if self.params.doubling_decay_rate is not None:
+                        fixed_params['A_0'] = self.params.doubling_decay_rate
+                    else:
+                        params_to_optimize.append('A_0')
+                    
+                    if self.params.anchor_doubling_time is not None:
+                        fixed_params['T_0'] = self.params.anchor_doubling_time
+                    else:
+                        params_to_optimize.append('T_0')
+                    
+                    if len(params_to_optimize) == 0:
+                        # All parameters are fixed, calculate H_0 directly
+                        A_0 = fixed_params['A_0']
+                        T_0 = fixed_params['T_0']
+                        
+                        # Calculate H_0 from anchor point: anchor_horizon = H_0 * (1 - A_0 * anchor_progress / T_0)**(log(2)/log(1-A_0))
+                        base_term = 1 - A_0 * anchor_progress / T_0
+                        if base_term > 0 and A_0 < 1:
+                            exponent = np.log(2) / np.log(1 - A_0)
+                            H_0 = self.params.anchor_horizon / (base_term ** exponent)
+                        else:
+                            logger.warning("Invalid parameter combination for manual decaying doubling time, falling back to optimization")
+                            H_0_init = 0.00001
+                            A_0_init = 0.05
+                            T_0_init = 1.35
+                            popt, pcov = optimize.curve_fit(
+                                decaying_doubling_time_func, 
+                                progress_values, 
+                                log_horizon_values,
+                                p0=[H_0_init, A_0_init, T_0_init],
+                                bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])
+                            )
+                            H_0, A_0, T_0 = popt
+                    else:
+                        # Need to optimize some parameters
+                        def fit_partial_params(params_array):
+                            # Reconstruct full parameter set
+                            param_dict = fixed_params.copy()
+                            for i, param_name in enumerate(params_to_optimize):
+                                param_dict[param_name] = params_array[i]
+                            
+                            A_0_val = param_dict['A_0']
+                            T_0_val = param_dict['T_0']
+                            
+                            # Calculate H_0 from anchor point
+                            base_term = 1 - A_0_val * anchor_progress / T_0_val
+                            if base_term <= 0 or A_0_val >= 1:
+                                return 1e6  # Large penalty for invalid parameters
+                            
+                            exponent = np.log(2) / np.log(1 - A_0_val)
+                            H_0_val = self.params.anchor_horizon / (base_term ** exponent)
+                            
+                            if H_0_val <= 0 or not np.isfinite(H_0_val):
+                                return 1e6
+                            
+                            # Calculate fit quality
+                            predicted = decaying_doubling_time_func(progress_values, H_0_val, A_0_val, T_0_val)
+                            return np.sum((log_horizon_values - predicted)**2)
+                        
+                        # Set up bounds and initial guesses for optimization
+                        bounds = []
+                        p0 = []
+                        for param_name in params_to_optimize:
+                            if param_name == 'A_0':
+                                bounds.append((1e-6, 0.999))
+                                p0.append(0.05)
+                            elif param_name == 'T_0':
+                                bounds.append((1e-6, 100.0))
+                                p0.append(1.35)
+                        
+                        result = optimize.minimize(fit_partial_params, p0, bounds=bounds, method='L-BFGS-B')
+                        
+                        # Extract optimized parameters
+                        param_dict = fixed_params.copy()
+                        for i, param_name in enumerate(params_to_optimize):
+                            param_dict[param_name] = result.x[i]
+                        
+                        A_0 = param_dict['A_0']
+                        T_0 = param_dict['T_0']
+                        
+                        # Calculate H_0 from anchor point
+                        base_term = 1 - A_0 * anchor_progress / T_0
+                        exponent = np.log(2) / np.log(1 - A_0)
+                        H_0 = self.params.anchor_horizon / (base_term ** exponent)
+                    
+                    logger.info(f"Manual decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
+                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}, horizon={self.params.anchor_horizon:.4f}")
+                else:
+                    # Use automatic curve fitting
+                    # These specific values are somewhat important for the optimization
+                    H_0_init = 0.00001  
+                    A_0_init = 0.05
+                    T_0_init = 1.35
+                    
+                    popt, pcov = optimize.curve_fit(
+                        decaying_doubling_time_func, 
+                        progress_values, 
+                        log_horizon_values,
+                        p0=[H_0_init, A_0_init, T_0_init],
+                        bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])  # Reasonable bounds
+                    )
+                    H_0, A_0, T_0 = popt
+                    
+                    logger.info(f"Fitted decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
+                    logger.info(f"R-squared: {1 - np.sum((log_horizon_values - decaying_doubling_time_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
                 
                 # Create horizon trajectory function: progress -> horizon
                 def horizon_trajectory(progress):
@@ -2218,7 +2382,7 @@ class ProgressModel:
                         
                         # Ensure parameters are within valid ranges
                         if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
-                            fallback = np.full_like(progress_arr, 1e6)
+                            fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
                         # Calculate the base term (1 - A_0 * progress / T_0)
@@ -2226,13 +2390,13 @@ class ProgressModel:
                         
                         # Check for negative or zero base terms
                         if np.any(base_term <= 0):
-                            fallback = np.full_like(progress_arr, 1e6)
+                            fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
                         # Calculate the exponent
                         log_denominator = np.log(1 - A_0)
                         if log_denominator >= 0:  # This should be negative for valid A_0
-                            fallback = np.full_like(progress_arr, 1e6)
+                            fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
                         exponent = np.log(2) / log_denominator
@@ -2242,14 +2406,14 @@ class ProgressModel:
                         
                         # Check for invalid results
                         if np.any(~np.isfinite(result)) or np.any(result <= 0):
-                            fallback = np.full_like(progress_arr, 1e6)
+                            fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
                         return result[0] if is_scalar else result
                         
                     except (ValueError, ZeroDivisionError, OverflowError):
                         progress_arr = np.atleast_1d(progress)
-                        fallback = np.full_like(progress_arr, 1e6)
+                        fallback = np.full_like(progress_arr, 1e12)
                         return fallback[0] if np.isscalar(progress) else fallback
                 
                 # Calculate progress level where horizon reaches sc_time_horizon_minutes

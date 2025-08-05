@@ -1174,7 +1174,12 @@ def params_to_dict(params: Parameters):
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
         'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
-        'horizon_extrapolation_type': params.horizon_extrapolation_type
+        'horizon_extrapolation_type': params.horizon_extrapolation_type,
+        # Manual horizon fitting parameters
+        'anchor_time': params.anchor_time,
+        'anchor_horizon': params.anchor_horizon,
+        'anchor_doubling_time': params.anchor_doubling_time,
+        'doubling_decay_rate': params.doubling_decay_rate
     }
     
     # Add calculated SC information if available from the current session
@@ -1473,6 +1478,27 @@ def get_parameter_config():
                     'name': 'Horizon Extrapolation Type',
                     'description': 'Method for extrapolating progress beyond the time horizon',
                     'units': 'categorical'
+                },
+                # Manual horizon fitting parameters
+                'anchor_time': {
+                    'name': 'Anchor Time',
+                    'description': 'Reference time point for manual horizon fitting',
+                    'units': 'year'
+                },
+                'anchor_horizon': {
+                    'name': 'Anchor Horizon',
+                    'description': 'Time horizon length at the anchor time (leave empty for auto-fit)',
+                    'units': 'minutes'
+                },
+                'anchor_doubling_time': {
+                    'name': 'Anchor Doubling Time',
+                    'description': 'Doubling time parameter at the anchor point (leave empty for auto-fit)',
+                    'units': 'progress units'
+                },
+                'doubling_decay_rate': {
+                    'name': 'Doubling Decay Rate',
+                    'description': 'Rate of decay for doubling time (leave empty for auto-fit)',
+                    'units': 'dimensionless'
                 }
             }
         }
@@ -2065,7 +2091,12 @@ def get_default_data():
             'taste_schedule_type': params.taste_schedule_type,
             'progress_at_sc': params.progress_at_sc,
             'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
-            'horizon_extrapolation_type': params.horizon_extrapolation_type
+            'horizon_extrapolation_type': params.horizon_extrapolation_type,
+            # Manual horizon fitting parameters
+            'anchor_time': params.anchor_time,
+            'anchor_horizon': params.anchor_horizon,
+            'anchor_doubling_time': params.anchor_doubling_time,
+            'doubling_decay_rate': params.doubling_decay_rate
         }
     })
 

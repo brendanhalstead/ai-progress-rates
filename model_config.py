@@ -39,6 +39,12 @@ DEFAULT_TASTE_SCHEDULE_TYPE = "sd_per_progress"
 HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
 DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "exponential"
 
+# Manual Horizon Fitting Parameters
+DEFAULT_ANCHOR_TIME = 2025.25
+DEFAULT_ANCHOR_HORIZON = None  # Will be optimized if None
+DEFAULT_ANCHOR_DOUBLING_TIME = None  # Will be optimized if None
+DEFAULT_DOUBLING_DECAY_RATE = None  # Will be optimized if None
+
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
 AI_RESEARCH_TASTE_MAX = 10000000000.0  # Match the upper bound from PARAMETER_BOUNDS
@@ -86,7 +92,12 @@ PARAMETER_BOUNDS = {
     'progress_at_half_ai_research_taste': (1.0, 500),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
-    'sc_time_horizon_minutes': (1000, 1000000)
+    'sc_time_horizon_minutes': (1000, 1000000),
+    # Manual horizon fitting parameter bounds
+    'anchor_time': (2020.0, 2030.0),
+    'anchor_horizon': (0.01, 100),  # minutes
+    'anchor_doubling_time': (0.01, 2),  # doubling time in progress units
+    'doubling_decay_rate': (0.001, 0.5)  # decay rate
 }
 
 # Validation thresholds for parameter combinations
@@ -152,4 +163,9 @@ DEFAULT_PARAMETERS = {
     'progress_at_sc': 20.0,
     'sc_time_horizon_minutes': 10000.0,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
+    # Manual horizon fitting parameters
+    'anchor_time': DEFAULT_ANCHOR_TIME,
+    'anchor_horizon': DEFAULT_ANCHOR_HORIZON,
+    'anchor_doubling_time': DEFAULT_ANCHOR_DOUBLING_TIME,
+    'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
 } 
