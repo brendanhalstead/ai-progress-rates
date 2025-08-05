@@ -2060,6 +2060,10 @@ class ProgressModel:
         self.results = {}
         self.horizon_trajectory = None
         
+        # Initialize flags for horizon trajectory anchor fix
+        self._horizon_uses_shifted_form = False
+        self._horizon_params = None
+        
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution()
     
@@ -2252,109 +2256,182 @@ class ProgressModel:
                         self.sc_progress = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
-                # Check if manual parameters are provided
-                if self.params.anchor_horizon is not None:
-                    # Use manual fitting with anchor point
+                # Determine approach based on whether anchor_doubling_time is specified
+                # If anchor_doubling_time is specified, we MUST use the shifted function approach
+                # to ensure the doubling time at the anchor point equals anchor_doubling_time
+                if self.params.anchor_doubling_time is not None or self.params.anchor_horizon is not None:
+                    # Use shifted function approach
+                    self._horizon_uses_shifted_form = True
                     # Get progress at anchor_time
                     anchor_progress = np.interp(self.params.anchor_time, backcast_times, backcast_progress)
                     
-                    # Determine which parameters to optimize vs. fix
+                    # Determine what parameters we have and what we need to optimize
                     params_to_optimize = []
                     fixed_params = {}
-                    param_names = ['H_0', 'A_0', 'T_0']
                     
-                    # H_0 is determined by anchor point if we have anchor_horizon
-                    # We'll calculate it after getting A_0 and T_0
-                    
-                    if self.params.doubling_decay_rate is not None:
-                        fixed_params['A_0'] = self.params.doubling_decay_rate
+                    # Handle H_0 (anchor_horizon)
+                    if self.params.anchor_horizon is not None:
+                        fixed_params['H_0'] = self.params.anchor_horizon
                     else:
-                        params_to_optimize.append('A_0')
+                        params_to_optimize.append('H_0')
                     
+                    # Handle T_0 (anchor_doubling_time)
                     if self.params.anchor_doubling_time is not None:
                         fixed_params['T_0'] = self.params.anchor_doubling_time
                     else:
                         params_to_optimize.append('T_0')
                     
-                    if len(params_to_optimize) == 0:
-                        # All parameters are fixed, calculate H_0 directly
-                        A_0 = fixed_params['A_0']
-                        T_0 = fixed_params['T_0']
-                        
-                        # Calculate H_0 from anchor point: anchor_horizon = H_0 * (1 - A_0 * anchor_progress / T_0)**(log(2)/log(1-A_0))
-                        base_term = 1 - A_0 * anchor_progress / T_0
-                        if base_term > 0 and A_0 < 1:
-                            exponent = np.log(2) / np.log(1 - A_0)
-                            H_0 = self.params.anchor_horizon / (base_term ** exponent)
-                        else:
-                            logger.warning("Invalid parameter combination for manual decaying doubling time, falling back to optimization")
-                            H_0_init = 0.00001
-                            A_0_init = 0.05
-                            T_0_init = 1.35
-                            popt, pcov = optimize.curve_fit(
-                                decaying_doubling_time_func, 
-                                progress_values, 
-                                log_horizon_values,
-                                p0=[H_0_init, A_0_init, T_0_init],
-                                bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])
-                            )
-                            H_0, A_0, T_0 = popt
+                    # Handle A_0 (doubling_decay_rate)
+                    if self.params.doubling_decay_rate is not None:
+                        fixed_params['A_0'] = self.params.doubling_decay_rate
                     else:
-                        # Need to optimize some parameters
-                        def fit_partial_params(params_array):
+                        params_to_optimize.append('A_0')
+                    
+                    if len(params_to_optimize) == 0:
+                        # All parameters specified (Case 8)
+                        H_0 = self.params.anchor_horizon
+                        T_0 = self.params.anchor_doubling_time
+                        A_0 = self.params.doubling_decay_rate
+                        logger.info(f"Manual decaying doubling time: All parameters specified")
+                    elif len(params_to_optimize) == 1:
+                        # Optimize one parameter
+                        param_name = params_to_optimize[0]
+                        
+                        def fit_single_param(param_val):
+                            if param_name == 'A_0' and (param_val <= 0 or param_val >= 1):
+                                return 1e6
+                            if param_name in ['H_0', 'T_0'] and param_val <= 0:
+                                return 1e6
+                            
+                            # Reconstruct full parameter set
+                            param_dict = fixed_params.copy()
+                            param_dict[param_name] = param_val
+                            
+                            H_0_val = param_dict['H_0']
+                            T_0_val = param_dict['T_0']
+                            A_0_val = param_dict['A_0']
+                            
+                            # Use shifted function: horizon(t) = H_0 * (1 - A_0 * (t - anchor_progress) / T_0)^exponent
+                            def shifted_func(t_vals):
+                                try:
+                                    t_shifted = t_vals - anchor_progress
+                                    base_term = 1 - A_0_val * t_shifted / T_0_val
+                                    
+                                    # Check for negative or zero base terms
+                                    if np.any(base_term <= 0):
+                                        return np.full_like(t_vals, np.log(1e12))
+                                    
+                                    exponent = np.log(2) / np.log(1 - A_0_val)
+                                    result = H_0_val * (base_term ** exponent)
+                                    
+                                    if np.any(~np.isfinite(result)) or np.any(result <= 0):
+                                        return np.full_like(t_vals, np.log(1e12))
+                                    
+                                    return np.log(result)
+                                except:
+                                    return np.full_like(t_vals, np.log(1e12))
+                            
+                            predicted = shifted_func(progress_values)
+                            return np.sum((log_horizon_values - predicted)**2)
+                        
+                        # Set bounds based on parameter type
+                        if param_name == 'A_0':
+                            bounds = (1e-6, 0.999)
+                            initial_guess = 0.05
+                        elif param_name == 'H_0':
+                            bounds = (1e-6, 1e6)
+                            initial_guess = 0.00001
+                        elif param_name == 'T_0':
+                            bounds = (1e-6, 100.0)
+                            initial_guess = 1.35
+                        
+                        result = optimize.minimize_scalar(fit_single_param, bounds=bounds, method='bounded')
+                        
+                        # Extract optimized parameters
+                        param_dict = fixed_params.copy()
+                        param_dict[param_name] = result.x
+                        
+                        H_0 = param_dict['H_0']
+                        T_0 = param_dict['T_0']
+                        A_0 = param_dict['A_0']
+                        
+                        logger.info(f"Optimized {param_name}: {result.x:.6f}")
+                    else:
+                        # Optimize multiple parameters
+                        def fit_multiple_params(params_array):
                             # Reconstruct full parameter set
                             param_dict = fixed_params.copy()
                             for i, param_name in enumerate(params_to_optimize):
                                 param_dict[param_name] = params_array[i]
                             
-                            A_0_val = param_dict['A_0']
+                            H_0_val = param_dict['H_0']
                             T_0_val = param_dict['T_0']
+                            A_0_val = param_dict['A_0']
                             
-                            # Calculate H_0 from anchor point
-                            base_term = 1 - A_0_val * anchor_progress / T_0_val
-                            if base_term <= 0 or A_0_val >= 1:
-                                return 1e6  # Large penalty for invalid parameters
-                            
-                            exponent = np.log(2) / np.log(1 - A_0_val)
-                            H_0_val = self.params.anchor_horizon / (base_term ** exponent)
-                            
-                            if H_0_val <= 0 or not np.isfinite(H_0_val):
+                            if A_0_val <= 0 or A_0_val >= 1 or H_0_val <= 0 or T_0_val <= 0:
                                 return 1e6
                             
-                            # Calculate fit quality
-                            predicted = decaying_doubling_time_func(progress_values, H_0_val, A_0_val, T_0_val)
+                            # Use shifted function
+                            def shifted_func(t_vals):
+                                try:
+                                    t_shifted = t_vals - anchor_progress
+                                    base_term = 1 - A_0_val * t_shifted / T_0_val
+                                    
+                                    if np.any(base_term <= 0):
+                                        return np.full_like(t_vals, np.log(1e12))
+                                    
+                                    exponent = np.log(2) / np.log(1 - A_0_val)
+                                    result = H_0_val * (base_term ** exponent)
+                                    
+                                    if np.any(~np.isfinite(result)) or np.any(result <= 0):
+                                        return np.full_like(t_vals, np.log(1e12))
+                                    
+                                    return np.log(result)
+                                except:
+                                    return np.full_like(t_vals, np.log(1e12))
+                            
+                            predicted = shifted_func(progress_values)
                             return np.sum((log_horizon_values - predicted)**2)
                         
-                        # Set up bounds and initial guesses for optimization
+                        # Set up bounds and initial guesses
                         bounds = []
                         p0 = []
                         for param_name in params_to_optimize:
                             if param_name == 'A_0':
                                 bounds.append((1e-6, 0.999))
                                 p0.append(0.05)
+                            elif param_name == 'H_0':
+                                bounds.append((1e-6, 1e6))
+                                p0.append(0.00001)
                             elif param_name == 'T_0':
                                 bounds.append((1e-6, 100.0))
                                 p0.append(1.35)
                         
-                        result = optimize.minimize(fit_partial_params, p0, bounds=bounds, method='L-BFGS-B')
+                        result = optimize.minimize(fit_multiple_params, p0, bounds=bounds, method='L-BFGS-B')
                         
                         # Extract optimized parameters
                         param_dict = fixed_params.copy()
                         for i, param_name in enumerate(params_to_optimize):
                             param_dict[param_name] = result.x[i]
                         
-                        A_0 = param_dict['A_0']
+                        H_0 = param_dict['H_0']
                         T_0 = param_dict['T_0']
+                        A_0 = param_dict['A_0']
                         
-                        # Calculate H_0 from anchor point
-                        base_term = 1 - A_0 * anchor_progress / T_0
-                        exponent = np.log(2) / np.log(1 - A_0)
-                        H_0 = self.params.anchor_horizon / (base_term ** exponent)
+                        logger.info(f"Optimized parameters: {', '.join([f'{name}={param_dict[name]:.6f}' for name in params_to_optimize])}")
                     
                     logger.info(f"Manual decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
-                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}, horizon={self.params.anchor_horizon:.4f}")
+                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}")
+                    if self.params.anchor_horizon is not None:
+                        logger.info(f"Anchor horizon: {self.params.anchor_horizon:.4f}")
+                    if self.params.anchor_doubling_time is not None:
+                        logger.info(f"Anchor doubling time: {self.params.anchor_doubling_time:.4f}")
+                    
+                    # Store anchor_progress for use in horizon_trajectory function
+                    anchor_progress_for_trajectory = anchor_progress
                 else:
-                    # Use automatic curve fitting
+                    # Use automatic curve fitting (Cases 1-2: no anchor parameters specified)
+                    self._horizon_uses_shifted_form = False
                     # These specific values are somewhat important for the optimization
                     H_0_init = 0.00001  
                     A_0_init = 0.05
@@ -2371,6 +2448,9 @@ class ProgressModel:
                     
                     logger.info(f"Fitted decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
                     logger.info(f"R-squared: {1 - np.sum((log_horizon_values - decaying_doubling_time_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+                    
+                    # For automatic fitting, no anchor_progress shift is used
+                    anchor_progress_for_trajectory = None
                 
                 # Create horizon trajectory function: progress -> horizon
                 def horizon_trajectory(progress):
@@ -2385,8 +2465,14 @@ class ProgressModel:
                             fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
-                        # Calculate the base term (1 - A_0 * progress / T_0)
-                        base_term = 1 - A_0 * progress_arr / T_0
+                        # Use shifted form if we're in the manual parameter case (anchor_progress_for_trajectory is set)
+                        if anchor_progress_for_trajectory is not None:
+                            # Shifted form: horizon(t) = H_0 * (1 - A_0 * (t - anchor_progress) / T_0)^exponent
+                            progress_shifted = progress_arr - anchor_progress_for_trajectory
+                            base_term = 1 - A_0 * progress_shifted / T_0
+                        else:
+                            # Original form: horizon(t) = H_0 * (1 - A_0 * t / T_0)^exponent
+                            base_term = 1 - A_0 * progress_arr / T_0
                         
                         # Check for negative or zero base terms
                         if np.any(base_term <= 0):
@@ -2427,10 +2513,6 @@ class ProgressModel:
                             logger.warning("Invalid sc_time_horizon_minutes for calculation")
                             self.sc_progress = None
                         else:
-                            # Solve: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)**(log(2)/log(1-A_0))
-                            # (sc_time_horizon_minutes / H_0)**(log(1-A_0)/log(2)) = 1 - A_0 * progress / T_0
-                            # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)**(log(1-A_0)/log(2))) / A_0
-                            
                             # Check if the ratio is valid
                             ratio = self.params.sc_time_horizon_minutes / H_0
                             if ratio <= 0:
@@ -2447,7 +2529,16 @@ class ProgressModel:
                                         logger.warning("Invalid ratio_term for sc_progress calculation")
                                         self.sc_progress = None
                                     else:
-                                        self.sc_progress = T_0 * (1 - ratio_term) / A_0
+                                        # Use shifted form if we're in the manual parameter case
+                                        if anchor_progress_for_trajectory is not None:
+                                            # Shifted form: sc_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
+                                            # progress = anchor_progress + T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            self.sc_progress = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
+                                        else:
+                                            # Original form: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
+                                            # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            self.sc_progress = T_0 * (1 - ratio_term) / A_0
+                                        
                                         if not np.isfinite(self.sc_progress):
                                             logger.warning("Invalid sc_progress result")
                                             self.sc_progress = None
@@ -2461,13 +2552,90 @@ class ProgressModel:
                 logger.error(f"Unknown horizon_extrapolation_type: {self.params.horizon_extrapolation_type}")
                 return None
             
-            # Store the function for later use
+            # Store the function and parameters for later use
             self.horizon_trajectory = horizon_trajectory
+            
+            # Store parameters needed for anchor update in shifted form cases
+            if hasattr(self, '_horizon_uses_shifted_form') and self._horizon_uses_shifted_form:
+                self._horizon_params = {
+                    'H_0': H_0,
+                    'A_0': A_0, 
+                    'T_0': T_0,
+                    'original_anchor_progress': anchor_progress_for_trajectory
+                }
+            
             return horizon_trajectory
             
         except Exception as e:
             logger.error(f"Error fitting horizon trajectory: {e}")
             return None
+    
+    def _update_horizon_trajectory_anchor(self, new_anchor_progress: float):
+        """
+        Update the horizon trajectory function with a new anchor progress value.
+        This fixes the Case 2 issue where the fitted anchor progress differs from 
+        the actual integrated progress at anchor_time.
+        """
+        if not hasattr(self, '_horizon_params') or not self._horizon_params:
+            logger.warning("Cannot update horizon trajectory: no stored parameters")
+            return
+            
+        # Extract stored parameters
+        H_0 = self._horizon_params['H_0']
+        A_0 = self._horizon_params['A_0'] 
+        T_0 = self._horizon_params['T_0']
+        
+        # Update the stored anchor progress
+        self._horizon_params['original_anchor_progress'] = new_anchor_progress
+        
+        # Create new horizon trajectory function with updated anchor progress
+        def horizon_trajectory(progress):
+            """Map progress to horizon length using fitted decaying doubling time model with updated anchor"""
+            try:
+                # Handle scalar vs array inputs
+                is_scalar = np.isscalar(progress)
+                progress_arr = np.atleast_1d(progress)
+                
+                # Ensure parameters are within valid ranges
+                if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                    fallback = np.full_like(progress_arr, 1e12)
+                    return fallback[0] if is_scalar else fallback
+                
+                # Use shifted form with updated anchor progress
+                progress_shifted = progress_arr - new_anchor_progress
+                base_term = 1 - A_0 * progress_shifted / T_0
+                
+                # Check for negative or zero base terms
+                if np.any(base_term <= 0):
+                    fallback = np.full_like(progress_arr, 1e12)
+                    return fallback[0] if is_scalar else fallback
+                
+                # Calculate the exponent
+                log_denominator = np.log(1 - A_0)
+                if log_denominator >= 0:  # This should be negative for valid A_0
+                    fallback = np.full_like(progress_arr, 1e12)
+                    return fallback[0] if is_scalar else fallback
+                
+                exponent = np.log(2) / log_denominator
+                
+                # Calculate the result
+                result = H_0 * (base_term ** exponent)
+                
+                # Check for invalid results
+                if np.any(~np.isfinite(result)) or np.any(result <= 0):
+                    fallback = np.full_like(progress_arr, 1e12)
+                    return fallback[0] if is_scalar else fallback
+                
+                return result[0] if is_scalar else result
+                
+            except (ValueError, ZeroDivisionError, OverflowError):
+                progress_arr = np.atleast_1d(progress)
+                fallback = np.full_like(progress_arr, 1e12)
+                return fallback[0] if np.isscalar(progress) else fallback
+        
+        # Replace the horizon trajectory function
+        self.horizon_trajectory = horizon_trajectory
+        logger.info(f"Updated horizon trajectory anchor progress to {new_anchor_progress:.6f}")
     
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -2494,6 +2662,19 @@ class ProgressModel:
             logger.info(f"Using config SC progress: {self.params.progress_at_sc:.4f} (not bootstrapped yet)")
         
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, params_to_use)
+        
+        # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
+        # This ensures that the horizon at anchor_time matches the specified anchor_horizon value
+        if (self.horizon_trajectory is not None and 
+            hasattr(self, '_horizon_uses_shifted_form') and self._horizon_uses_shifted_form and
+            self.params.anchor_horizon is not None):
+            
+            # Recompute the actual progress at anchor_time from the integrated trajectory
+            actual_anchor_progress = np.interp(self.params.anchor_time, times, progress_values)
+            
+            # Update the horizon trajectory function with the corrected anchor progress
+            logger.info(f"Updating anchor progress from fitted value to actual integrated value: {actual_anchor_progress:.6f}")
+            self._update_horizon_trajectory_anchor(actual_anchor_progress)
         
         # Use utility function to compute initial conditions with the correct parameters
         initial_conditions = compute_initial_conditions(self.data, params_to_use, initial_progress)
