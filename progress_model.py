@@ -2179,6 +2179,7 @@ class ProgressModel:
         automation_fractions = []
         ai_research_tastes = []
         ai_research_taste_sds = []
+        ai_research_taste_quantiles = []
         aggregate_research_tastes = []
         cognitive_outputs = []
         software_progress_rates = []
@@ -2210,9 +2211,11 @@ class ProgressModel:
                 # Compute AI research taste and aggregate research taste
                 ai_research_taste = compute_ai_research_taste(p, params_to_use)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
+                ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
                 ai_research_tastes.append(ai_research_taste)
                 ai_research_taste_sds.append(ai_research_taste_sd if np.isfinite(ai_research_taste_sd) else 0.0)
+                ai_research_taste_quantiles.append(ai_research_taste_quantile if np.isfinite(ai_research_taste_quantile) else 0.0)
                 aggregate_research_tastes.append(aggregate_research_taste)
                 
                 # Interpolate input time series to current time
@@ -2300,6 +2303,7 @@ class ProgressModel:
                 automation_fractions.append(0.0)
                 ai_research_tastes.append(0.0)
                 ai_research_taste_sds.append(0.0)
+                ai_research_taste_quantiles.append(0.0)
                 aggregate_research_tastes.append(cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)  # Default to no enhancement
                 cognitive_outputs.append(0.0)
                 software_progress_rates.append(0.0)
@@ -2348,6 +2352,7 @@ class ProgressModel:
             'automation_fraction': automation_fractions,
             'ai_research_taste': ai_research_tastes,
             'ai_research_taste_sd': ai_research_taste_sds,
+            'ai_research_taste_quantile': ai_research_taste_quantiles,
             'aggregate_research_taste': aggregate_research_tastes,
             'progress_rates': progress_rates,
             'research_stock_rates': research_stock_rates,

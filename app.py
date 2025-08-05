@@ -618,6 +618,36 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
                 row=row, col=col
             )
 
+def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row, col):
+    """Plot AI research taste quantile in human distribution over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_research_taste_quantile.tolist(),
+                  name='AI Research Taste (Quantile)',
+                  line=dict(color='#e377c2', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+    # Add horizontal reference lines at key quantiles
+    fig.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)  # Median
+    fig.add_hline(y=0.9, line_dash="dot", line_color="red", opacity=0.3, row=row, col=col)   # 90th percentile
+    fig.add_hline(y=0.95, line_dash="dot", line_color="red", opacity=0.5, row=row, col=col)  # 95th percentile
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_research_taste_quantile.min(), ai_research_taste_quantile.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
+
 def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col):
     """Plot aggregate research taste over time"""
     fig.add_trace(
@@ -809,9 +839,11 @@ def get_tab_configurations():
                   y_axis_title="AI Research Taste"),
         PlotConfig("AI Research Taste (SD)", lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c), 2, 2,
                   y_axis_title="AI Research Taste (Standard Deviations)"),
-        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 1,
+        PlotConfig("AI Research Taste (Quantile)", lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c), 3, 1,
+                  y_axis_title="AI Research Taste (Quantile)"),
+        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
                   y_axis_title="Aggregate Research Taste"),
-        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
+        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
                   x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
     ]
     
@@ -819,9 +851,10 @@ def get_tab_configurations():
         tab_id="automation",
         tab_name="SWE Automation and Taste",
         plots=automation_plots,
-        rows=3,
+        rows=4,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
