@@ -191,6 +191,22 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
                   mode='lines+markers', marker=dict(size=4)),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[(automation_fraction*100).min(), (automation_fraction*100).max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_progress_rate(fig, times, progress_rates, row, col):
     """Plot overall progress rate over time"""
