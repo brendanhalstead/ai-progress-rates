@@ -325,6 +325,24 @@ def plot_cognitive_components(fig, times, ai_labor_contributions, human_labor_co
                   mode='lines'),
         row=row, col=col
     )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            y_min = min(ai_labor_contributions.min(), human_labor_contributions.min())
+            y_max = max(ai_labor_contributions.max(), human_labor_contributions.max())
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[y_min, y_max],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_research_stock(fig, times, research_stocks, row, col):
     """Plot research stock over time"""
@@ -411,6 +429,22 @@ def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipli
     )
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_cognitive_output_multipliers.min(), ai_cognitive_output_multipliers.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers, row, col):
     """Plot AI research stock multiplier over time"""
@@ -423,6 +457,22 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
     )
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_research_stock_multipliers.min(), ai_research_stock_multipliers.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multipliers, row, col):
     """Plot AI software progress multiplier over time"""
@@ -435,6 +485,22 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
     )
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_software_progress_multipliers.min(), ai_software_progress_multipliers.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipliers, row, col):
     """Plot AI overall progress multiplier over time"""
@@ -447,6 +513,22 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
     )
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_overall_progress_multipliers.min(), ai_overall_progress_multipliers.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                row=row, col=col
+            )
 
 def plot_all_ai_multipliers(fig, times, ai_cognitive_output_multipliers, ai_research_stock_multipliers, 
                            ai_software_progress_multipliers, ai_overall_progress_multipliers, row, col):

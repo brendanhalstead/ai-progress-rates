@@ -2156,10 +2156,20 @@ class ProgressModel:
         if initial_progress is None:
             initial_progress = 1.0  # Use a reasonable default value
         
-        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
+        # Bootstrap process: Use calculated sc_progress if available, otherwise fall back to config value
+        params_to_use = self.params
+        if hasattr(self, 'sc_progress') and self.sc_progress is not None:
+            import copy
+            params_to_use = copy.deepcopy(self.params)
+            params_to_use.progress_at_sc = self.sc_progress
+            logger.info(f"Using bootstrap-calculated SC progress: {self.sc_progress:.4f} (overriding config value: {self.params.progress_at_sc:.4f})")
+        else:
+            logger.info(f"Using config SC progress: {self.params.progress_at_sc:.4f} (bootstrap not available)")
         
-        # Use utility function to compute initial conditions
-        initial_conditions = compute_initial_conditions(self.data, self.params, initial_progress)
+        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, params_to_use)
+        
+        # Use utility function to compute initial conditions with the correct parameters
+        initial_conditions = compute_initial_conditions(self.data, params_to_use, initial_progress)
         initial_research_stock_rate_val = initial_conditions.research_stock_rate
         initial_research_stock_val = initial_conditions.research_stock
         
@@ -2189,16 +2199,16 @@ class ProgressModel:
         for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
                 state = [p, rs]
-                rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
+                rates = progress_rate_at_time(t, state, self.data, params_to_use, initial_research_stock_rate_val, initial_research_stock_val)
                 progress_rates.append(rates[0])
                 research_stock_rates.append(rates[1])
                 
                 # Compute automation fraction
-                automation_fraction = compute_automation_fraction(p, self.params)
+                automation_fraction = compute_automation_fraction(p, params_to_use)
                 automation_fractions.append(automation_fraction)
                 
                 # Compute AI research taste and aggregate research taste
-                ai_research_taste = compute_ai_research_taste(p, self.params)
+                ai_research_taste = compute_ai_research_taste(p, params_to_use)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
                 ai_research_tastes.append(ai_research_taste)
@@ -2212,13 +2222,13 @@ class ProgressModel:
                 training_compute = _log_interp(t, self.data.time, self.data.training_compute)
                 
                 # Compute discounted experiment compute
-                discounted_exp_compute_val = experiment_compute ** self.params.zeta
+                discounted_exp_compute_val = experiment_compute ** params_to_use.zeta
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
                     automation_fraction, L_AI, L_HUMAN, 
-                    self.params.rho_cognitive, self.params.cognitive_output_normalization
+                    params_to_use.rho_cognitive, params_to_use.cognitive_output_normalization
                 )
                 cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
                 
@@ -2232,11 +2242,11 @@ class ProgressModel:
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
+                human_only_cognitive_output = L_HUMAN * params_to_use.cognitive_output_normalization
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
-                    self.params.alpha, self.params.rho_progress, self.params.zeta, human_only_aggregate_research_taste
+                    params_to_use.alpha, params_to_use.rho_progress, params_to_use.zeta, human_only_aggregate_research_taste
                 )
                 human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
@@ -2246,15 +2256,15 @@ class ProgressModel:
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
-                    human_only_software_rate, training_compute, self.params.software_progress_share
-                ) * self.params.progress_rate_normalization
+                    human_only_software_rate, training_compute, params_to_use.software_progress_share
+                ) * params_to_use.progress_rate_normalization
                 
                 human_only_progress_rates.append(
                     human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = L_HUMAN * self.params.cognitive_output_normalization
+                human_contrib = L_HUMAN * params_to_use.cognitive_output_normalization
                 ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
