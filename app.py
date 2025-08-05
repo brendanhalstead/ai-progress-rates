@@ -1212,7 +1212,7 @@ def compute_model():
         
         # Get time range
         time_range = data.get('time_range', [2029, 2030])
-        initial_progress = data.get('initial_progress', 1.0)
+        initial_progress = data.get('initial_progress', 0.0)
         
         # Use utility function to set up model with proper normalization
         try:
@@ -1548,7 +1548,7 @@ def estimate_params():
         # Get initial parameters and initial progress
         initial_params_dict = data.get('initial_parameters', {})
         initial_params = Parameters(**initial_params_dict)
-        initial_progress = data.get('initial_progress', 1.0)
+        initial_progress = data.get('initial_progress', 0.0)
         fixed_params = data.get('fixed_params', [])
         
         # Use stored time series or default

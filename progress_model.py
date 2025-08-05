@@ -684,7 +684,7 @@ def _log_interp(x: float, xp: np.ndarray, fp: np.ndarray) -> float:
 
 
 def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: Parameters, 
-                                   initial_progress: float = 1.0) -> float:
+                                   initial_progress: float = 0.0) -> float:
     """
     Calculate initial research stock using the formula: RS(0) = (RS'(0))^2 / RS''(0)
     
@@ -785,7 +785,7 @@ class InitialConditions:
     research_stock: float
 
 def compute_initial_conditions(time_series_data: TimeSeriesData, params: Parameters, 
-                             initial_progress: float = 1.0) -> InitialConditions:
+                             initial_progress: float = 0.0) -> InitialConditions:
     """
     Compute all initial conditions needed for model calculations.
     This eliminates duplication across evaluate_anchor_constraint, estimate_parameters, 
@@ -879,7 +879,7 @@ def compute_progress_rate_normalization(initial_conditions: InitialConditions,
         return 1.0
 
 def setup_model_with_normalization(time_series_data: TimeSeriesData, params: Parameters,
-                                 initial_progress: float = 1.0) -> Tuple[Parameters, InitialConditions]:
+                                 initial_progress: float = 0.0) -> Tuple[Parameters, InitialConditions]:
     """
     Set up model parameters with proper progress rate normalization.
     This replaces the duplicated setup logic in estimate_parameters and compute_model.
@@ -1429,9 +1429,9 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         t_start, t_end = t_end, t_start
     
     # Validate initial conditions
-    if not np.isfinite(initial_progress) or initial_progress <= 0:
+    if not np.isfinite(initial_progress) or initial_progress < 0:
         logger.warning(f"Invalid initial progress {initial_progress}, using fallback")
-        initial_progress = 1.0
+        initial_progress = 0.0
     
     # Use research stock from initial conditions
     initial_state = [initial_progress, initial_conditions.research_stock]
@@ -1597,7 +1597,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
 
 
 def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_data: TimeSeriesData, 
-                       initial_params: Parameters, initial_progress: float = 1.0, fixed_params: Optional[List[str]] = None) -> Tuple[Parameters, List[Dict[str, Any]]]:
+                       initial_params: Parameters, initial_progress: float = 0.0, fixed_params: Optional[List[str]] = None) -> Tuple[Parameters, List[Dict[str, Any]]]:
     """
     Find parameters that best satisfy anchor constraints.
     
@@ -2029,18 +2029,22 @@ class ProgressModel:
     
     def estimate_horizon_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None):
         """
-        Estimate horizon trajectory by fitting a line to log(p80_horizon_length) vs progress.
+        Estimate horizon trajectory by fitting to log(p80_horizon_length) vs progress.
         Uses a backcast model with zero AI contributions to get progress values at model release dates.
+        
+        The functional form depends on horizon_extrapolation_type:
+        - "exponential": linear regression on log(horizon) vs progress
+        - "decaying doubling time": decaying doubling time functional form
         
         Args:
             time_range: [start_time, end_time] for trajectory computation
-            initial_progress: Initial progress value (defaults to 1.0)
+            initial_progress: Initial progress value (defaults to 0.0)
             
         Returns:
             Function that maps progress to horizon length
         """
         if initial_progress is None:
-            initial_progress = 1.0
+            initial_progress = 0.0
         
         # Create backcast parameters with zero AI contributions
         backcast_params = copy.deepcopy(self.params)
@@ -2109,39 +2113,192 @@ class ProgressModel:
         progress_values = np.array([pair[0] for pair in progress_horizon_pairs])
         horizon_values = np.array([pair[1] for pair in progress_horizon_pairs])
         
-        # Fit linear regression to log(horizon) vs progress
+        # Fit functional form based on horizon_extrapolation_type
         log_horizon_values = np.log(horizon_values)
         
-        # Use scipy.optimize.curve_fit for linear regression: log(horizon) = a * progress + b
+        # Define fitting functions
         def linear_func(x, a, b):
             return a * x + b
         
+        def decaying_doubling_time_func(t, H_0, A_0, T_0):
+            """Decaying doubling time function with numerical safeguards"""
+            try:
+                # Handle scalar vs array inputs
+                is_scalar = np.isscalar(t)
+                t_arr = np.atleast_1d(t)
+                
+                # Ensure parameters are within valid ranges
+                if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                    fallback = np.full_like(t_arr, np.log(1e6))
+                    return fallback[0] if is_scalar else fallback
+                
+                # Calculate the base term (1 - A_0 * t / T_0)
+                base_term = 1 - A_0 * t_arr / T_0
+                
+                # Check for negative or zero base terms
+                if np.any(base_term <= 0):
+                    fallback = np.full_like(t_arr, np.log(1e6))
+                    return fallback[0] if is_scalar else fallback
+                
+                # Calculate the exponent
+                log_denominator = np.log(1 - A_0)
+                if log_denominator >= 0:  # This should be negative for valid A_0
+                    fallback = np.full_like(t_arr, np.log(1e6))
+                    return fallback[0] if is_scalar else fallback
+                
+                exponent = np.log(2) / log_denominator
+                
+                # Calculate the result
+                result = H_0 * (base_term ** exponent)
+                
+                # Check for invalid results
+                if np.any(~np.isfinite(result)) or np.any(result <= 0):
+                    fallback = np.full_like(t_arr, np.log(1e6))
+                    return fallback[0] if is_scalar else fallback
+                
+                log_result = np.log(result)
+                return log_result[0] if is_scalar else log_result
+                
+            except (ValueError, ZeroDivisionError, OverflowError):
+                t_arr = np.atleast_1d(t)
+                fallback = np.full_like(t_arr, np.log(1e6))
+                return fallback[0] if np.isscalar(t) else fallback
+        
         try:
-            popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
-            slope, intercept = popt
+            if self.params.horizon_extrapolation_type == "exponential":
+                # Linear regression: log(horizon) = a * progress + b
+                popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
+                slope, intercept = popt
+                
+                logger.info(f"Fitted exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
+                logger.info(f"R-squared: {1 - np.sum((log_horizon_values - linear_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+                
+                # Create horizon trajectory function: progress -> horizon
+                def horizon_trajectory(progress):
+                    """Map progress to horizon length using fitted exponential model"""
+                    return np.exp(slope * progress + intercept)
+                
+                # Calculate progress level where horizon reaches sc_time_horizon_minutes
+                if self.params.sc_time_horizon_minutes > 0:
+                    try:
+                        # Solve: sc_time_horizon_minutes = exp(slope * progress + intercept)
+                        # Therefore: progress = (log(sc_time_horizon_minutes) - intercept) / slope
+                        self.sc_progress = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
+                        logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
+                    except (ValueError, ZeroDivisionError) as e:
+                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        self.sc_progress = None
             
-            logger.info(f"Fitted horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
-            logger.info(f"R-squared: {1 - np.sum((log_horizon_values - linear_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+            elif self.params.horizon_extrapolation_type == "decaying doubling time":
+                # Decaying doubling time functional form
+                # Initial parameter guesses
+                H_0_init = 0.00001  
+                A_0_init = 0.05
+                T_0_init = 1.35
+                
+                popt, pcov = optimize.curve_fit(
+                    decaying_doubling_time_func, 
+                    progress_values, 
+                    log_horizon_values,
+                    p0=[H_0_init, A_0_init, T_0_init],
+                    bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])  # Reasonable bounds
+                )
+                H_0, A_0, T_0 = popt
+                
+                logger.info(f"Fitted decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
+                logger.info(f"R-squared: {1 - np.sum((log_horizon_values - decaying_doubling_time_func(progress_values, *popt))**2) / np.sum((log_horizon_values - np.mean(log_horizon_values))**2):.4f}")
+                
+                # Create horizon trajectory function: progress -> horizon
+                def horizon_trajectory(progress):
+                    """Map progress to horizon length using fitted decaying doubling time model"""
+                    try:
+                        # Handle scalar vs array inputs
+                        is_scalar = np.isscalar(progress)
+                        progress_arr = np.atleast_1d(progress)
+                        
+                        # Ensure parameters are within valid ranges
+                        if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                            fallback = np.full_like(progress_arr, 1e6)
+                            return fallback[0] if is_scalar else fallback
+                        
+                        # Calculate the base term (1 - A_0 * progress / T_0)
+                        base_term = 1 - A_0 * progress_arr / T_0
+                        
+                        # Check for negative or zero base terms
+                        if np.any(base_term <= 0):
+                            fallback = np.full_like(progress_arr, 1e6)
+                            return fallback[0] if is_scalar else fallback
+                        
+                        # Calculate the exponent
+                        log_denominator = np.log(1 - A_0)
+                        if log_denominator >= 0:  # This should be negative for valid A_0
+                            fallback = np.full_like(progress_arr, 1e6)
+                            return fallback[0] if is_scalar else fallback
+                        
+                        exponent = np.log(2) / log_denominator
+                        
+                        # Calculate the result
+                        result = H_0 * (base_term ** exponent)
+                        
+                        # Check for invalid results
+                        if np.any(~np.isfinite(result)) or np.any(result <= 0):
+                            fallback = np.full_like(progress_arr, 1e6)
+                            return fallback[0] if is_scalar else fallback
+                        
+                        return result[0] if is_scalar else result
+                        
+                    except (ValueError, ZeroDivisionError, OverflowError):
+                        progress_arr = np.atleast_1d(progress)
+                        fallback = np.full_like(progress_arr, 1e6)
+                        return fallback[0] if np.isscalar(progress) else fallback
+                
+                # Calculate progress level where horizon reaches sc_time_horizon_minutes
+                if self.params.sc_time_horizon_minutes > 0:
+                    try:
+                        # Add numerical safeguards
+                        if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                            logger.warning("Invalid parameters for sc_progress calculation")
+                            self.sc_progress = None
+                        elif self.params.sc_time_horizon_minutes <= 0:
+                            logger.warning("Invalid sc_time_horizon_minutes for calculation")
+                            self.sc_progress = None
+                        else:
+                            # Solve: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)**(log(2)/log(1-A_0))
+                            # (sc_time_horizon_minutes / H_0)**(log(1-A_0)/log(2)) = 1 - A_0 * progress / T_0
+                            # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)**(log(1-A_0)/log(2))) / A_0
+                            
+                            # Check if the ratio is valid
+                            ratio = self.params.sc_time_horizon_minutes / H_0
+                            if ratio <= 0:
+                                logger.warning("Invalid ratio for sc_progress calculation")
+                                self.sc_progress = None
+                            else:
+                                log_ratio = np.log(1-A_0) / np.log(2)
+                                if not np.isfinite(log_ratio):
+                                    logger.warning("Invalid log ratio for sc_progress calculation")
+                                    self.sc_progress = None
+                                else:
+                                    ratio_term = ratio ** log_ratio
+                                    if not np.isfinite(ratio_term):
+                                        logger.warning("Invalid ratio_term for sc_progress calculation")
+                                        self.sc_progress = None
+                                    else:
+                                        self.sc_progress = T_0 * (1 - ratio_term) / A_0
+                                        if not np.isfinite(self.sc_progress):
+                                            logger.warning("Invalid sc_progress result")
+                                            self.sc_progress = None
+                                        else:
+                                            logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
+                    except (ValueError, ZeroDivisionError, OverflowError) as e:
+                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        self.sc_progress = None
             
-            # Create horizon trajectory function: progress -> horizon
-            def horizon_trajectory(progress):
-                """Map progress to horizon length using fitted linear model"""
-                return np.exp(slope * progress + intercept)
+            else:
+                logger.error(f"Unknown horizon_extrapolation_type: {self.params.horizon_extrapolation_type}")
+                return None
             
             # Store the function for later use
             self.horizon_trajectory = horizon_trajectory
-            
-            # Calculate progress level where horizon reaches sc_time_horizon_minutes
-            if self.params.sc_time_horizon_minutes > 0:
-                try:
-                    # Solve: sc_time_horizon_minutes = exp(slope * progress + intercept)
-                    # Therefore: progress = (log(sc_time_horizon_minutes) - intercept) / slope
-                    self.sc_progress = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
-                    logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
-                except (ValueError, ZeroDivisionError) as e:
-                    logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
-                    self.sc_progress = None
-            
             return horizon_trajectory
             
         except Exception as e:
@@ -2154,13 +2311,13 @@ class ProgressModel:
         
         Args:
             time_range: [start_time, end_time]
-            initial_progress: Initial progress (defaults to 1.0)
+            initial_progress: Initial progress (defaults to 0.0)
         
         Returns:
             Tuple of (times, cumulative_progress_values, research_stock_values)
         """
         if initial_progress is None:
-            initial_progress = 1.0  # Use a reasonable default value
+            initial_progress = 0.0  # Use a reasonable default value
         
         # Bootstrap process: Use calculated sc_progress if available, otherwise fall back to config value
         params_to_use = self.params
@@ -2720,7 +2877,7 @@ if __name__ == "__main__":
     
     # Run model
     model = ProgressModel(params, data)
-    times, progress, research_stock = model.compute_progress_trajectory([2019, 2030], initial_progress=1.0)
+    times, progress, research_stock = model.compute_progress_trajectory([2019, 2030], initial_progress=0.0)
     
     # Export results
     model.export_results("progress_results.csv")

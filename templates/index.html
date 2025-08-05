@@ -609,7 +609,7 @@
             // Apply fallbacks for invalid inputs
             if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
             if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2030);
-            if (!isFinite(initialProgress) || initialProgress <= 0) initialProgress = 1.0;
+            if (!isFinite(initialProgress) || initialProgress < 0) initialProgress = 0.0;
             
             const timeRange = [startYear, endYear];
             
@@ -1338,8 +1338,8 @@
             
             const initialProgress = document.getElementById('initial_progress');
             if (initialProgress) {
-                initialProgress.value = initialProgress.value || 1.0;
-                initialProgress.min = 0.01;
+                initialProgress.value = initialProgress.value || 0.0;
+                initialProgress.min = 0.0;
                 initialProgress.max = 100;
             }
             
@@ -1461,7 +1461,7 @@
             const simSettings = {
                 'start_year': { value: 2012, min: 2000, max: 2050 },
                 'end_year': { value: 2030, min: 2020, max: 2100 },
-                'initial_progress': { value: 1.0, min: 0.01, max: 100 }
+                'initial_progress': { value: 0.0, min: 0.0, max: 100 }
             };
             
             Object.entries(simSettings).forEach(([inputName, config]) => {
