@@ -131,8 +131,8 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
-    'rho_progress': -0.1,
-    'alpha': 0.5,
+    'rho_progress': -0.3,
+    'alpha': 0.35,
     'software_progress_share': 0.5,
     'automation_fraction_at_superhuman_coder': 0.99,
     'progress_at_half_sc_automation': 20.0,
@@ -146,5 +146,5 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_slope': 1.2,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': 20.0,
-    'sc_time_horizon_minutes': 50000.0,
+    'sc_time_horizon_minutes': 10000.0,
 } 
