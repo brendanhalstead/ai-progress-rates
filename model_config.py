@@ -49,6 +49,9 @@ DEFAULT_DOUBLING_DECAY_RATE = None  # Will be optimized if None
 AI_RESEARCH_TASTE_MIN = 0.0
 AI_RESEARCH_TASTE_MAX = 10000000000.0  # Match the upper bound from PARAMETER_BOUNDS
 
+# Baseline Annual Compute Multiplier
+BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
+
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
@@ -97,7 +100,9 @@ PARAMETER_BOUNDS = {
     'anchor_time': (2020.0, 2030.0),
     'anchor_horizon': (0.01, 100),  # minutes
     'anchor_doubling_time': (0.01, 2),  # doubling time in progress units
-    'doubling_decay_rate': (0.001, 0.5)  # decay rate
+    'doubling_decay_rate': (0.001, 0.5),  # decay rate
+    # Baseline Annual Compute Multiplier bounds
+    'baseline_annual_compute_multiplier': (1.0, 20.0)
 }
 
 # Validation thresholds for parameter combinations
@@ -168,4 +173,6 @@ DEFAULT_PARAMETERS = {
     'anchor_horizon': DEFAULT_ANCHOR_HORIZON,
     'anchor_doubling_time': DEFAULT_ANCHOR_DOUBLING_TIME,
     'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
+    # Baseline Annual Compute Multiplier
+    'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
 } 

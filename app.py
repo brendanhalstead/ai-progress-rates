@@ -122,6 +122,16 @@ def plot_training_compute(fig, times, values, row, col):
         row=row, col=col
     )
 
+def plot_effective_compute(fig, times, values, row, col):
+    """Plot effective compute over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=values.tolist(),
+                  name='Effective Compute',
+                  line=dict(color='#ff7f0e', width=3),
+                  mode='lines+markers', marker=dict(size=4)),
+        row=row, col=col
+    )
+
 def plot_labor_comparison(fig, time_series, row, col):
     """Plot human vs AI labor comparison"""
     fig.add_trace(
@@ -911,16 +921,19 @@ def get_tab_configurations():
                   y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 2, 2,
                   y_axis_title="Progress"),
+        PlotConfig("Effective Compute", lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c), 3, 1,
+                  y_axis_title="Effective Compute (log scale)", y_axis_type="log"),
     ]
     
     combined_progress_tab = TabConfig(
         tab_id="combined_progress",
         tab_name="Combined Progress Production",
         plots=combined_progress_plots,
-        rows=2,
+        rows=3,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
+               [{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False, "colspan": 2}, None]]
     )
     
     # Other Metrics Tab
@@ -1179,7 +1192,9 @@ def params_to_dict(params: Parameters):
         'anchor_time': params.anchor_time,
         'anchor_horizon': params.anchor_horizon,
         'anchor_doubling_time': params.anchor_doubling_time,
-        'doubling_decay_rate': params.doubling_decay_rate
+        'doubling_decay_rate': params.doubling_decay_rate,
+        # Baseline Annual Compute Multiplier
+        'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier
     }
     
     # Add calculated SC information if available from the current session
@@ -1498,6 +1513,11 @@ def get_parameter_config():
                 'doubling_decay_rate': {
                     'name': 'Doubling Decay Rate',
                     'description': 'Rate of decay for doubling time (leave empty for auto-fit)',
+                    'units': 'dimensionless'
+                },
+                'baseline_annual_compute_multiplier': {
+                    'name': 'Baseline Annual Compute Multiplier',
+                    'description': 'Annual multiplier for baseline compute growth (effective compute = multiplier^progress)',
                     'units': 'dimensionless'
                 }
             }
@@ -2096,7 +2116,9 @@ def get_default_data():
             'anchor_time': params.anchor_time,
             'anchor_horizon': params.anchor_horizon,
             'anchor_doubling_time': params.anchor_doubling_time,
-            'doubling_decay_rate': params.doubling_decay_rate
+            'doubling_decay_rate': params.doubling_decay_rate,
+            # Baseline Annual Compute Multiplier  
+            'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier
         }
     })
 

@@ -276,6 +276,9 @@ class Parameters:
     progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
     cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
     
+    # Baseline Annual Compute Multiplier
+    baseline_annual_compute_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['baseline_annual_compute_multiplier'])
+    
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
         # Sanitize elasticity parameters
@@ -409,6 +412,15 @@ class Parameters:
             self.cognitive_output_normalization = 1.0
         else:
             self.cognitive_output_normalization = max(cfg.NORMALIZATION_MIN, self.cognitive_output_normalization)
+        
+        # Validate baseline annual compute multiplier
+        if not np.isfinite(self.baseline_annual_compute_multiplier) or self.baseline_annual_compute_multiplier <= 0:
+            logger.warning(f"Invalid baseline_annual_compute_multiplier: {self.baseline_annual_compute_multiplier}, setting to default")
+            self.baseline_annual_compute_multiplier = cfg.BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT
+        else:
+            # Ensure it's within reasonable bounds
+            bounds = cfg.PARAMETER_BOUNDS.get('baseline_annual_compute_multiplier', (1.0, 20.0))
+            self.baseline_annual_compute_multiplier = np.clip(self.baseline_annual_compute_multiplier, bounds[0], bounds[1])
 
 
 @dataclass
@@ -2702,6 +2714,7 @@ class ProgressModel:
         ai_overall_progress_multipliers = []
         discounted_exp_compute = []
         horizon_lengths = []
+        effective_compute = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -2799,6 +2812,18 @@ class ProgressModel:
                         horizon_length = 0.0
                 
                 horizon_lengths.append(horizon_length)
+                
+                # Compute effective compute as baseline_annual_compute_multiplier^progress
+                effective_compute_val = 0.0  # Default fallback
+                try:
+                    effective_compute_val = params_to_use.baseline_annual_compute_multiplier ** p
+                    if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
+                        effective_compute_val = 0.0
+                except Exception as compute_e:
+                    logger.warning(f"Error computing effective compute at progress {p}: {compute_e}")
+                    effective_compute_val = 0.0
+                
+                effective_compute.append(effective_compute_val)
 
                 
             except Exception as e:
@@ -2826,6 +2851,7 @@ class ProgressModel:
                 ai_overall_progress_multipliers.append(0.0)
                 discounted_exp_compute.append(0.0)
                 horizon_lengths.append(0.0)
+                effective_compute.append(0.0)
         
             
         # Calculate time when superhuman coder level is reached
@@ -2875,6 +2901,7 @@ class ProgressModel:
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
+            'effective_compute': effective_compute,
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.sc_progress if hasattr(self, 'sc_progress') else None,  # Progress level for SC
             'input_time_series': {
