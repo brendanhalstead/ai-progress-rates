@@ -869,19 +869,19 @@ def get_tab_configurations():
                [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    # Cognitive Output Production Tab
+    # Parallel Coding Labor Production Tab
     cognitive_output_plots = [
-        PlotConfig("Cognitive Output", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
-                  y_axis_title="Cognitive Output (log scale)", y_axis_type="log"),
-        PlotConfig("Cognitive Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 1, 2,
+        PlotConfig("Parallel Coding Labor", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
+                  y_axis_title="Parallel Coding Labor (log scale)", y_axis_type="log"),
+        PlotConfig("Parallel Coding Labor Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 1, 2,
                   y_axis_title="Labor Contribution (log scale)", y_axis_type="log"),
-        PlotConfig("AI Cognitive Output Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 2, 1,
-                  y_axis_title="Cognitive Output Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("AI Parallel Coding Labor Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 2, 1,
+                  y_axis_title="Parallel Coding Labor Multiplier (log scale)", y_axis_type="log"),
     ]
     
     cognitive_output_tab = TabConfig(
         tab_id="cognitive_output",
-        tab_name="Cognitive Output Production",
+        tab_name="Parallel Coding Labor",
         plots=cognitive_output_plots,
         rows=2,
         cols=2,
@@ -891,8 +891,8 @@ def get_tab_configurations():
     
     # Software R&D Tab
     software_rd_plots = [
-        PlotConfig("Cognitive Output & Discounted Exp. Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
-                  y_axis_title="Cognitive Output & Discounted Compute (log scale)", y_axis_type="log"),
+        PlotConfig("Parallel Coding Labor & Discounted Exp. Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
+                  y_axis_title="Parallel Coding Labor & Discounted Compute (log scale)", y_axis_type="log"),
         PlotConfig("Research Effort", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 1, 2,
                   y_axis_title="Research Stock Rate (log scale)", y_axis_type="log"),
         PlotConfig("Cumulative Stock of Research Effort", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 2, 1,
@@ -938,8 +938,8 @@ def get_tab_configurations():
     
     # Other Metrics Tab
     other_metrics_plots = [
-        PlotConfig("AI Cognitive Output Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 1, 1,
-                  y_axis_title="Cognitive Output Multiplier (log scale)", y_axis_type="log"),
+        PlotConfig("AI Parallel Coding Labor Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 1, 1,
+                  y_axis_title="Parallel Coding Labor Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("AI Research Stock Multiplier", lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c), 1, 2,
                   y_axis_title="Research Stock Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("AI Software Progress Multiplier", lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c), 2, 1,

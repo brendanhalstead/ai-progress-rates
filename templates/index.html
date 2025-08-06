@@ -233,10 +233,10 @@
                                 </div>
                             </div>
                             
-                            <!-- Cognitive Output Parameters -->
+                            <!-- Parallel Coding Labor Parameters -->
                             <div class="param-group">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="text-muted mb-0">Cognitive Output CES Parameters</h6>
+                                    <h6 class="text-muted mb-0">Parallel Coding Labor CES Parameters</h6>
                                     <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#cognitiveOutputParams" aria-expanded="false" aria-controls="cognitiveOutputParams">
                                         <i class="fas fa-chevron-down"></i>
                                     </button>
@@ -250,9 +250,9 @@
                                     </div>
                                                                     
                                     <div class="mb-3">
-                                        <label class="param-label">Cognitive Output Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
+                                        <label class="param-label">Parallel Coding Labor Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
-                                        <small class="text-muted">Scale factor for cognitive work output (log scale: 10^value)</small>
+                                        <small class="text-muted">Scale factor for parallel coding labor output (log scale: 10^value)</small>
                                     </div>
                                 </div>
                             </div>
@@ -267,20 +267,20 @@
                                     <div class="mb-3">
                                         <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="rho_progress" step="0.1">
-                                        <small class="text-muted">Substitutability between exp. compute and cognitive output.</small>
+                                        <small class="text-muted">Substitutability between exp. compute and parallel coding labor.</small>
                                         <small class="text-muted" id="rho_progress_range">Loading range...</small>
                                     </div>
                                     
                                     <div class="mb-3">
                                         <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="alpha" step="0.05">
-                                        <small class="text-muted">Higher values favor experiment compute over cognitive work</small>
+                                        <small class="text-muted">Higher values favor experiment compute over parallel coding labor</small>
                                     </div>
                                     
                                     <div class="mb-3">
                                         <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="zeta" step="0.05">
-                                        <small class="text-muted">Relates OOMs of experiment compute to OOMs of cognitive output.</small>
+                                        <small class="text-muted">Relates OOMs of experiment compute to OOMs of parallel coding labor.</small>
                                     </div>
                                 </div>
                             </div>
@@ -1718,7 +1718,7 @@
                     'software_progress_share': 'Software Share',
                     'automation_fraction_at_superhuman_coder': 'SC Automation Fraction:',
                     'automation_slope': 'Automation Slope',
-                    'cognitive_output_normalization': 'Cognitive Output Normalization',
+                    'cognitive_output_normalization': 'Parallel Coding Labor Normalization',
                     'zeta': 'Experiment Compute Discounting',
                     'ai_research_taste_at_superhuman_coder': 'SC Research Taste',
                     'ai_research_taste_slope': 'AI Research Taste Slope',
@@ -1810,7 +1810,7 @@
                                     <select class="form-select form-select-sm" name="target_variable">
                                         <option value="progress_rate">Progress Rate</option>
                                         <option value="automation_fraction">Automation Fraction</option>
-                                        <option value="cognitive_output">Cognitive Output</option>
+                                        <option value="cognitive_output">Parallel Coding Labor</option>
                                     </select>
                                 </div>
                                 <div class="mb-2">
