@@ -318,7 +318,22 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <div class="param-group">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Overall Progress Rate Parameters</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#overallProgressParams" aria-expanded="false" aria-controls="overallProgressParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="overallProgressParams">
+                                    <div class="mb-3">
+                                        <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                        <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
+                                        <small class="text-muted" id="software_progress_share_range">Loading range...</small>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Normalization Parameters -->
                             <div class="param-group">
@@ -330,30 +345,8 @@
                                 </div>
                                 <div class="collapse" id="normalizationParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Reference Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="reference_year" step="0.01">
-                                        <small class="text-muted">Reference year for model calibration</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="param-label">Software Share in Reference Year: <span id="software_progress_share_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
-                                        <small class="text-muted">Software progress share in the reference year (weight vs training compute growth).</small>
-                                        <small class="text-muted" id="software_progress_share_range">Loading range...</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="param-label">Progress Rate in Reference Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="progress_rate_reference_year" step="0.01">
-                                        <small class="text-muted">AI progress rate at the reference year</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="param-label">Progress Level at Reference Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="progress_level_reference_year" step="0.01">
-                                        <small class="text-muted">AI progress level at the reference year</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="param-label">Initial Progress</label>
-                                        <input type="number" class="form-control form-control-sm" id="initial_progress" step="0.01">
-                                        <small class="text-muted">Starting progress level for the simulation</small>
+                                        <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
+                                        <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
                                     </div>
                                 </div>
                             </div>
@@ -368,13 +361,17 @@
                                 </div>
                                 <div class="collapse" id="simulationSettingsParams">
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-4">
                                             <label class="param-label">Start Year</label>
                                             <input type="number" class="form-control form-control-sm" id="start_year">
                                         </div>
-                                        <div class="col-6">
+                                        <div class="col-4">
                                             <label class="param-label">End Year</label>
                                             <input type="number" class="form-control form-control-sm" id="end_year">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="param-label">Initial Progress</label>
+                                            <input type="number" class="form-control form-control-sm" id="initial_progress" step="0.01">
                                         </div>
                                     </div>
                                 </div>
