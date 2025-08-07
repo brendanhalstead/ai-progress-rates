@@ -29,7 +29,7 @@ from progress_model import (
     progress_rate_at_time, compute_cognitive_output,
     compute_software_progress_rate, compute_automation_fraction,
     compute_research_stock_rate, compute_overall_progress_rate,
-    calculate_initial_research_stock, setup_model_with_normalization, compute_initial_conditions
+    calculate_initial_research_stock, setup_model, compute_initial_conditions
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -1178,7 +1178,7 @@ def params_to_dict(params: Parameters):
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
         'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
         'automation_slope': params.automation_slope,
-        'progress_rate_normalization': params.progress_rate_normalization,
+
         'cognitive_output_normalization': params.cognitive_output_normalization,
         'zeta': params.zeta,
         'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
@@ -1236,7 +1236,7 @@ def compute_model():
         
         # Use utility function to set up model with proper normalization
         try:
-            params, initial_conditions = setup_model_with_normalization(time_series, params, initial_progress)
+            params, initial_conditions = setup_model(time_series, params, initial_progress)
             # Extract needed values for metrics calculation
             initial_research_stock_rate = initial_conditions.research_stock_rate
             initial_research_stock_calc = initial_conditions.research_stock
@@ -1454,11 +1454,7 @@ def get_parameter_config():
                     'description': 'Diminishing returns factor for experiment compute',
                     'units': 'dimensionless'
                 },
-                'progress_rate_normalization': {
-                    'name': 'Progress Rate Normalization',
-                    'description': 'Normalization factor for progress rates (auto-calculated)',
-                    'units': 'dimensionless'
-                },
+
                 'ai_research_taste_at_superhuman_coder': {
                     'name': 'Max AI Research Taste',
                     'description': 'AI research taste when AI reaches superhuman coding ability',
@@ -1610,7 +1606,7 @@ def estimate_params():
             
             # Set up estimated parameters with proper normalization
             time_range = data.get('time_range', [time_series.time[0], time_series.time[-1]])
-            estimated_params, initial_conditions = setup_model_with_normalization(time_series, estimated_params, initial_progress)
+            estimated_params, initial_conditions = setup_model(time_series, estimated_params, initial_progress)
             initial_research_stock_calc = initial_conditions.research_stock
             
             # Update session state with the optimized parameters
@@ -2102,7 +2098,7 @@ def get_default_data():
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
             'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
             'automation_slope': params.automation_slope,
-            'progress_rate_normalization': params.progress_rate_normalization,
+    
             'cognitive_output_normalization': params.cognitive_output_normalization,
             'zeta': params.zeta,
             'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,

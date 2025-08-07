@@ -344,10 +344,7 @@
                                     </button>
                                 </div>
                                 <div class="collapse" id="normalizationParams">
-                                    <div class="mb-3">
-                                        <label class="param-label">Progress Rate Normalization: <span id="progress_rate_normalization_val">Auto</span></label>
-                                        <small class="text-muted">Automatically calculated to ensure initial progress rate = 1</small>
-                                    </div>
+
                                 </div>
                             </div>
                             
@@ -1703,10 +1700,7 @@
             if (parameterConfig && parameterConfig.descriptions) {
                 params = {};
                 Object.entries(parameterConfig.descriptions).forEach(([id, info]) => {
-                    // Skip progress_rate_normalization as it's auto-calculated
-                    if (id !== 'progress_rate_normalization') {
-                        params[id] = info.name || info.display_name || id;
-                    }
+                    params[id] = info.name || info.display_name || id;
                 });
             } else {
                 // Fallback to hardcoded values (reduced reliance on hardcoded data)

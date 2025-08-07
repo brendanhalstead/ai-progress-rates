@@ -273,7 +273,6 @@ class Parameters:
     doubling_decay_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_decay_rate'])
     
     # Normalization
-    progress_rate_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_rate_normalization'])
     cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
     
     # Baseline Annual Compute Multiplier
@@ -401,12 +400,6 @@ class Parameters:
                 self.doubling_decay_rate = np.clip(self.doubling_decay_rate, 0.001, 1.0)
 
         # Sanitize normalization parameters
-        if not np.isfinite(self.progress_rate_normalization) or self.progress_rate_normalization <= 0:
-            logger.warning(f"Invalid progress_rate_normalization: {self.progress_rate_normalization}, setting to 1.0")
-            self.progress_rate_normalization = 1.0
-        else:
-            self.progress_rate_normalization = max(cfg.NORMALIZATION_MIN, self.progress_rate_normalization)
-        
         if not np.isfinite(self.cognitive_output_normalization) or self.cognitive_output_normalization <= 0:
             logger.warning(f"Invalid cognitive_output_normalization: {self.cognitive_output_normalization}, setting to 1.0")
             self.cognitive_output_normalization = 1.0
@@ -891,62 +884,24 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         research_stock=research_stock
     )
 
-def compute_progress_rate_normalization(initial_conditions: InitialConditions, 
-                                      params: Parameters) -> float:
-    """
-    Calculate progress rate normalization so that initial progress rate equals 1.0.
-    This eliminates duplication between estimate_parameters and compute_model.
-    
-    Args:
-        initial_conditions: Pre-computed initial conditions
-        params: Model parameters (with temporary progress_rate_normalization=1)
-        
-    Returns:
-        Calculated normalization factor
-    """
-    # Compute initial software progress rate
-    initial_software_progress_rate = compute_software_progress_rate(
-        initial_conditions.research_stock, 
-        initial_conditions.research_stock_rate,
-        initial_conditions.research_stock,  # Use same value for initial reference
-        initial_conditions.research_stock_rate  # Use same value for initial reference
-    )
-    
-    # Compute unnormalized overall progress rate
-    unnormalized_rate = compute_overall_progress_rate(
-        initial_software_progress_rate, 
-        initial_conditions.training_compute, 
-        params.software_progress_share
-    )
-    
-    # Return normalization factor that makes the rate equal to 1.0
-    if unnormalized_rate > 0:
-        return 1.0 / unnormalized_rate
-    else:
-        logger.warning("Unnormalized progress rate is zero or negative, using default normalization")
-        return 1.0
 
-def setup_model_with_normalization(time_series_data: TimeSeriesData, params: Parameters,
-                                 initial_progress: float = 0.0) -> Tuple[Parameters, InitialConditions]:
+
+def setup_model(time_series_data: TimeSeriesData, params: Parameters,
+               initial_progress: float = 0.0) -> Tuple[Parameters, InitialConditions]:
     """
-    Set up model parameters with proper progress rate normalization.
+    Set up model parameters and compute initial conditions.
     This replaces the duplicated setup logic in estimate_parameters and compute_model.
     
     Args:
         time_series_data: Input time series
-        params: Model parameters (will be modified to set progress_rate_normalization)
+        params: Model parameters
         initial_progress: Initial cumulative progress
         
     Returns:
-        Tuple of (updated_params, initial_conditions)
+        Tuple of (params, initial_conditions)
     """
     # Compute initial conditions
     initial_conditions = compute_initial_conditions(time_series_data, params, initial_progress)
-    
-    # Calculate and set progress rate normalization
-    params.progress_rate_normalization = compute_progress_rate_normalization(initial_conditions, params)
-    
-    # logger.info(f"Calculated progress_rate_normalization: {params.progress_rate_normalization}")
     
     return params, initial_conditions
 
@@ -1376,31 +1331,20 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             software_progress_rate, training_compute, params.software_progress_share
         )
         
+        # Final validation
         if not np.isfinite(overall_rate) or overall_rate < 0:
             logger.warning(f"Invalid overall progress rate: {overall_rate}")
             return [0.0, 0.0]
         
-        # Apply normalization with validation
-        if not np.isfinite(params.progress_rate_normalization) or params.progress_rate_normalization <= 0:
-            logger.warning(f"Invalid progress rate normalization: {params.progress_rate_normalization}")
-            return [0.0, 0.0]
-        
-        normalized_progress_rate = overall_rate * params.progress_rate_normalization
-        
-        # Final validation
-        if not np.isfinite(normalized_progress_rate) or normalized_progress_rate < 0:
-            logger.warning(f"Invalid final normalized progress rate: {normalized_progress_rate}")
-            return [0.0, 0.0]
-        
         # Cap extremely large rates to prevent numerical issues
-        if normalized_progress_rate > cfg.MAX_NORMALIZED_PROGRESS_RATE:
-            logger.warning(f"Very large progress rate {normalized_progress_rate}, capping to {cfg.MAX_NORMALIZED_PROGRESS_RATE}")
-            normalized_progress_rate = cfg.MAX_NORMALIZED_PROGRESS_RATE
+        if overall_rate > cfg.MAX_NORMALIZED_PROGRESS_RATE:
+            logger.warning(f"Very large progress rate {overall_rate}, capping to {cfg.MAX_NORMALIZED_PROGRESS_RATE}")
+            overall_rate = cfg.MAX_NORMALIZED_PROGRESS_RATE
         
         logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
-                    f"automation={automation_fraction:.3f}, dP/dt={normalized_progress_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
+                    f"automation={automation_fraction:.3f}, dP/dt={overall_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
         
-        return [normalized_progress_rate, research_stock_rate]
+        return [overall_rate, research_stock_rate]
         
     except Exception as e:
         logger.error(f"Error computing rates at t={t}, state={state}: {e}")
@@ -1704,13 +1648,8 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
             logger.warning(f"Error validating parameter combination: {e}")
             return False
     
-    # Always fix progress_rate_normalization - it should not be optimized
-    if 'progress_rate_normalization' not in fixed_params:
-        fixed_params = fixed_params.copy()
-        fixed_params.append('progress_rate_normalization')
-    
-    # Use utility function to compute initial conditions and set progress rate normalization
-    initial_params, initial_conditions = setup_model_with_normalization(time_series_data, initial_params, initial_progress)
+    # Use utility function to compute initial conditions
+    initial_params, initial_conditions = setup_model(time_series_data, initial_params, initial_progress)
     
     # Pre-validate constraints for feasibility
     def check_constraint_feasibility(constraint: AnchorConstraint) -> bool:
@@ -1788,7 +1727,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         
         try:
             # Set up model with proper normalization
-            normalized_params, initial_conditions = setup_model_with_normalization(
+            normalized_params, initial_conditions = setup_model(
                 time_series_data, params, initial_progress
             )
             
@@ -2014,7 +1953,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
         time_range = [start_time, end_time]
         
         # Set up model with proper normalization
-        normalized_params, initial_conditions = setup_model_with_normalization(
+        normalized_params, initial_conditions = setup_model(
             time_series_data, optimized_params, initial_progress
         )
         
@@ -2781,7 +2720,7 @@ class ProgressModel:
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
                     human_only_software_rate, training_compute, params_to_use.software_progress_share
-                ) * params_to_use.progress_rate_normalization
+                )
                 
                 human_only_progress_rates.append(
                     human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0
