@@ -898,7 +898,7 @@ def get_tab_configurations():
         PlotConfig("Cumulative Stock of Research Effort", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 2, 1,
                   y_axis_title="Research Stock (log scale)", y_axis_type="log"),
         PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
-                  y_axis_title="Software Rate (log scale)", y_axis_type="log"),
+                  y_axis_title="Software Rate", y_axis_type="linear"),
     ]
     
     software_rd_tab = TabConfig(
@@ -916,9 +916,9 @@ def get_tab_configurations():
         PlotConfig("Training Compute Growth Rate (Hardware Progress Rate)", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 1, 1,
                   y_axis_title="Training Compute (log scale)", y_axis_type="log"),
         PlotConfig("Progress Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 1, 2,
-                  y_axis_title="Rate (log scale)", y_axis_type="log"),
+                  y_axis_title="Rate", y_axis_type="linear"),
         PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1,
-                  y_axis_title="Overall Rate (log scale)", y_axis_type="log"),
+                  y_axis_title="Overall Rate", y_axis_type="linear"),
         PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 2, 2,
                   y_axis_title="Progress"),
         PlotConfig("Effective Compute", lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c), 3, 1,
@@ -947,7 +947,7 @@ def get_tab_configurations():
         PlotConfig("AI Overall Progress Multiplier", lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c), 2, 2,
                   y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
-                  y_axis_title="Human-Only Rate (log scale)", y_axis_type="log"),
+                  y_axis_title="Human-Only Rate", y_axis_type="linear"),
         PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')), 3, 2,
                   y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
         PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('parameters', {}).get('progress_at_sc')), 4, 1,
@@ -1022,9 +1022,11 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
         
         # Update primary y-axis
         y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
+        y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
         fig.update_yaxes(
             title_text=plot_config.y_axis_title,
             type=y_axis_type,
+            rangemode=y_axis_range_mode,
             row=row, col=col,
             gridcolor='lightgray',
             secondary_y=False
@@ -1033,9 +1035,11 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
         # Update secondary y-axis if present
         if plot_config.secondary_y and plot_config.y_axis_secondary_title:
             secondary_type = plot_config.y_axis_secondary_type if plot_config.y_axis_secondary_type != "linear" else None
+            secondary_range_mode = 'tozero' if plot_config.y_axis_secondary_type == "linear" else None
             fig.update_yaxes(
                 title_text=plot_config.y_axis_secondary_title,
                 type=secondary_type,
+                rangemode=secondary_range_mode,
                 row=row, col=col,
                 gridcolor='lightgray',
                 secondary_y=True
@@ -1174,7 +1178,7 @@ def params_to_dict(params: Parameters):
         'rho_cognitive': params.rho_cognitive,
         'rho_progress': params.rho_progress,
         'alpha': params.alpha,
-        'software_progress_share': params.software_progress_share,
+        'software_scale': params.software_scale,
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
         'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
         'automation_slope': params.automation_slope,
@@ -1424,9 +1428,9 @@ def get_parameter_config():
                     'description': 'Weight of compute vs cognitive output in progress production',
                     'units': 'dimensionless'
                 },
-                'software_progress_share': {
-                    'name': 'Software Share',
-                    'description': 'Share of progress attributable to software vs hardware',
+                'software_scale': {
+                    'name': 'Software Scale',
+                    'description': 'Scale factor for software progress',
                     'units': 'dimensionless'
                 },
                 'automation_fraction_at_superhuman_coder': {
@@ -2094,7 +2098,7 @@ def get_default_data():
             'rho_cognitive': params.rho_cognitive,
             'rho_progress': params.rho_progress,
             'alpha': params.alpha,
-            'software_progress_share': params.software_progress_share,
+            'software_scale': params.software_scale,
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
             'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
             'automation_slope': params.automation_slope,

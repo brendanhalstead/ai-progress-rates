@@ -249,7 +249,7 @@ class Parameters:
     rho_cognitive: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_cognitive'])
     rho_progress: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_progress'])
     alpha: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha'])
-    software_progress_share: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_progress_share'])
+    software_scale: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_scale'])
     zeta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['zeta'])
     
     # Automation sigmoid parameters
@@ -304,11 +304,11 @@ class Parameters:
         else:
             self.alpha = np.clip(self.alpha, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
-        if not np.isfinite(self.software_progress_share):
-            logger.warning(f"Non-finite software_progress_share: {self.software_progress_share}, setting to 0.5")
-            self.software_progress_share = 0.5
+        if not np.isfinite(self.software_scale):
+            logger.warning(f"Non-finite software_scale: {self.software_scale}, setting to 0.5")
+            self.software_scale = 0.5
         else:
-            self.software_progress_share = np.clip(self.software_progress_share, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+            self.software_scale = np.clip(self.software_scale, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         if not np.isfinite(self.zeta):
             logger.warning(f"Non-finite zeta: {self.zeta}, setting to {cfg.DEFAULT_PARAMETERS['zeta']}")
@@ -637,22 +637,24 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
 
 
 def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
-                                 initial_research_stock: float, initial_research_stock_rate: float) -> float:
+                                 initial_research_stock: float, initial_research_stock_rate: float,
+                                 software_scale: float) -> float:
     """
     Compute software progress rate using research stock formulation:
-    S(t) = RS(0) * RS'(t) / (RS'(0) * RS(t))
+    S(t) = RS(0) * RS'(t) / (RS'(0) * RS(t)) * s
     
     Args:
         research_stock: Current research stock RS(t)
         research_stock_rate: Current research stock rate RS'(t)
         initial_research_stock: Initial research stock RS(0)
         initial_research_stock_rate: Initial research stock rate RS'(0)
+        software_scale: Software progress share parameter s [0,1]
     
     Returns:
-        Software progress rate
+        Software progress rate multiplied by s
     """
     # Input validation
-    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate])):
+    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate, software_scale])):
         logger.warning("Non-finite inputs to compute_software_progress_rate")
         return 0.0
     
@@ -662,6 +664,10 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
     
     if initial_research_stock_rate <= 0:
         logger.warning("Non-positive initial research stock rate")
+        return 0.0
+    
+    if software_scale < 0 or software_scale > 1:
+        logger.warning(f"Invalid software_scale: {software_scale}, must be in [0,1]")
         return 0.0
     
     # Compute software progress rate using research stock ratio formula
@@ -679,26 +685,32 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
             logger.warning(f"Invalid software progress rate: {software_progress_rate}")
             return 0.0
         
-        return software_progress_rate
+            # Apply software progress share multiplier: s
+        final_rate = software_progress_rate * software_scale
+        
+        if not np.isfinite(final_rate) or final_rate < 0:
+            logger.warning(f"Invalid final software progress rate after share multiplier: {final_rate}")
+            return 0.0
+        
+        return final_rate
         
     except (ZeroDivisionError, OverflowError) as e:
         logger.warning(f"Error computing software progress rate: {e}")
         return 0.0
 
 
-def compute_overall_progress_rate(software_progress_rate: float, training_compute: float, software_share: float) -> float:
+def compute_overall_progress_rate(software_progress_rate: float, training_compute: float) -> float:
     """
-    Weighted average of software and training progress
+    Sum of software and training progress rates
     
     Args:
-        software_progress_rate: Rate from software development
+        software_progress_rate: Rate from software development (already adjusted by software share)
         training_compute: Training compute budget
-        software_share: Weight on software progress [0,1]
     
     Returns:
-        Overall progress rate
+        Overall progress rate (sum of software and hardware contributions)
     """
-    return software_share * software_progress_rate + (1 - software_share) * training_compute
+    return software_progress_rate + training_compute
 
 
 def _log_interp(x: float, xp: np.ndarray, fp: np.ndarray) -> float:
@@ -1231,9 +1243,9 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
     
     cumulative_progress, research_stock = state
     
-    if not np.isfinite(cumulative_progress) or cumulative_progress < 0:
+    if not np.isfinite(cumulative_progress):
         logger.warning(f"Invalid cumulative progress: {cumulative_progress}")
-        cumulative_progress = max(0.0, cfg.PARAM_CLIP_MIN)  # Use small positive value
+        cumulative_progress = 0.0
     
     if not np.isfinite(research_stock) or research_stock <= 0:
         logger.warning(f"Invalid research stock: {research_stock}")
@@ -1319,7 +1331,8 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         else:
             software_progress_rate = compute_software_progress_rate(
                 research_stock, research_stock_rate, 
-                initial_research_stock, initial_research_stock_rate
+                initial_research_stock, initial_research_stock_rate,
+                params.software_scale
             )
         
         if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
@@ -1328,7 +1341,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         
         # Compute overall progress rate (dP/dt)
         overall_rate = compute_overall_progress_rate(
-            software_progress_rate, training_compute, params.software_progress_share
+            software_progress_rate, training_compute
         )
         
         # Final validation
@@ -1388,10 +1401,8 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     def ode_func_bounded(t, y):
         """ODE function with bounds checking to prevent extreme values"""
         try:
-            # Prevent progress from going negative or becoming extremely large
-            if y[0] < 0:
-                y[0] = 1e-6
-            elif y[0] > cfg.PROGRESS_ODE_CLAMP_MAX:
+            # Prevent progress from becoming extremely large
+            if y[0] > cfg.PROGRESS_ODE_CLAMP_MAX:
                 logger.warning(f"Progress {y[0]} too large at time {t}, clamping")
                 y[0] = cfg.PROGRESS_ODE_CLAMP_MAX
             
@@ -1421,7 +1432,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
         t_start, t_end = t_end, t_start
     
     # Validate initial conditions
-    if not np.isfinite(initial_progress) or initial_progress < 0:
+    if not np.isfinite(initial_progress):
         logger.warning(f"Invalid initial progress {initial_progress}, using fallback")
         initial_progress = 0.0
     
@@ -1519,10 +1530,8 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                     progress_values[i] = progress_values[i-1] + rates[0] * dt
                     research_stock_values[i] = research_stock_values[i-1] + rates[1] * dt
                     
-                    # Ensure values don't go negative or become too large
-                    if progress_values[i] < 0:
-                        progress_values[i] = progress_values[i-1]
-                    elif progress_values[i] > cfg.PROGRESS_ODE_CLAMP_MAX:
+                    # Ensure values don't become too large
+                    if progress_values[i] > cfg.PROGRESS_ODE_CLAMP_MAX:
                         progress_values[i] = cfg.PROGRESS_ODE_CLAMP_MAX
                     
                     if research_stock_values[i] <= 0:
@@ -1572,10 +1581,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             else:
                 raise ValueError("All research stock integration results are non-finite")
         
-        # Check for negative values
-        if np.any(progress_values < 0):
-            logger.warning("Negative progress values detected, clamping to zero")
-            progress_values = np.maximum(progress_values, 0.0)
+        # Note: Negative progress values are allowed
         
         if np.any(research_stock_values <= 0):
             logger.warning("Non-positive research stock values detected, clamping to minimum")
@@ -1754,7 +1760,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                 if name in ['rho_cognitive', 'rho_progress']:
                     # Penalize extreme elasticity values more strongly
                     regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['elasticity_regularization_weight'] * (value ** 4)  # Quartic penalty for elasticities
-                elif name in ['alpha', 'software_progress_share']:
+                elif name in ['alpha', 'software_scale']:
                     # Penalize values near boundaries (0 or 1)
                     distance_from_center = abs(value - 0.5)
                     if distance_from_center > cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']:  # Tighter boundary avoidance
@@ -2700,7 +2706,8 @@ class ProgressModel:
                 software_rate = compute_software_progress_rate(
                     rs, current_research_stock_rate, 
                     initial_research_stock_val, 
-                    initial_research_stock_rate_val
+                    initial_research_stock_rate_val,
+                    params_to_use.software_scale
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
@@ -2715,11 +2722,12 @@ class ProgressModel:
                 human_only_software_rate = compute_software_progress_rate(
                     rs, human_only_research_stock_rate,
                     initial_research_stock_val,
-                    initial_research_stock_rate_val
+                    initial_research_stock_rate_val,
+                    params_to_use.software_scale
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
-                    human_only_software_rate, training_compute, params_to_use.software_progress_share
+                    human_only_software_rate, training_compute
                 )
                 
                 human_only_progress_rates.append(

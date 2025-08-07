@@ -327,10 +327,10 @@
                                 </div>
                                 <div class="collapse" id="overallProgressParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Software Progress Share: <span id="software_progress_share_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="software_progress_share" step="0.05">
+                                        <label class="param-label">Software Scale: <span id="software_scale_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="software_scale" step="0.05">
                                         <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
-                                        <small class="text-muted" id="software_progress_share_range">Loading range...</small>
+                                        <small class="text-muted" id="software_scale_range">Loading range...</small>
                                     </div>
                                 </div>
                             </div>
@@ -687,7 +687,7 @@
             
             // List of expected parameters with their element IDs
             const parameterIds = [
-                'rho_cognitive', 'rho_progress', 'alpha', 'software_progress_share',
+                'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
                 'automation_fraction_at_superhuman_coder', 'automation_slope', 
                 'cognitive_output_normalization', 'zeta', 'ai_research_taste_at_superhuman_coder',
                 'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
@@ -733,7 +733,7 @@
                             // Hardcoded fallbacks as last resort
                             const fallbacks = {
                                 'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
-                                'software_progress_share': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
+                                'software_scale': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
                                 'automation_slope': 1.6, 'cognitive_output_normalization': 1, 'zeta': 0.4,
                                 'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_slope': 1.2,
                                 'sc_time_horizon_minutes': 50000.0,
@@ -779,7 +779,7 @@
             // Apply fallbacks for invalid inputs
             if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
             if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2030);
-            if (!isFinite(initialProgress) || initialProgress < 0) initialProgress = 0.0;
+            if (!isFinite(initialProgress)) initialProgress = 0.0;
             
             const timeRange = [startYear, endYear];
             
@@ -1509,7 +1509,7 @@
             const initialProgress = document.getElementById('initial_progress');
             if (initialProgress) {
                 initialProgress.value = initialProgress.value || 0.0;
-                initialProgress.min = 0.0;
+                initialProgress.min = -100;
                 initialProgress.max = 100;
             }
             
@@ -1587,7 +1587,7 @@
                         'rho_cognitive': [-10, 1],
                         'rho_progress': [-1, 1],
                         'alpha': [0.05, 0.95],
-                        'software_progress_share': [0.05, 0.95],
+                        'software_scale': [0.05, 0.95],
                         'automation_fraction_at_superhuman_coder': [0.1, 0.99],
                         'automation_slope': [0.1, 10],
                         'cognitive_output_normalization': [-5, 1],
@@ -1617,7 +1617,7 @@
                 'rho_cognitive': { min: -10, max: 1, value: -2, range: '[-10, 0]' },
                 'rho_progress': { min: -1, max: 1, value: -0.2, range: '[-1, 1]' },
                 'alpha': { min: 0.05, max: 0.95, value: 0.5 },
-                'software_progress_share': { min: 0.05, max: 0.95, value: 0.7, range: '[0.05, 0.95]' },
+                'software_scale': { min: 0.05, max: 0.95, value: 0.7, range: '[0.05, 0.95]' },
                 'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
                 'automation_slope': { min: 0.1, max: 10, value: 2.0 },
                 'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
@@ -1709,7 +1709,7 @@
                     'rho_cognitive': 'Cognitive Elasticity',
                     'rho_progress': 'Progress Elasticity',
                     'alpha': 'Compute Weight',
-                    'software_progress_share': 'Software Share',
+                    'software_scale': 'Software Scale',
                     'automation_fraction_at_superhuman_coder': 'SC Automation Fraction:',
                     'automation_slope': 'Automation Slope',
                     'cognitive_output_normalization': 'Parallel Coding Labor Normalization',
