@@ -11,101 +11,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* Fixed height panels with independent scrollbars */
-        .left-panel {
-            height: calc(100vh - 120px); /* Account for navbar height */
-            overflow-y: auto;
-            padding-right: 15px;
-        }
-        
-        .right-panel {
-            height: calc(100vh - 120px); /* Account for navbar height */
-            overflow-y: auto;
-            padding-left: 15px;
-        }
-        
-        .control-panel { 
-            background-color: #f8f9fa; 
-            border-radius: 8px; 
-            padding: 20px; 
-            margin-bottom: 20px; 
-            min-height: fit-content;
-        }
-        
-        .plot-container { 
-            height: 0px; 
-            border: 1px solid #dee2e6; 
-            border-radius: 8px; 
-            margin-bottom: 10px;
-        }
-        
-        #plotDiv { width: 100%; height: 100%; min-height: 1280px; }
-        
-        /* Ensure tab content and plots have proper dimensions */
-        .tab-content { height: 100%; }
-        .tab-pane { height: 100%; }
-        
-        /* Specific styling for plot containers in tabs */
-        [id^="plot-"] { 
-            width: 100% !important; 
-            height: 100% !important; 
-            min-height: 600px !important; 
-        }
-        .param-group { margin-bottom: 20px; }
-        .param-label { font-weight: 600; margin-bottom: 5px; }
-        .range-input { width: 100%; }
-        .summary-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
-        .loading-spinner { display: none; text-align: center; padding: 20px; }
-        .error-alert { display: none; }
-        .nav-tabs .nav-link.active { background-color: #667eea; color: white; border-color: #667eea; }
-        .btn-primary { background-color: #667eea; border-color: #667eea; }
-        .btn-primary:hover { background-color: #5a6fd8; border-color: #5a6fd8; }
-        
-        /* Custom scrollbar styling for webkit browsers */
-        .left-panel::-webkit-scrollbar, .right-panel::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .left-panel::-webkit-scrollbar-track, .right-panel::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        
-        .left-panel::-webkit-scrollbar-thumb, .right-panel::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 4px;
-        }
-        
-        .left-panel::-webkit-scrollbar-thumb:hover, .right-panel::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
-        }
-        
-        /* Collapsible parameter groups styling */
-        .param-group .btn-outline-secondary {
-            border: none;
-            padding: 2px 6px;
-            font-size: 0.8rem;
-        }
-        
-        .param-group .btn-outline-secondary:hover {
-            background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .param-group .btn-outline-secondary i {
-            transition: transform 0.2s ease-in-out;
-        }
-        
-        .param-group .btn-outline-secondary[aria-expanded="false"] i {
-            transform: rotate(-90deg);
-        }
-        
-        .param-group .collapse {
-            transition: all 0.2s ease-in-out;
-        }
+        /* Using external stylesheet at /static/styles.css */
     </style>
 </head>
 <body>
@@ -113,10 +22,13 @@
         <div class="row">
             <!-- Header -->
             <div class="col-12">
-                <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+                <nav class="navbar navbar-expand-lg navbar-dark mb-4">
                     <div class="container-fluid">
                         <span class="navbar-brand mb-0 h1">AI Progress Model</span>
                         <div class="navbar-nav ms-auto">
+                            <button class="btn btn-outline-light me-2" id="toggleThemeBtn" title="Toggle theme" onclick="toggleTheme()">
+                                <i class="fas fa-moon"></i>
+                            </button>
                             <button class="btn btn-outline-light me-2" onclick="loadDefaultData()">Reset to Default</button>
                             <button class="btn btn-outline-light me-2" onclick="exportResults()">Export CSV</button>
                             <button class="btn btn-outline-light" onclick="exportMETRData()">Export Progress-Adjusted METR Data</button>
@@ -130,6 +42,33 @@
             <!-- Left Panel: Controls -->
             <div class="col-lg-4 left-panel">
                 <div class="control-panel">
+                    <!-- Summary Cards -->
+                    <div class="row g-2 mb-3" id="summaryCards" style="display:none;">
+                        <div class="col-6">
+                            <div class="summary-card">
+                                <div class="summary-label">Final Progress</div>
+                                <div class="summary-value" id="summary_final_progress">—</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-card">
+                                <div class="summary-label">Final Automation</div>
+                                <div class="summary-value"><span id="summary_final_automation">—</span><span class="summary-suffix">%</span></div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-card">
+                                <div class="summary-label">Avg Progress Rate</div>
+                                <div class="summary-value" id="summary_avg_progress_rate">—</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-card">
+                                <div class="summary-label">SC Time</div>
+                                <div class="summary-value" id="summary_sc_time">—</div>
+                            </div>
+                        </div>
+                    </div>
                     <!-- Navigation Tabs -->
                     <ul class="nav nav-tabs mb-3" id="controlTabs">
                         <li class="nav-item">
@@ -474,11 +413,31 @@
                 <div class="alert alert-danger error-alert mt-3" id="errorAlert">
                     <strong>Error:</strong> <span id="errorMessage"></span>
                 </div>
+                <div class="app-footer text-center mt-3">
+                    <span>Built with Plotly + Flask. Use the sliders to explore scenarios. Toggle light/dark with the moon/sun icon.</span>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Theme handling
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            const icon = document.querySelector('#toggleThemeBtn i');
+            if (icon) {
+                icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }
+        function toggleTheme() {
+            const current = localStorage.getItem('theme') || 'light';
+            setTheme(current === 'light' ? 'dark' : 'light');
+        }
+        (function initTheme(){
+            const saved = localStorage.getItem('theme');
+            if (saved) setTheme(saved);
+        })();
         // Global parameter configuration from server
         let parameterConfig = null;
         
@@ -808,6 +767,9 @@
                             createSinglePlot(response.plot);
                         } else {
                             showError('No plot data received from server');
+                        }
+                        if (response.summary) {
+                            updateSummary(response.summary);
                         }
                     } else {
                         showError(response.error);
@@ -1301,6 +1263,9 @@
                             // Handle legacy single plot response (fallback)
                             createSinglePlot(response.plot);
                         }
+                        if (response.summary) {
+                            updateSummary(response.summary);
+                        }
                         
                         // Show parameter changes in validation area
                         const validationResults = document.getElementById('validationResults');
@@ -1750,6 +1715,26 @@
         
         function hideError() {
             $('#errorAlert').hide();
+        }
+        function updateSummary(summary) {
+            try {
+                $('#summaryCards').show();
+                const fmt = (n) => {
+                    if (n === null || n === undefined || !isFinite(n)) return '—';
+                    const abs = Math.abs(n);
+                    if (abs >= 1e9) return (n/1e9).toFixed(2) + 'B';
+                    if (abs >= 1e6) return (n/1e6).toFixed(2) + 'M';
+                    if (abs >= 1e3) return (n/1e3).toFixed(2) + 'k';
+                    return (Math.round(n * 100) / 100).toString();
+                };
+                $('#summary_final_progress').text(fmt(summary.final_progress));
+                const fa = summary.final_automation != null ? (summary.final_automation * 100) : null;
+                $('#summary_final_automation').text(fa != null && isFinite(fa) ? fa.toFixed(1) : '—');
+                $('#summary_avg_progress_rate').text(fmt(summary.avg_progress_rate));
+                $('#summary_sc_time').text(summary.sc_time != null ? summary.sc_time.toFixed(3) : '—');
+            } catch (e) {
+                console.warn('Failed to update summary', e);
+            }
         }
         
         function resetToDefaults() {
