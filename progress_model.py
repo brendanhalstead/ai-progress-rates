@@ -2825,6 +2825,12 @@ class ProgressModel:
             else:
                 logger.info(f"Superhuman Coder level ({sc_progress_target:.3f}) not reached within trajectory (final progress: {progress_values[-1]:.3f})")
         
+        # Calculate software progress multiplier at SC
+        if sc_time is not None:
+            self.sc_sw_multiplier = np.interp(sc_time, times, ai_software_progress_multipliers)
+        else:
+            sc_sw_multiplier = None
+        
         # Store comprehensive results
         self.results = {
             'times': times,
@@ -2851,6 +2857,7 @@ class ProgressModel:
             'effective_compute': effective_compute,
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.sc_progress if hasattr(self, 'sc_progress') else None,  # Progress level for SC
+            'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

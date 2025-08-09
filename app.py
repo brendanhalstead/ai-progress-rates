@@ -81,6 +81,45 @@ class TabConfig:
         self.subplot_titles = subplot_titles or [plot.title for plot in plots]
         self.specs = specs
 
+# Professional Plotly Theme
+def get_professional_plotly_template() -> go.layout.Template:
+    """Return a cohesive, professional Plotly template used across all figures."""
+    return go.layout.Template(
+        layout=dict(
+            font=dict(
+                family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+                size=14,
+                color="#2b2d42",
+            ),
+            title=dict(
+                font=dict(size=18, color="#2b2d42"),
+                x=0.5,
+                xanchor="center",
+            ),
+            colorway=[
+                "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+                "#EDC949", "#AF7AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
+            ],
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            hovermode="x unified",
+            hoverlabel=dict(bgcolor="white", bordercolor="#e0e0e0"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
+            margin=dict(t=60, b=40, l=60, r=40),
+            xaxis=dict(
+                showline=True, linewidth=1, linecolor="#d9d9d9",
+                showgrid=True, gridcolor="#ebedf0", gridwidth=1,
+                zeroline=False, ticks="outside", tickcolor="#bdbdbd", ticklen=6, mirror=True,
+                showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikedash="dot", spikecolor="#999999",
+            ),
+            yaxis=dict(
+                showline=True, linewidth=1, linecolor="#d9d9d9",
+                showgrid=True, gridcolor="#ebedf0", gridwidth=1,
+                zeroline=False, ticks="outside", tickcolor="#bdbdbd", ticklen=6, mirror=True,
+            ),
+        )
+    )
+
 # Plot Functions for Input Time Series
 def plot_human_labor(fig, times, values, row, col):
     """Plot human labor over time"""
@@ -987,8 +1026,8 @@ def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
             logger.warning(f"Failed to create plot '{plot_config.title}': {e}")
             continue
     
-    # Update layout with consistent height per row
-    height_per_row = 400  # pixels per row
+    # Update layout with consistent height per row (aligned with front-end sizing)
+    height_per_row = 320  # pixels per row
     total_height = height_per_row * tab_config.rows
     
     fig.update_layout(
@@ -996,12 +1035,12 @@ def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
         autosize=True,  # Allow width to be responsive
         showlegend=False,
         title_text=tab_config.tab_name,
-        title_x=0.5,
         plot_bgcolor='white',
-        margin=dict(t=60, b=40, l=60, r=40)  # Set consistent margins
+        margin=dict(t=60, b=40, l=60, r=40),  # Set consistent margins
+        template=get_professional_plotly_template(),
     )
     
-    # Update axes
+    # Update axes per subplot (no forced matching; some plots use non-time x-axes)
     update_axes_for_tab(fig, tab_config, data)
     
     return fig
@@ -1017,33 +1056,75 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
         fig.update_xaxes(
             title_text=plot_config.x_axis_title,
             row=row, col=col,
-            gridcolor='lightgray'
+            gridcolor='#ebedf0',
+            ticks='outside', tickcolor='#bdbdbd', ticklen=6,
         )
+        # Ensure time axes render correctly (we use decimal years, not dates)
+        if isinstance(plot_config.x_axis_title, str) and plot_config.x_axis_title.strip().lower() == 'time':
+            # Use integer year ticks with adaptive spacing to avoid clutter
+            dtick_years = 1
+            try:
+                # Prefer session time series range
+                ts = session_data.get('time_series')
+                if ts is not None and hasattr(ts, 'time') and len(ts.time) > 1:
+                    tmin = float(np.nanmin(ts.time))
+                    tmax = float(np.nanmax(ts.time))
+                else:
+                    # Fallback to metrics times if present
+                    mt = data.get('metrics', {}).get('times')
+                    tmin = float(np.nanmin(mt)) if mt is not None and len(mt) > 1 else None
+                    tmax = float(np.nanmax(mt)) if mt is not None and len(mt) > 1 else None
+                if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
+                    span = max(0.0, tmax - tmin)
+                    target_ticks = 6.0
+                    dtick_years = max(1, int(round(span / target_ticks)))
+            except Exception:
+                dtick_years = 2
+            fig.update_xaxes(
+                type='linear', tickformat='d', dtick=dtick_years,
+                tickangle=0, automargin=True,
+                row=row, col=col,
+            )
         
         # Update primary y-axis
         y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
         y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
-        fig.update_yaxes(
+        y_axis_kwargs = dict(
             title_text=plot_config.y_axis_title,
             type=y_axis_type,
             rangemode=y_axis_range_mode,
             row=row, col=col,
-            gridcolor='lightgray',
-            secondary_y=False
+            gridcolor='#ebedf0',
+            ticks='outside', tickcolor='#bdbdbd', ticklen=6,
+            secondary_y=False,
         )
+        # Use compact SI ticks on log scale axes
+        if plot_config.y_axis_type == 'log':
+            y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+        fig.update_yaxes(**y_axis_kwargs)
         
         # Update secondary y-axis if present
         if plot_config.secondary_y and plot_config.y_axis_secondary_title:
             secondary_type = plot_config.y_axis_secondary_type if plot_config.y_axis_secondary_type != "linear" else None
             secondary_range_mode = 'tozero' if plot_config.y_axis_secondary_type == "linear" else None
-            fig.update_yaxes(
+            secondary_kwargs = dict(
                 title_text=plot_config.y_axis_secondary_title,
                 type=secondary_type,
                 rangemode=secondary_range_mode,
                 row=row, col=col,
-                gridcolor='lightgray',
-                secondary_y=True
+                gridcolor='#ebedf0',
+                ticks='outside', tickcolor='#bdbdbd', ticklen=6,
+                secondary_y=True,
             )
+            if plot_config.y_axis_secondary_type == 'log':
+                secondary_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+            fig.update_yaxes(**secondary_kwargs)
+
+    # Apply consistent trace styling for scatter line charts
+    try:
+        fig.update_traces(line=dict(width=2.5), marker=dict(size=3), selector=dict(type='scatter'))
+    except Exception:
+        pass
 
 def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
     """Create dashboard with multiple tabs"""
@@ -1376,19 +1457,17 @@ def compute_model():
         tab_configs = get_tab_configurations()
         tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
         
-        # Prepare summary with SC information
+        # Prepare summary focusing on SC metrics
         summary = {
-            'final_progress': float(progress_values[-1]),
-            'final_automation': float(model.results['automation_fraction'][-1]),
-            'avg_progress_rate': float(np.mean(model.results['progress_rates'])),
             'time_range': time_range
         }
         
         # Add SC timing information if available
-        if model.results.get('sc_time') is not None:
+        if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
             summary['sc_time'] = float(model.results['sc_time'])
-            summary['sc_progress_level'] = float(model.results['sc_progress_level']) if model.results.get('sc_progress_level') is not None else None
-        
+            summary['sc_progress_level'] = float(model.results['sc_progress_level'])
+            summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
+            logger.info(f"SC time: {summary['sc_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
         return jsonify({
             'success': True,
             'plots': plots,

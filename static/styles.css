@@ -88,7 +88,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--surface-color);
-  box-shadow: var(--card-shadow);
+  /* Remove heavy drop shadow for a cleaner, flatter look */
+  box-shadow: none;
 }
 
 #plotDiv {
