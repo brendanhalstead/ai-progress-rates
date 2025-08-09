@@ -1500,7 +1500,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     
     # If all methods fail, try simple Euler method as ultimate fallback
     if sol is None or not sol.success:
-        logger.warning("All scipy integration methods failed, using simple Euler fallback")
+        assert False, "All scipy integration methods failed, ignoring Euler fallback and quitting"        
         try:
             # Simple Euler integration as last resort
             n_steps = max(cfg.EULER_FALLBACK_MIN_STEPS, int(abs(t_end - t_start) * cfg.EULER_FALLBACK_STEPS_PER_YEAR))  # Adaptive step count
@@ -2594,6 +2594,16 @@ class ProgressModel:
         self.horizon_trajectory = horizon_trajectory
         logger.info(f"Updated horizon trajectory anchor progress to {new_anchor_progress:.6f}")
     
+    def compute_human_only_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Compute human-only progress over specified time range
+        """
+        if initial_progress is None:
+            initial_progress = 0.0  # Use a reasonable default value
+
+        # Calls the human-only version of integrate_progress
+        
+
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute progress over specified time range with comprehensive metrics

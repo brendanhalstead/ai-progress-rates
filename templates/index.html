@@ -777,7 +777,7 @@
             
             // Apply fallbacks for invalid inputs
             if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
-            if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2030);
+            if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2035);
             if (!isFinite(initialProgress)) initialProgress = 0.0;
             
             const timeRange = [startYear, endYear];
@@ -1537,7 +1537,7 @@
             
             const endYear = document.getElementById('end_year');
             if (endYear) {
-                endYear.value = endYear.value || 2030;
+                endYear.value = endYear.value || 2035;
                 endYear.min = 2020;
                 endYear.max = 2100;
             }
@@ -1692,7 +1692,7 @@
             // Fallback simulation settings
             const simSettings = {
                 'start_year': { value: 2012, min: 2000, max: 2050 },
-                'end_year': { value: 2030, min: 2020, max: 2100 },
+                'end_year': { value: 2035, min: 2020, max: 2100 },
                 'initial_progress': { value: 0.0, min: 0.0, max: 100 }
             };
             
