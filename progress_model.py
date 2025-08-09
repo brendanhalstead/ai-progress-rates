@@ -245,6 +245,9 @@ class TasteDistribution:
 @dataclass
 class Parameters:
     """Model parameters with validation"""
+
+    human_only: bool = field(default_factory=lambda: False)
+    
     # Production function parameters
     rho_cognitive: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_cognitive'])
     rho_progress: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_progress'])
@@ -754,18 +757,23 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         dt = 1e-6  # Small time step for numerical differentiation
         
         # Get initial conditions at t=0
-        initial_automation = 0
-        initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
-        initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+        
         
         L_HUMAN_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
         L_AI_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_AI)
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
-        cognitive_output_0 = compute_cognitive_output(
-            initial_automation, L_AI_0, L_HUMAN_0, 
-            params.rho_cognitive, params.cognitive_output_normalization
-        )
+        if params.human_only:
+            cognitive_output_0 = L_HUMAN_0
+            initial_aggregate_research_taste = 1.0
+        else:
+            initial_automation = compute_automation_fraction(initial_progress, params)
+            initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
+            initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+            cognitive_output_0 = compute_cognitive_output(
+                initial_automation, L_AI_0, L_HUMAN_0, 
+                params.rho_cognitive, params.cognitive_output_normalization
+            )
         
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
@@ -780,10 +788,13 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.experiment_compute)
         
         # Automation fraction changes very little over small dt, so use same value
-        cognitive_output_dt = compute_cognitive_output(
-            initial_automation, L_AI_dt, L_HUMAN_dt,
-            params.rho_cognitive, params.cognitive_output_normalization
-        )
+        if params.human_only:
+            cognitive_output_dt = L_HUMAN_dt
+        else:
+            cognitive_output_dt = compute_cognitive_output(
+                initial_automation, L_AI_dt, L_HUMAN_dt,
+                params.rho_cognitive, params.cognitive_output_normalization
+            )
         
         rs_rate_dt = compute_research_stock_rate(
             experiment_compute_dt, cognitive_output_dt,
@@ -854,26 +865,31 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     """
     start_time = time_series_data.time[0]
     
-    # Basic initial conditions
-    initial_automation = compute_automation_fraction(initial_progress, params)
-    initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
-    initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
-    
+    # TODO: may need to change to log-space interpolation
     L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
     L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
     experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
     training_compute = np.interp(start_time, time_series_data.time, time_series_data.training_compute)
+
+    if params.human_only:
+        initial_automation = 1.0
+        initial_ai_research_taste = 0.0
+        initial_aggregate_research_taste = 1.0
+        cognitive_output = L_HUMAN
+        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste)
+    else:
+        initial_automation = compute_automation_fraction(initial_progress, params)
+        initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
+        initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+        cognitive_output = compute_cognitive_output(
+            initial_automation, L_AI, L_HUMAN, 
+            params.rho_cognitive, params.cognitive_output_normalization
+        )
     
-    # Derived conditions
-    cognitive_output = compute_cognitive_output(
-        initial_automation, L_AI, L_HUMAN, 
-        params.rho_cognitive, params.cognitive_output_normalization
-    )
-    
-    research_stock_rate = compute_research_stock_rate(
-        experiment_compute, cognitive_output, 
-        params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
-    )
+        research_stock_rate = compute_research_stock_rate(
+            experiment_compute, cognitive_output, 
+            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
+        )
     
     # Validate and fallback for research stock rate
     if not np.isfinite(research_stock_rate) or research_stock_rate <= 0:
@@ -1295,20 +1311,25 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         experiment_compute = max(0.0, experiment_compute)
         training_compute = max(0.0, training_compute)
         
-        # Compute automation fraction from cumulative progress
-        automation_fraction = compute_automation_fraction(cumulative_progress, params)
-        if not (0 <= automation_fraction <= 1):
-            logger.warning(f"Invalid automation fraction {automation_fraction} at progress {cumulative_progress}")
-            automation_fraction = np.clip(automation_fraction, 0.0, 1.0)
-        
-        # Compute AI research taste and aggregate research taste
-        ai_research_taste = compute_ai_research_taste(cumulative_progress, params)
-        aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
-        
-        # Compute cognitive output with validation
-        cognitive_output = compute_cognitive_output(
-            automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
-        )
+        if params.human_only:
+            automation_fraction = 0.0
+            aggregate_research_taste = 1.0
+            cognitive_output = L_HUMAN
+        else:
+            # Compute automation fraction from cumulative progress
+            automation_fraction = compute_automation_fraction(cumulative_progress, params)
+            if not (0 <= automation_fraction <= 1):
+                logger.warning(f"Invalid automation fraction {automation_fraction} at progress {cumulative_progress}")
+                automation_fraction = np.clip(automation_fraction, 0.0, 1.0)
+            
+            # Compute AI research taste and aggregate research taste
+            ai_research_taste = compute_ai_research_taste(cumulative_progress, params)
+            aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
+            
+            # Compute cognitive output with validation
+            cognitive_output = compute_cognitive_output(
+                automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
+            )
         
         if not np.isfinite(cognitive_output) or cognitive_output < 0:
             logger.warning(f"Invalid cognitive output: {cognitive_output}")
@@ -2014,6 +2035,7 @@ class ProgressModel:
     def __init__(self, params: Parameters, time_series_data: TimeSeriesData):
         self.params = params
         self.data = time_series_data
+        self.human_only_results = {}
         self.results = {}
         self.horizon_trajectory = None
         
@@ -2602,8 +2624,42 @@ class ProgressModel:
             initial_progress = 0.0  # Use a reasonable default value
 
         # Calls the human-only version of integrate_progress
-        
+        human_only_params = copy.deepcopy(self.params)
+        human_only_params.human_only = True
+        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, human_only_params)
 
+        # human-only initial conditions
+        initial_conditions = compute_initial_conditions(self.data, human_only_params, initial_progress)
+        initial_research_stock_rate_val = initial_conditions.research_stock_rate
+        initial_research_stock_val = initial_conditions.research_stock
+
+        progress_rates = []
+        research_stock_rates = []
+
+        # human-only metrics
+        for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
+            state = [p, rs]
+            rates = progress_rate_at_time(t, state, self.data, human_only_params, initial_research_stock_rate_val, initial_research_stock_val)
+            progress_rates.append(rates[0])
+            research_stock_rates.append(rates[1])
+        
+        self.human_only_results = {
+            'times': times,
+            'progress': progress_values,
+            'research_stock': research_stock_values,
+            'progress_rates': progress_rates,
+            'research_stock_rates': research_stock_rates,
+            'input_time_series': {
+                'time': self.data.time,
+                'L_HUMAN': self.data.L_HUMAN,
+                'L_AI': self.data.L_AI,
+                'experiment_compute': self.data.experiment_compute,
+                'training_compute': self.data.training_compute
+            }
+        }
+        
+        return times, progress_values, research_stock_values
+        
     def compute_progress_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute progress over specified time range with comprehensive metrics
@@ -2615,6 +2671,10 @@ class ProgressModel:
         Returns:
             Tuple of (times, cumulative_progress_values, research_stock_values)
         """
+
+        # first compute human-only trajectory
+        self.compute_human_only_trajectory(time_range, initial_progress)
+
         if initial_progress is None:
             initial_progress = 0.0  # Use a reasonable default value
         
