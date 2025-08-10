@@ -110,7 +110,7 @@
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_horizon" checked>
+                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_horizon">
                                                 <label class="form-check-label" for="auto_fit_anchor_horizon">Auto-fit Anchor Horizon</label>
                                             </div>
                                             <label class="param-label">Anchor Horizon: <span id="anchor_horizon_val">Loading...</span> mins</label>
@@ -119,7 +119,7 @@
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_doubling_time" checked>
+                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_doubling_time">
                                                 <label class="form-check-label" for="auto_fit_anchor_doubling_time">Auto-fit Anchor Doubling Time</label>
                                             </div>
                                             <label class="param-label">Anchor Doubling Time: <span id="anchor_doubling_time_val">Loading...</span></label>
@@ -128,7 +128,7 @@
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="auto_fit_doubling_decay_rate" checked>
+                                                <input class="form-check-input" type="checkbox" id="auto_fit_doubling_decay_rate">
                                                 <label class="form-check-label" for="auto_fit_doubling_decay_rate">Auto-fit Doubling Decay Rate</label>
                                             </div>
                                             <label class="param-label">Doubling Decay Rate: <span id="doubling_decay_rate_val">Loading...</span></label>
@@ -262,9 +262,9 @@
                                 </div>
                                 <div class="collapse" id="overallProgressParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Software Scale: <span id="software_scale_val">Loading...</span></label>
+                                        <label class="param-label">Returns to Software R&D: <span id="software_scale_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="software_scale" step="0.05">
-                                        <small class="text-muted">Controls the weight of software progress vs training compute growth.</small>
+                                        <small class="text-muted">Determines the number of doublings of software efficiency per doubling in cumulative research effort.</small>
                                         <small class="text-muted" id="software_scale_range">Loading range...</small>
                                     </div>
                                 </div>

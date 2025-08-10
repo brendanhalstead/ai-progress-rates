@@ -37,17 +37,17 @@ DEFAULT_TASTE_SCHEDULE_TYPE = "sd_per_progress"
 
 # Horizon Extrapolation Configuration
 HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
-DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "exponential"
+DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 
 # Manual Horizon Fitting Parameters
 DEFAULT_ANCHOR_TIME = 2025.25
-DEFAULT_ANCHOR_HORIZON = None  # Will be optimized if None
-DEFAULT_ANCHOR_DOUBLING_TIME = None  # Will be optimized if None
-DEFAULT_DOUBLING_DECAY_RATE = None  # Will be optimized if None
+DEFAULT_ANCHOR_HORIZON = 15  # Will be optimized if None
+DEFAULT_ANCHOR_DOUBLING_TIME = 0.850  # Will be optimized if None
+DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
-AI_RESEARCH_TASTE_MAX = 10000000000.0  # Match the upper bound from PARAMETER_BOUNDS
+AI_RESEARCH_TASTE_MAX = 1e10  # Match the upper bound from PARAMETER_BOUNDS
 
 # Baseline Annual Compute Multiplier
 BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
@@ -55,8 +55,8 @@ BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
-MAX_RESEARCH_STOCK_RATE = 10000000000.0
-MAX_NORMALIZED_PROGRESS_RATE = 100.0
+MAX_RESEARCH_STOCK_RATE = 1000000000000000000000000.0
+MAX_NORMALIZED_PROGRESS_RATE = 1000.0
 TIME_EXTRAPOLATION_WINDOW = 10.0
 
 # =============================================================================
@@ -152,19 +152,19 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
-    'rho_progress': -0.3,
-    'alpha': 0.35,
-    'software_scale': 1.0,
+    'rho_progress': -0.15,
+    'alpha': 0.7,
+    'software_scale': 1.4,
     'automation_fraction_at_superhuman_coder': 0.99,
     'progress_at_half_sc_automation': 20.0,
     'automation_slope': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
-    'cognitive_output_normalization': 1.26e-3,
-    'zeta': 0.2,
+    'cognitive_output_normalization': 1e-2,
+    'zeta': 0.55,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'progress_at_half_ai_research_taste': 30.0,
-    'ai_research_taste_slope': 1.0,
+    'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
     'sc_time_horizon_minutes': 10000.0,
