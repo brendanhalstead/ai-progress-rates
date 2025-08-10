@@ -1188,8 +1188,7 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
         else:
             ai_research_taste = L * (0.5 + 0.5 * (cumulative_progress - x0) / x0)
     
-    # Clamp to valid range as a final safeguard
-    return np.clip(ai_research_taste, cfg.AI_RESEARCH_TASTE_MIN, cfg.AI_RESEARCH_TASTE_MAX)
+    return ai_research_taste
 
 
 def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
@@ -1214,6 +1213,7 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
         
         # Handle extreme exponents to prevent overflow/underflow
         if exponent > cfg.SIGMOID_EXPONENT_CLAMP:
+
             ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * np.exp(cfg.SIGMOID_EXPONENT_CLAMP))
         elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:
             ai_research_taste = max(0.0, taste_at_sc * np.exp(-cfg.SIGMOID_EXPONENT_CLAMP))
@@ -1232,7 +1232,7 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
             ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * 2.0)
     
     # Clamp to valid range as a final safeguard
-    return np.clip(ai_research_taste, cfg.AI_RESEARCH_TASTE_MIN, cfg.AI_RESEARCH_TASTE_MAX)
+    return ai_research_taste
 
 
 def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, params: Parameters) -> float:
@@ -1275,8 +1275,12 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         offset = target_sd - slope * progress_at_sc
         
         # Compute AI research taste at current progress
-        current_sd = slope * cumulative_progress + offset
-        ai_research_taste = taste_distribution.get_taste_at_sd(current_sd)
+        penalty = (cfg.AI_RESEARCH_TASTE_MAX_SD - target_sd) / cfg.AI_RESEARCH_TASTE_MAX_SD
+        current_sd = slope * penalty * cumulative_progress + offset
+        current_sd_clamped = min(current_sd, cfg.AI_RESEARCH_TASTE_MAX_SD)
+
+
+        ai_research_taste = taste_distribution.get_taste_at_sd(current_sd_clamped)
         
     except Exception as e:
         logger.warning(f"Error in SD per progress calculation: {e}")
@@ -2842,7 +2846,7 @@ class ProgressModel:
             actual_anchor_progress = np.interp(self.params.anchor_time, times, progress_values)
             
             # Update the horizon trajectory function with the corrected anchor progress
-            logger.info(f"Updating anchor progress from fitted value to actual integrated value: {actual_anchor_progress:.6f}")
+            logger.info(f"Updating anchor progress from fitted value ({anchor_progress:.6f}) to actual integrated value: {actual_anchor_progress:.6f}")
             self._update_horizon_trajectory_anchor(actual_anchor_progress)
         
         # Use utility function to compute initial conditions with the correct parameters
