@@ -773,7 +773,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                       name='SC Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes:.0f} minutes<extra></extra>'),
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes/10380:.1f} work months<extra></extra>'),
             row=row, col=col
         )
 
@@ -815,7 +815,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                       name='SC Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes:.0f} minutes<extra></extra>'),
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes/10380:.1f} work months<extra></extra>'),
             row=row, col=col
         )
     

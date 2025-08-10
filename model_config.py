@@ -170,7 +170,7 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
-    'sc_time_horizon_minutes': 10000.0,
+    'sc_time_horizon_minutes': 124560.0, # 124560 minutes = 1 work year
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters

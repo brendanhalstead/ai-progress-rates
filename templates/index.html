@@ -87,9 +87,9 @@
                                 </div>
                                 <div class="collapse" id="timeHorizonParams">
                                     <div class="mb-3">
-                                        <label class="param-label">80% Time Horizon at Superhuman Coder: <span id="sc_time_horizon_minutes_val">Loading...</span> mins</label>
+                                        <label class="param-label">80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months</label>
                                         <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
-                                        <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (1k-1M minutes)</small>
+                                        <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (0.1-96 work months)</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">Horizon Extrapolation Type:</label>
@@ -667,14 +667,15 @@
                 const actualValue = Math.pow(10, value);
                 displayValue = actualValue.toExponential(2);
             } else if (input.id === 'sc_time_horizon_minutes') {
-                // Convert log scale value to actual value and format nicely
-                const actualValue = Math.pow(10, value);
-                if (actualValue >= 1000000) {
-                    displayValue = (actualValue / 1000000).toFixed(1) + 'M';
-                } else if (actualValue >= 1000) {
-                    displayValue = (actualValue / 1000).toFixed(0) + 'k';
+                // Convert log scale value to actual value in minutes, then to work months
+                const actualValueMinutes = Math.pow(10, value);
+                const workMonths = actualValueMinutes / 10380; // 173 hours * 60 mins = 10380 minutes per work month
+                if (workMonths >= 10) {
+                    displayValue = workMonths.toFixed(0);
+                } else if (workMonths >= 1) {
+                    displayValue = workMonths.toFixed(1);
                 } else {
-                    displayValue = actualValue.toFixed(0);
+                    displayValue = workMonths.toFixed(2);
                 }
             } else if (input.id.includes('normalization')) {
                 if (value < 0.001) {
