@@ -1302,182 +1302,163 @@ def index():
 @app.route('/api/compute', methods=['POST'])
 def compute_model():
     """Compute model with given parameters"""
-    try:
-        data = request.json
+    # try:
+    data = request.json
+    
+    # Parse parameters
+    params_dict = data.get('parameters', {})
+    params = Parameters(**params_dict)
+    
+    # Use stored time series or default
+    time_series = session_data['time_series']
+    if time_series is None:
+        time_series = create_default_time_series()
+        session_data['time_series'] = time_series
+    
+    # Get time range
+    time_range = data.get('time_range', [2029, 2030])
+    initial_progress = data.get('initial_progress', 0.0)
+    
+    
+    # Compute model with comprehensive validation and error handling
+    # try:
         
-        # Parse parameters
-        params_dict = data.get('parameters', {})
-        params = Parameters(**params_dict)
+    
         
-        # Use stored time series or default
-        time_series = session_data['time_series']
-        if time_series is None:
-            time_series = create_default_time_series()
-            session_data['time_series'] = time_series
+    #     # All metrics are now available in model.results - no need for separate calculation
         
-        # Get time range
-        time_range = data.get('time_range', [2029, 2030])
-        initial_progress = data.get('initial_progress', 0.0)
+    #     # Validate results
+    #     if len(times) == 0 or len(progress_values) == 0:
+    #         logger.error("Model computation produced no results")
+    #         return jsonify({
+    #             'success': False, 
+    #             'error': 'Model computation failed to produce results. Check parameter values and constraints.',
+    #             'suggestions': [
+    #                 'Try more conservative parameter values',
+    #                 'Check if time range is valid',
+    #                 'Verify initial progress value is reasonable'
+    #             ]
+    #         }), 500
         
-        # Use utility function to set up model with proper normalization
-        try:
-            params, initial_conditions = setup_model(time_series, params, initial_progress)
-            # Extract needed values for metrics calculation
-            initial_research_stock_rate = initial_conditions.research_stock_rate
-            initial_research_stock_calc = initial_conditions.research_stock
-        except Exception as e:
-            logger.error(f"Error setting up model: {e}")
-            return jsonify({
-                'success': False,
-                'error': f'Failed to set up model: {e}',
-                'error_type': 'initialization_failure'
-            }), 500
-        
-        # Compute model with comprehensive validation and error handling
-        try:
-            model = ProgressModel(params, time_series)
+    #     if not all(np.isfinite(progress_values)):
+    #         logger.error("Model computation produced non-finite values")
+    #         # Try to salvage what we can
+    #         finite_mask = np.isfinite(progress_values)
+    #         if np.any(finite_mask):
+    #             logger.warning("Attempting to interpolate over non-finite values")
+    #             times = times[finite_mask]
+    #             progress_values = progress_values[finite_mask]
+    #             if len(times) < 10:  # Too few valid points
+    #                 return jsonify({
+    #                     'success': False,
+    #                     'error': 'Model produced mostly non-finite values. Parameters may be causing numerical instability.',
+    #                     'suggestions': [
+    #                         'Reduce elasticity parameter magnitudes',
+    #                         'Check normalization parameters',
+    #                         'Verify anchor constraints are reasonable'
+    #                     ]
+    #                 }), 500
+    #         else:
+    #             return jsonify({
+    #                 'success': False,
+    #                 'error': 'All computed values are non-finite. Severe numerical instability detected.',
+    #                 'suggestions': [
+    #                     'Reset to default parameters',
+    #                     'Use more conservative parameter bounds',
+    #                     'Check input time series data for anomalies'
+    #                 ]
+    #             }), 500
             
-            # First, estimate horizon trajectory from METR data to enable horizon length tracking
-            try:
-                horizon_func = model.estimate_horizon_trajectory(time_range, initial_progress)
-                if horizon_func is None:
-                    logger.warning("Failed to estimate horizon trajectory - horizon lengths will be zero")
-            except Exception as e:
-                logger.warning(f"Error estimating horizon trajectory: {e} - horizon lengths will be zero")
-            
-            times, progress_values, research_stock_values = model.compute_progress_trajectory(
-                time_range, initial_progress
-            )
-            
-            # All metrics are now available in model.results - no need for separate calculation
-            
-            # Validate results
-            if len(times) == 0 or len(progress_values) == 0:
-                logger.error("Model computation produced no results")
-                return jsonify({
-                    'success': False, 
-                    'error': 'Model computation failed to produce results. Check parameter values and constraints.',
-                    'suggestions': [
-                        'Try more conservative parameter values',
-                        'Check if time range is valid',
-                        'Verify initial progress value is reasonable'
-                    ]
-                }), 500
-            
-            if not all(np.isfinite(progress_values)):
-                logger.error("Model computation produced non-finite values")
-                # Try to salvage what we can
-                finite_mask = np.isfinite(progress_values)
-                if np.any(finite_mask):
-                    logger.warning("Attempting to interpolate over non-finite values")
-                    times = times[finite_mask]
-                    progress_values = progress_values[finite_mask]
-                    if len(times) < 10:  # Too few valid points
-                        return jsonify({
-                            'success': False,
-                            'error': 'Model produced mostly non-finite values. Parameters may be causing numerical instability.',
-                            'suggestions': [
-                                'Reduce elasticity parameter magnitudes',
-                                'Check normalization parameters',
-                                'Verify anchor constraints are reasonable'
-                            ]
-                        }), 500
-                else:
-                    return jsonify({
-                        'success': False,
-                        'error': 'All computed values are non-finite. Severe numerical instability detected.',
-                        'suggestions': [
-                            'Reset to default parameters',
-                            'Use more conservative parameter bounds',
-                            'Check input time series data for anomalies'
-                        ]
-                    }), 500
-                
-        except RuntimeError as e:
-            if "integration" in str(e).lower():
-                logger.error(f"Integration failed: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'Differential equation integration failed: {str(e)}',
-                    'error_type': 'integration_failure',
-                    'suggestions': [
-                        'Try smaller time steps or shorter time range',
-                        'Check if parameters cause mathematical instability',
-                        'Verify initial conditions are reasonable'
-                    ]
-                }), 500
-            else:
-                logger.error(f"Runtime error in model computation: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'Model computation error: {str(e)}',
-                    'error_type': 'runtime_error'
-                }), 500
-        except ValueError as e:
-            logger.error(f"Value error in model computation: {e}")
-            return jsonify({
-                'success': False,
-                'error': f'Invalid parameter or data values: {str(e)}',
-                'error_type': 'value_error',
-                'suggestions': [
-                    'Check parameter ranges and constraints',
-                    'Verify input data is valid',
-                    'Try different initial conditions'
-                ]
-            }), 500
-        except Exception as e:
-            logger.error(f"Unexpected error in model computation: {e}")
-            return jsonify({
-                'success': False,
-                'error': f'Unexpected error occurred: {str(e)}',
-                'error_type': 'unexpected_error',
-                'suggestions': [
-                    'Try resetting to default parameters',
-                    'Check system logs for more details',
-                    'Contact support if problem persists'
-                ]
-            }), 500
+    # except RuntimeError as e:
+    #     if "integration" in str(e).lower():
+    #         logger.error(f"Integration failed: {e}")
+    #         return jsonify({
+    #             'success': False,
+    #             'error': f'Differential equation integration failed: {str(e)}',
+    #             'error_type': 'integration_failure',
+    #             'suggestions': [
+    #                 'Try smaller time steps or shorter time range',
+    #                 'Check if parameters cause mathematical instability',
+    #                 'Verify initial conditions are reasonable'
+    #             ]
+    #         }), 500
+    #     else:
+    #         logger.error(f"Runtime error in model computation: {e}")
+    #         return jsonify({
+    #             'success': False,
+    #             'error': f'Model computation error: {str(e)}',
+    #             'error_type': 'runtime_error'
+    #         }), 500
+    # except ValueError as e:
+    #     logger.error(f"Value error in model computation: {e}")
+    #     return jsonify({
+    #         'success': False,
+    #         'error': f'Invalid parameter or data values: {str(e)}',
+    #         'error_type': 'value_error',
+    #         'suggestions': [
+    #             'Check parameter ranges and constraints',
+    #             'Verify input data is valid',
+    #             'Try different initial conditions'
+    #         ]
+    #     }), 500
+    # except Exception as e:
+    #     logger.error(f"Unexpected error in model computation: {e}")
+    #     return jsonify({
+    #         'success': False,
+    #         'error': f'Unexpected error occurred: {str(e)}',
+    #         'error_type': 'unexpected_error',
+    #         'suggestions': [
+    #             'Try resetting to default parameters',
+    #             'Check system logs for more details',
+    #             'Contact support if problem persists'
+    #         ]
+    #     }), 500
+    model = ProgressModel(params, time_series)
+    
+    times, progress_values, research_stock_values = model.compute_progress_trajectory(
+            time_range, initial_progress
+        )
+    
+    # All metrics are now computed by ProgressModel - use them directly
+    all_metrics = model.results
+    
+    # Store results (including auxiliary metrics for potential export)
+    session_data['current_params'] = params
+    session_data['results'] = all_metrics
+    
+    # Create multi-tab dashboard using the calculated metrics
+    figures = create_multi_tab_dashboard(all_metrics)
+    
+    # Convert figures to JSON format
+    plots = {}
+    for tab_id, fig in figures.items():
+        plots[tab_id] = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+    
+    # Get tab metadata including row information for proper sizing
+    tab_configs = get_tab_configurations()
+    tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
+    
+    # Prepare summary focusing on SC metrics
+    summary = {
+        'time_range': time_range
+    }
+    
+    # Add SC timing information if available
+    if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
+        summary['sc_time'] = float(model.results['sc_time'])
+        summary['sc_progress_level'] = float(model.results['sc_progress_level'])
+        summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
+        logger.info(f"SC time: {summary['sc_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
+    return jsonify({
+        'success': True,
+        'plots': plots,
+        'tabs': tabs_info,
+        'summary': summary
+    })
         
-        # All metrics are now computed by ProgressModel - use them directly
-        all_metrics = model.results
-        
-        # Store results (including auxiliary metrics for potential export)
-        session_data['current_params'] = params
-        session_data['results'] = all_metrics
-        
-        # Create multi-tab dashboard using the calculated metrics
-        figures = create_multi_tab_dashboard(all_metrics)
-        
-        # Convert figures to JSON format
-        plots = {}
-        for tab_id, fig in figures.items():
-            plots[tab_id] = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
-        
-        # Get tab metadata including row information for proper sizing
-        tab_configs = get_tab_configurations()
-        tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
-        
-        # Prepare summary focusing on SC metrics
-        summary = {
-            'time_range': time_range
-        }
-        
-        # Add SC timing information if available
-        if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
-            summary['sc_time'] = float(model.results['sc_time'])
-            summary['sc_progress_level'] = float(model.results['sc_progress_level'])
-            summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
-            logger.info(f"SC time: {summary['sc_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
-        return jsonify({
-            'success': True,
-            'plots': plots,
-            'tabs': tabs_info,
-            'summary': summary
-        })
-        
-    except Exception as e:
-        logger.error(f"Error computing model: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+    # except Exception as e:
+    #     logger.error(f"Error computing model: {e}")
+    #     return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/parameter-config', methods=['GET'])
 def get_parameter_config():
@@ -1525,6 +1506,11 @@ def get_parameter_config():
                 'automation_slope': {
                     'name': 'Automation Slope',  
                     'description': 'Steepness of automation curve',
+                    'units': 'dimensionless'
+                },
+                'swe_multiplier_at_anchor_time': {
+                    'name': 'SWE Multiplier at Anchor Time',
+                    'description': 'Software engineering productivity multiplier at the anchor time',
                     'units': 'dimensionless'
                 },
                 'cognitive_output_normalization': {
@@ -1698,14 +1684,6 @@ def estimate_params():
             # Automatically run the model computation with the estimated parameters
             try:
                 model = ProgressModel(estimated_params, time_series)
-                
-                # First, estimate horizon trajectory from METR data to enable horizon length tracking
-                try:
-                    horizon_func = model.estimate_horizon_trajectory(time_range, initial_progress)
-                    if horizon_func is None:
-                        logger.warning("Failed to estimate horizon trajectory - horizon lengths will be zero")
-                except Exception as e:
-                    logger.warning(f"Error estimating horizon trajectory: {e} - horizon lengths will be zero")
                 
                 times, progress_values, research_stock_values = model.compute_progress_trajectory(
                     time_range, initial_progress

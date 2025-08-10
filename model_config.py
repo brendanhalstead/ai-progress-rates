@@ -84,10 +84,11 @@ PARAMETER_BOUNDS = {
     'rho_cognitive': (-10, 0),
     'rho_progress': (-1, 1),
     'alpha': (0.05, 0.95),
-    'software_scale': (0.05, 0.95),
+    'software_scale': (0.1, 10),
     'automation_fraction_at_superhuman_coder': (0.1, 0.99),
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
+    'swe_multiplier_at_anchor_time': (1.0, 10.0),
     'cognitive_output_normalization': (0.00001, 10),
     'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
     # AI Research Taste parameter bounds
@@ -153,11 +154,11 @@ DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
     'rho_progress': -0.3,
     'alpha': 0.35,
-    'software_scale': 0.5,
+    'software_scale': 1.0,
     'automation_fraction_at_superhuman_coder': 0.99,
     'progress_at_half_sc_automation': 20.0,
     'automation_slope': 1.0,
-
+    'swe_multiplier_at_anchor_time': 1.05,
     'cognitive_output_normalization': 1.26e-3,
     'zeta': 0.2,
     # AI Research Taste parameters
@@ -165,9 +166,10 @@ DEFAULT_PARAMETERS = {
     'progress_at_half_ai_research_taste': 30.0,
     'ai_research_taste_slope': 1.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
-    'progress_at_sc': 20.0,
+    'progress_at_sc': None,
     'sc_time_horizon_minutes': 10000.0,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
+    'automation_anchors': None,
     # Manual horizon fitting parameters
     'anchor_time': DEFAULT_ANCHOR_TIME,
     'anchor_horizon': DEFAULT_ANCHOR_HORIZON,

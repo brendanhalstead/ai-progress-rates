@@ -259,13 +259,14 @@ class Parameters:
     automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
     progress_at_half_sc_automation: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation'])
     automation_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_slope'])
-    
+    automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
+    swe_multiplier_at_anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_anchor_time'])
     # AI Research Taste sigmoid parameters
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     progress_at_half_ai_research_taste: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste'])
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
-    progress_at_sc: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_sc'])
+    progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
@@ -308,10 +309,10 @@ class Parameters:
             self.alpha = np.clip(self.alpha, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
         if not np.isfinite(self.software_scale):
-            logger.warning(f"Non-finite software_scale: {self.software_scale}, setting to 0.5")
-            self.software_scale = 0.5
+            logger.warning(f"Non-finite software_scale: {self.software_scale}, setting to 1.0")
+            self.software_scale = 1.0
         else:
-            self.software_scale = np.clip(self.software_scale, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+            self.software_scale = np.clip(self.software_scale, 0.1, 10.0)
         
         if not np.isfinite(self.zeta):
             logger.warning(f"Non-finite zeta: {self.zeta}, setting to {cfg.DEFAULT_PARAMETERS['zeta']}")
@@ -500,7 +501,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
         return w1 * X1 + w2 * X2
 
 
-def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, cognitive_normalization: float = 1.0) -> float:
+def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
     """
     CES combination of AI and human labor using an alternative formulation inspired by
     the structure in FORMULAS.md: Y = ( (A^(1-rho) * L_AI^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
@@ -519,6 +520,9 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     Returns:
         Cognitive output
     """
+    if human_only:
+        return L_HUMAN * cognitive_normalization
+    
     # Input validation
     if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, cognitive_normalization])):
         logger.warning("Non-finite inputs to compute_cognitive_output")
@@ -644,14 +648,12 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
                                  software_scale: float) -> float:
     """
     Compute software progress rate using research stock formulation:
-    S(t) = RS(0) * RS'(t) / (RS'(0) * RS(t)) * s
+    S(t) = RS'(t) / RS(t) * s
     
     Args:
         research_stock: Current research stock RS(t)
         research_stock_rate: Current research stock rate RS'(t)
-        initial_research_stock: Initial research stock RS(0)
-        initial_research_stock_rate: Initial research stock rate RS'(0)
-        software_scale: Software progress share parameter s [0,1]
+        software_scale: Software progress share parameter s [0.1,10]
     
     Returns:
         Software progress rate multiplied by s
@@ -669,14 +671,14 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
         logger.warning("Non-positive initial research stock rate")
         return 0.0
     
-    if software_scale < 0 or software_scale > 1:
-        logger.warning(f"Invalid software_scale: {software_scale}, must be in [0,1]")
+    if software_scale < 0.1 or software_scale > 10:
+        logger.warning(f"Invalid software_scale: {software_scale}, must be in [0.1,10]")
         return 0.0
     
     # Compute software progress rate using research stock ratio formula
     try:
-        numerator = initial_research_stock * research_stock_rate
-        denominator = initial_research_stock_rate * research_stock
+        numerator = research_stock_rate
+        denominator = research_stock
         
         if denominator == 0:
             logger.warning("Zero denominator in software progress rate calculation")
@@ -764,7 +766,8 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            cognitive_output_0 = L_HUMAN_0
+            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
+            logger.info(f"HUMAN-ONLY::: cognitive_output_0: {cognitive_output_0}")
             initial_aggregate_research_taste = 1.0
         else:
             initial_automation = compute_automation_fraction(initial_progress, params)
@@ -774,6 +777,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
                 initial_automation, L_AI_0, L_HUMAN_0, 
                 params.rho_cognitive, params.cognitive_output_normalization
             )
+            logger.info(f"ACTUAL::: cognitive_output_0: {cognitive_output_0}")
         
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
@@ -789,7 +793,8 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            cognitive_output_dt = L_HUMAN_dt
+            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
+            logger.info(f"HUMAN-ONLY::: cognitive_output_dt: {cognitive_output_dt}")
         else:
             cognitive_output_dt = compute_cognitive_output(
                 initial_automation, L_AI_dt, L_HUMAN_dt,
@@ -875,7 +880,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        cognitive_output = L_HUMAN
+        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
         research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
@@ -933,78 +938,170 @@ def setup_model(time_series_data: TimeSeriesData, params: Parameters,
     
     return params, initial_conditions
 
+def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: float, params: Parameters) -> float:
+    """
+    Compute automation fraction from swe multiplier.
+
+    Solve for A in:
+      swe_multiplier * L_HUMAN * cognitive_normalization = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
+    where p = params.rho_cognitive.
+    Returns A in (0, 1). If there are multiple solutions, return the lower one.
+
+    """
+    # Input validation
+    if not all(np.isfinite([swe_multiplier, L_HUMAN, L_AI])):
+        logger.warning("Non-finite inputs to aut_frac_from_swe_multiplier")
+        return 0.0
+    
+    if swe_multiplier <= 0 or L_HUMAN <= 0 or L_AI < 0:
+        logger.warning("Invalid inputs to aut_frac_from_swe_multiplier")
+        return 0.0
+    
+    # Target value we want to achieve
+    target_output = swe_multiplier * L_HUMAN * params.cognitive_output_normalization
+    
+    # Define the objective function to minimize
+    def objective(A_candidate):
+        """Return the difference between target and actual cognitive output"""
+        try:
+            actual_output = compute_cognitive_output(
+                A_candidate, L_AI, L_HUMAN, 
+                params.rho_cognitive, params.cognitive_output_normalization
+            )
+            return actual_output - target_output
+        except Exception as e:
+            logger.warning(f"Error in objective function: {e}")
+            return float('inf')
+    
+    # Use bounds slightly inside (0, 1) to avoid numerical issues
+    bounds = (cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)
+    
+    try:
+        # Use Brent's method for root finding since we have a single variable
+        from scipy.optimize import brentq, minimize_scalar
+        
+        # Check if the function changes sign over the interval
+        f_low = objective(bounds[0])
+        f_high = objective(bounds[1])
+        
+        if f_low * f_high <= 0:
+            # Sign change exists - we can find a root
+            result = brentq(objective, bounds[0], bounds[1], xtol=1e-12, maxiter=100)
+            result = np.clip(result, bounds[0], bounds[1])
+            return float(result)
+        else:
+            # No sign change - target may not be achievable
+            # Find the automation fraction that minimizes the absolute error
+            result = minimize_scalar(
+                lambda A: abs(objective(A)),
+                bounds=bounds,
+                method='bounded',
+                options={'xatol': 1e-12, 'maxiter': 100}
+            )
+            
+            if result.success:
+                return float(np.clip(result.x, bounds[0], bounds[1]))
+            else:
+                raise RuntimeError("Optimization failed")
+        
+    except Exception as e:
+        logger.warning(f"Root finding/optimization failed in aut_frac_from_swe_multiplier: {e}")
+        
+        # Fallback: use grid search to find the best approximation
+        try:
+            A_candidates = np.linspace(bounds[0], bounds[1], 1000)
+            errors = [abs(objective(A)) for A in A_candidates]
+            best_idx = np.argmin(errors)
+            result = A_candidates[best_idx]
+            
+            logger.info(f"Used grid search fallback, error: {errors[best_idx]}")
+            return float(result)
+            
+        except Exception as e2:
+            logger.warning(f"Grid search fallback also failed: {e2}")
+            # Return a reasonable default
+            return 0.5
+
 
 def compute_automation_fraction(cumulative_progress: float, params: Parameters) -> float:
     """
-    Sigmoid function for automation fraction based on cumulative progress.
-    Uses a standard sigmoid: f(x) = 1 / (1 + e^(-k*(x-x0)))
+    Exponential (log-space) interpolation for automation fraction based on cumulative progress.
     
-    The automation fraction always asymptotes at 1.0. The parameters are:
-    - automation_fraction_at_superhuman_coder: Automation fraction at progress_at_sc
-    - progress_at_sc: Progress level where automation = automation_fraction_at_superhuman_coder
-    - automation_slope: Controls transition steepness (k)
+    Uses log-space interpolation between two anchor points in automation_anchors.
+    Extrapolates beyond these points but clips at 1.0.
     
     Args:
         cumulative_progress: Current cumulative progress.
-        params: Model parameters containing sigmoid parameters.
+        params: Model parameters containing automation_anchors.
     
     Returns:
         Automation fraction in [0, 1].
     """
-    # Extract sigmoid parameters
-    automation_at_sc = params.automation_fraction_at_superhuman_coder
-    progress_sc = params.progress_at_sc
-    k = params.automation_slope  # Slope parameter
+    if params.automation_anchors is None:
+        assert False, "automation_anchors must be provided"
     
     # Input validation
     if not np.isfinite(cumulative_progress):
         logger.warning(f"Non-finite cumulative_progress: {cumulative_progress}")
         cumulative_progress = 0.0
     
-    # Validate automation_at_sc is in valid range
-    if automation_at_sc <= 0.0 or automation_at_sc >= 1.0:
-        logger.warning(f"automation_fraction_at_superhuman_coder must be in (0, 1), got {automation_at_sc}")
-        automation_at_sc = np.clip(automation_at_sc, 0.01, 0.99)
+    # Extract anchor points (progress -> automation_fraction mapping)
+    anchor_points = list(params.automation_anchors.items())
     
-    # Calculate x0 such that f(progress_at_sc) = automation_fraction_at_superhuman_coder
-    # From: automation_at_sc = 1 / (1 + e^(-k*(progress_sc - x0)))
-    # Solving: x0 = progress_sc + ln((1 - automation_at_sc) / automation_at_sc) / k
-    try:
-        if k == 0:
-            logger.warning("automation_slope is zero, returning constant automation fraction")
-            return automation_at_sc
-            
-        ratio = (1 - automation_at_sc) / automation_at_sc
-        if ratio <= 0:
-            logger.warning(f"Invalid ratio in x0 calculation: {ratio}")
-            x0 = progress_sc
-        else:
-            x0 = progress_sc + np.log(ratio) / k
-    except (ValueError, OverflowError) as e:
-        logger.warning(f"Error calculating x0: {e}")
-        x0 = progress_sc
+    if len(anchor_points) != 2:
+        logger.error(f"automation_anchors must contain exactly 2 points, got {len(anchor_points)}")
+        assert False, "automation_anchors must contain exactly 2 points"
     
-    # Calculate sigmoid: f(x) = 1 / (1 + e^(-k*(x-x0)))
+    # Sort by progress value to ensure consistent ordering
+    anchor_points.sort(key=lambda x: x[0])
+    (progress_1, automation_1), (progress_2, automation_2) = anchor_points
+    
+    # Validate anchor values
+    if automation_1 <= 0.0 or automation_1 >= 1.0:
+        logger.warning(f"automation_fraction at progress {progress_1} must be in (0, 1), got {automation_1}")
+        automation_1 = np.clip(automation_1, 1e-6, 1.0 - 1e-6)
+    
+    if automation_2 <= 0.0 or automation_2 >= 1.0:
+        logger.warning(f"automation_fraction at progress {progress_2} must be in (0, 1), got {automation_2}")
+        automation_2 = np.clip(automation_2, 1e-6, 1.0 - 1e-6)
+    
+    if progress_1 >= progress_2:
+        logger.error(f"Progress values must be distinct and ordered: {progress_1} >= {progress_2}")
+        assert False, "Progress anchor points must be distinct"
+    
     try:
-        exponent = -k * (cumulative_progress - x0)
+        # Log-space interpolation: log(automation) = a * progress + b
+        # Solve for a and b using the two anchor points
+        log_automation_1 = np.log(automation_1)
+        log_automation_2 = np.log(automation_2)
         
-        # Handle extreme exponents to prevent overflow/underflow
-        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:  # e^100 is very large, sigmoid ≈ 0
-            automation_fraction = 0.0
-        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ 1
-            automation_fraction = 1.0
-        else:
-            automation_fraction = 1.0 / (1 + np.exp(exponent))
-            
-    except (OverflowError, ValueError) as e:
-        logger.warning(f"Numerical error in sigmoid calculation: {e}")
-        # Fallback: linear interpolation between 0 and 1
-        if cumulative_progress <= x0:
-            automation_fraction = 0.5 * (cumulative_progress / x0) if x0 > 0 else 0.0
-        else:
-            automation_fraction = 0.5 + 0.5 * min(1.0, (cumulative_progress - x0) / max(x0, 1e-6))
+        # Linear interpolation in log space: log(y) = a*x + b
+        a = (log_automation_2 - log_automation_1) / (progress_2 - progress_1)
+        b = log_automation_1 - a * progress_1
+        
+        # Calculate log(automation) at current progress
+        log_automation = a * cumulative_progress + b
+        
+        # Convert back from log space
+        automation_fraction = np.exp(log_automation)
+        
+    except (ValueError, OverflowError) as e:
+        logger.warning(f"Numerical error in log-space interpolation: {e}")
+        # Fallback: linear interpolation
+        if progress_1 <= cumulative_progress <= progress_2:
+            # Linear interpolation between anchor points
+            t = (cumulative_progress - progress_1) / (progress_2 - progress_1)
+            automation_fraction = automation_1 + t * (automation_2 - automation_1)
+        elif cumulative_progress < progress_1:
+            # Extrapolate below first anchor
+            slope = (automation_2 - automation_1) / (progress_2 - progress_1)
+            automation_fraction = automation_1 + slope * (cumulative_progress - progress_1)
+        else:  # cumulative_progress > progress_2
+            # Extrapolate above second anchor
+            slope = (automation_2 - automation_1) / (progress_2 - progress_1)
+            automation_fraction = automation_2 + slope * (cumulative_progress - progress_2)
     
-    # Clamp to [0, 1] as a final safeguard
+    # Clip to [0, 1] as required
     return np.clip(automation_fraction, 0.0, 1.0)
 
 
@@ -1084,6 +1181,10 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope
     
+    # Handle case where progress_at_sc is None (bootstrap failed)
+    if progress_at_sc is None:
+        raise ValueError("progress_at_sc is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
+    
     try:
         # Calculate exponential: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
         exponent = slope * (cumulative_progress - progress_at_sc)
@@ -1134,6 +1235,10 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     taste_at_sc = params.ai_research_taste_at_superhuman_coder
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope  # SD per progress unit
+    
+    # Handle case where progress_at_sc is None (bootstrap failed)
+    if progress_at_sc is None:
+        raise ValueError("progress_at_sc is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
     
     try:
         # Compute offset so curve passes through (progress_at_sc, taste_at_sc)
@@ -1314,7 +1419,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            cognitive_output = L_HUMAN
+            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -2046,37 +2151,22 @@ class ProgressModel:
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution()
     
-    def estimate_horizon_trajectory(self, time_range: List[float], initial_progress: Optional[float] = None):
+    def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray):
         """
         Estimate horizon trajectory by fitting to log(p80_horizon_length) vs progress.
-        Uses a backcast model with zero AI contributions to get progress values at model release dates.
+        Uses provided human-only progress trajectory to get progress values at model release dates.
         
         The functional form depends on horizon_extrapolation_type:
         - "exponential": linear regression on log(horizon) vs progress
         - "decaying doubling time": decaying doubling time functional form
         
         Args:
-            time_range: [start_time, end_time] for trajectory computation
-            initial_progress: Initial progress value (defaults to 0.0)
+            human_only_times: Time array from human-only trajectory computation
+            human_only_progress: Progress array from human-only trajectory computation
             
         Returns:
             Function that maps progress to horizon length
         """
-        if initial_progress is None:
-            initial_progress = 0.0
-        
-        # Create backcast parameters with zero AI contributions
-        backcast_params = copy.deepcopy(self.params)
-        # zero out AI contributions via automation fraction and taste
-        backcast_params.progress_at_half_automation_fraction = 100
-        backcast_params.ai_research_taste_at_superhuman_coder = 0
-        backcast_params.ai_research_taste_slope = 1
-        backcast_params.taste_schedule_type = "sd_per_progress"
-        backcast_params.progress_at_sc = 100.0
-        
-        # Create backcast model and compute trajectory
-        backcast_model = ProgressModel(backcast_params, self.data)
-        backcast_times, backcast_progress, _ = backcast_model.compute_progress_trajectory(time_range, initial_progress)
         
         # Load METR benchmark data
         try:
@@ -2107,13 +2197,13 @@ class ProgressModel:
                 logger.warning(f"Could not parse release date for {model_name}: {release_date_obj} ({e})")
                 continue
             
-            # Interpolate progress value at the release date using backcast results
-            if decimal_year >= backcast_times.min() and decimal_year <= backcast_times.max():
-                interpolated_progress = np.interp(decimal_year, backcast_times, backcast_progress)
-            elif decimal_year < backcast_times.min():
-                interpolated_progress = backcast_progress[0]
+            # Interpolate progress value at the release date using human-only trajectory results
+            if decimal_year >= human_only_times.min() and decimal_year <= human_only_times.max():
+                interpolated_progress = np.interp(decimal_year, human_only_times, human_only_progress)
+            elif decimal_year < human_only_times.min():
+                interpolated_progress = human_only_progress[0]
             else:
-                interpolated_progress = backcast_progress[-1]
+                interpolated_progress = human_only_progress[-1]
             
             # Extract p80_horizon_length estimates for each agent configuration
             for agent_name, agent_data in model_info['agents'].items():
@@ -2189,7 +2279,7 @@ class ProgressModel:
                 if self.params.anchor_horizon is not None:
                     # Use manual fitting with anchor point
                     # Get progress at anchor_time
-                    anchor_progress = np.interp(self.params.anchor_time, backcast_times, backcast_progress)
+                    anchor_progress = np.interp(self.params.anchor_time, human_only_times, human_only_progress)
                     
                     # If anchor_doubling_time is provided, use it to calculate slope
                     if self.params.anchor_doubling_time is not None:
@@ -2228,11 +2318,12 @@ class ProgressModel:
                     try:
                         # Solve: sc_time_horizon_minutes = exp(slope * progress + intercept)
                         # Therefore: progress = (log(sc_time_horizon_minutes) - intercept) / slope
-                        self.sc_progress = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
-                        logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
+                        calculated_progress_at_sc = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
+                        self.params.progress_at_sc = calculated_progress_at_sc
+                        logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
                         logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
-                        self.sc_progress = None
+                        self.params.progress_at_sc = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
                 # Determine approach based on whether anchor_doubling_time is specified
@@ -2242,7 +2333,7 @@ class ProgressModel:
                     # Use shifted function approach
                     self._horizon_uses_shifted_form = True
                     # Get progress at anchor_time
-                    anchor_progress = np.interp(self.params.anchor_time, backcast_times, backcast_progress)
+                    anchor_progress = np.interp(self.params.anchor_time, human_only_times, human_only_progress)
                     
                     # Determine what parameters we have and what we need to optimize
                     params_to_optimize = []
@@ -2486,46 +2577,47 @@ class ProgressModel:
                     try:
                         # Add numerical safeguards
                         if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
-                            logger.warning("Invalid parameters for sc_progress calculation")
-                            self.sc_progress = None
+                            logger.warning("Invalid parameters for progress_at_sc calculation")
+                            self.params.progress_at_sc = None
                         elif self.params.sc_time_horizon_minutes <= 0:
                             logger.warning("Invalid sc_time_horizon_minutes for calculation")
-                            self.sc_progress = None
+                            self.params.progress_at_sc = None
                         else:
                             # Check if the ratio is valid
                             ratio = self.params.sc_time_horizon_minutes / H_0
                             if ratio <= 0:
-                                logger.warning("Invalid ratio for sc_progress calculation")
-                                self.sc_progress = None
+                                logger.warning("Invalid ratio for progress_at_sc calculation")
+                                self.params.progress_at_sc = None
                             else:
                                 log_ratio = np.log(1-A_0) / np.log(2)
                                 if not np.isfinite(log_ratio):
-                                    logger.warning("Invalid log ratio for sc_progress calculation")
-                                    self.sc_progress = None
+                                    logger.warning("Invalid log ratio for progress_at_sc calculation")
+                                    self.params.progress_at_sc = None
                                 else:
                                     ratio_term = ratio ** log_ratio
                                     if not np.isfinite(ratio_term):
-                                        logger.warning("Invalid ratio_term for sc_progress calculation")
-                                        self.sc_progress = None
+                                        logger.warning("Invalid ratio_term for progress_at_sc calculation")
+                                        self.params.progress_at_sc = None
                                     else:
                                         # Use shifted form if we're in the manual parameter case
                                         if anchor_progress_for_trajectory is not None:
                                             # Shifted form: sc_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
                                             # progress = anchor_progress + T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
-                                            self.sc_progress = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
+                                            calculated_progress_at_sc = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
                                         else:
                                             # Original form: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
                                             # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
-                                            self.sc_progress = T_0 * (1 - ratio_term) / A_0
+                                            calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
-                                        if not np.isfinite(self.sc_progress):
-                                            logger.warning("Invalid sc_progress result")
-                                            self.sc_progress = None
+                                        if not np.isfinite(calculated_progress_at_sc):
+                                            logger.warning("Invalid progress_at_sc result")
+                                            self.params.progress_at_sc = None
                                         else:
-                                            logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {self.sc_progress:.4f}")
+                                            self.params.progress_at_sc = calculated_progress_at_sc
+                                            logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError, OverflowError) as e:
                         logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
-                        self.sc_progress = None
+                        self.params.progress_at_sc = None
             
             else:
                 logger.error(f"Unknown horizon_extrapolation_type: {self.params.horizon_extrapolation_type}")
@@ -2632,7 +2724,7 @@ class ProgressModel:
         initial_conditions = compute_initial_conditions(self.data, human_only_params, initial_progress)
         initial_research_stock_rate_val = initial_conditions.research_stock_rate
         initial_research_stock_val = initial_conditions.research_stock
-
+        logger.info(f"HUMAN-ONLY::: initial_research_stock_val: {initial_research_stock_val}, initial_research_stock_rate_val: {initial_research_stock_rate_val}")
         progress_rates = []
         research_stock_rates = []
 
@@ -2643,12 +2735,30 @@ class ProgressModel:
             progress_rates.append(rates[0])
             research_stock_rates.append(rates[1])
         
+        # Anchor stats at params.anchor_time
+        anchor_time = human_only_params.anchor_time
+        anchor_progress = np.interp(anchor_time, times, progress_values)
+        # Interpolate human and AI labor at anchor time using log-space when positive
+        if np.all(self.data.L_HUMAN > 0):
+            anchor_human_labor = _log_interp(anchor_time, self.data.time, self.data.L_HUMAN)
+        else:
+            anchor_human_labor = np.interp(anchor_time, self.data.time, self.data.L_HUMAN)
+        if np.all(self.data.L_AI > 0):
+            anchor_ai_labor = _log_interp(anchor_time, self.data.time, self.data.L_AI)
+        else:
+            anchor_ai_labor = np.interp(anchor_time, self.data.time, self.data.L_AI)
+        
         self.human_only_results = {
             'times': times,
             'progress': progress_values,
             'research_stock': research_stock_values,
             'progress_rates': progress_rates,
             'research_stock_rates': research_stock_rates,
+            'anchor_stats': {
+                'progress': anchor_progress,
+                'human_labor': anchor_human_labor,
+                'ai_labor': anchor_ai_labor
+            },
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,
@@ -2673,22 +2783,31 @@ class ProgressModel:
         """
 
         # first compute human-only trajectory
-        self.compute_human_only_trajectory(time_range, initial_progress)
+        human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
+        
+        # estimate horizon trajectory from METR data using human-only trajectory
+        try:
+            self.estimate_horizon_trajectory(human_only_times, human_only_progress)
+        except Exception as e:
+            logger.warning(f"Failed to estimate horizon trajectory: {e}")
+            self.horizon_trajectory = None
 
-        if initial_progress is None:
-            initial_progress = 0.0  # Use a reasonable default value
-        
-        # Bootstrap process: Use calculated sc_progress if available, otherwise fall back to config value
-        params_to_use = self.params
-        if hasattr(self, 'sc_progress') and self.sc_progress is not None:
-            import copy
-            params_to_use = copy.deepcopy(self.params)
-            params_to_use.progress_at_sc = self.sc_progress
-            logger.info(f"Using bootstrap-calculated SC progress: {self.sc_progress:.4f} (overriding config value: {self.params.progress_at_sc:.4f})")
-        else:
-            logger.info(f"Using config SC progress: {self.params.progress_at_sc:.4f} (not bootstrapped yet)")
-        
-        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, params_to_use)
+        # compute automation fraction at anchor time
+        anchor_time = self.params.anchor_time
+        anchor_progress = self.human_only_results['anchor_stats']['progress']
+        anchor_human_labor = self.human_only_results['anchor_stats']['human_labor']
+        anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
+        # compute automation fraction at anchor time
+        anchor_aut_frac = aut_frac_from_swe_multiplier(self.params.swe_multiplier_at_anchor_time, anchor_human_labor, anchor_ai_labor, self.params)
+        # anchor_aut_frac = 0.01
+        logger.info(f"calculated anchor automation fraction: {anchor_aut_frac} from swe_multiplier_at_anchor_time: {self.params.swe_multiplier_at_anchor_time} and anchor_time: {anchor_time}")
+        automation_anchors = {
+            anchor_progress: anchor_aut_frac,
+            self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
+        }
+        logger.info(f"Automation anchors: {automation_anchors}")
+        self.params.automation_anchors = automation_anchors
+        times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
         # This ensures that the horizon at anchor_time matches the specified anchor_horizon value
@@ -2704,10 +2823,11 @@ class ProgressModel:
             self._update_horizon_trajectory_anchor(actual_anchor_progress)
         
         # Use utility function to compute initial conditions with the correct parameters
-        initial_conditions = compute_initial_conditions(self.data, params_to_use, initial_progress)
+        initial_conditions = compute_initial_conditions(self.data, self.params, initial_progress)
         initial_research_stock_rate_val = initial_conditions.research_stock_rate
         initial_research_stock_val = initial_conditions.research_stock
-        
+        logger.info(f"ACTUAL::: initial_research_stock_val: {initial_research_stock_val}, initial_research_stock_rate_val: {initial_research_stock_rate_val}")
+
         # Calculate all metrics in a single pass to avoid redundancy
         progress_rates = []
         research_stock_rates = []
@@ -2736,16 +2856,16 @@ class ProgressModel:
         for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
                 state = [p, rs]
-                rates = progress_rate_at_time(t, state, self.data, params_to_use, initial_research_stock_rate_val, initial_research_stock_val)
+                rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
                 progress_rates.append(rates[0])
                 research_stock_rates.append(rates[1])
                 
                 # Compute automation fraction
-                automation_fraction = compute_automation_fraction(p, params_to_use)
+                automation_fraction = compute_automation_fraction(p, self.params)
                 automation_fractions.append(automation_fraction)
                 
                 # Compute AI research taste and aggregate research taste
-                ai_research_taste = compute_ai_research_taste(p, params_to_use)
+                ai_research_taste = compute_ai_research_taste(p, self.params)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
@@ -2761,13 +2881,13 @@ class ProgressModel:
                 training_compute = _log_interp(t, self.data.time, self.data.training_compute)
                 
                 # Compute discounted experiment compute
-                discounted_exp_compute_val = experiment_compute ** params_to_use.zeta
+                discounted_exp_compute_val = experiment_compute ** self.params.zeta
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
                     automation_fraction, L_AI, L_HUMAN, 
-                    params_to_use.rho_cognitive, params_to_use.cognitive_output_normalization
+                    self.params.rho_cognitive, self.params.cognitive_output_normalization
                 )
                 cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
                 
@@ -2777,23 +2897,23 @@ class ProgressModel:
                     rs, current_research_stock_rate, 
                     initial_research_stock_val, 
                     initial_research_stock_rate_val,
-                    params_to_use.software_scale
+                    self.params.software_scale
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_cognitive_output = L_HUMAN * params_to_use.cognitive_output_normalization
+                human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
-                    params_to_use.alpha, params_to_use.rho_progress, params_to_use.zeta, human_only_aggregate_research_taste
+                    self.params.alpha, self.params.rho_progress, self.params.zeta, human_only_aggregate_research_taste
                 )
                 human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
                     rs, human_only_research_stock_rate,
                     initial_research_stock_val,
                     initial_research_stock_rate_val,
-                    params_to_use.software_scale
+                    self.params.software_scale
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
@@ -2805,7 +2925,7 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = L_HUMAN * params_to_use.cognitive_output_normalization
+                human_contrib = L_HUMAN * self.params.cognitive_output_normalization
                 ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
@@ -2833,7 +2953,7 @@ class ProgressModel:
                 # Compute effective compute as baseline_annual_compute_multiplier^progress
                 effective_compute_val = 0.0  # Default fallback
                 try:
-                    effective_compute_val = params_to_use.baseline_annual_compute_multiplier ** p
+                    effective_compute_val = self.params.baseline_annual_compute_multiplier ** p
                     if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
                         effective_compute_val = 0.0
                 except Exception as compute_e:
@@ -2873,9 +2993,9 @@ class ProgressModel:
             
         # Calculate time when superhuman coder level is reached
         sc_time = None
-        if hasattr(self, 'sc_progress') and self.sc_progress is not None:
-            # Find the time when progress reaches sc_progress
-            sc_progress_target = self.sc_progress
+        if self.params.progress_at_sc is not None:
+            # Find the time when progress reaches progress_at_sc
+            sc_progress_target = self.params.progress_at_sc
             
             # Check if SC is reached within the trajectory
             if progress_values[-1] >= sc_progress_target:
@@ -2926,7 +3046,7 @@ class ProgressModel:
             'horizon_lengths': horizon_lengths,
             'effective_compute': effective_compute,
             'sc_time': sc_time,  # Time when superhuman coder level is reached
-            'sc_progress_level': self.sc_progress if hasattr(self, 'sc_progress') else None,  # Progress level for SC
+            'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
             'input_time_series': {
                 'time': self.data.time,
@@ -3092,74 +3212,6 @@ class ProgressModel:
         
         return total_error
     
-    def plot_results(self, comprehensive: bool = False, save_path: Optional[str] = None):
-        """Visualize progress, automation fraction, and component contributions"""
-        try:
-            from visualization import create_default_visualizer, quick_plot_results
-            
-            if 'times' not in self.results:
-                raise ValueError("No results to plot. Run compute_progress_trajectory first.")
-            
-            if comprehensive:
-                # Use comprehensive dashboard
-                time_series_dict = {
-                    'time': self.data.time,
-                    'L_AI': self.data.L_AI,
-                    'L_HUMAN': self.data.L_HUMAN,
-                    'experiment_compute': self.data.experiment_compute,
-                    'training_compute': self.data.training_compute
-                }
-                fig = quick_plot_results(self.results, time_series_dict, save_path)
-            else:
-                # Simple two-panel plot
-                visualizer = create_default_visualizer()
-                import matplotlib.pyplot as plt
-                
-                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
-                
-                visualizer.plot_progress_trajectory(
-                    self.results['times'], self.results['progress'], 
-                    'AI Progress Over Time', ax1
-                )
-                
-                visualizer.plot_automation_fraction(
-                    self.results['times'], self.results['automation_fraction'],
-                    'Automation Fraction Over Time', ax2
-                )
-                
-                plt.tight_layout()
-                
-                if save_path:
-                    visualizer.save_plot(fig, save_path)
-            
-            return fig
-            
-        except ImportError:
-            logger.warning("matplotlib or visualization module not available for plotting")
-    
-    def export_results(self, filename: str):
-        """Export trajectories and parameters"""
-        if 'times' not in self.results:
-            raise ValueError("No results to export. Run compute_progress_trajectory first.")
-        
-        import csv
-        
-        with open(filename, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            
-            # Write header
-            writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'research_stock'])
-            
-            # Write data
-            for i in range(len(self.results['times'])):
-                writer.writerow([
-                    self.results['times'][i],
-                    self.results['progress'][i],
-                    self.results['automation_fraction'][i],
-                    self.results['research_stock'][i]
-                ])
-        
-        logger.info(f"Results exported to {filename}")
     
     def get_progress_at_time(self, time: float) -> float:
         """
