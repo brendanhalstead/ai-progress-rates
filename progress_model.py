@@ -282,6 +282,9 @@ class Parameters:
     # Baseline Annual Compute Multiplier
     baseline_annual_compute_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['baseline_annual_compute_multiplier'])
     
+    # Lambda parameter for CES output transformation
+    lambda_param: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['lambda'])
+    
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
         # Sanitize elasticity parameters
@@ -418,6 +421,15 @@ class Parameters:
             # Ensure it's within reasonable bounds
             bounds = cfg.PARAMETER_BOUNDS.get('baseline_annual_compute_multiplier', (1.0, 20.0))
             self.baseline_annual_compute_multiplier = np.clip(self.baseline_annual_compute_multiplier, bounds[0], bounds[1])
+        
+        # Validate lambda parameter
+        if not np.isfinite(self.lambda_param) or self.lambda_param < 0:
+            logger.warning(f"Invalid lambda: {self.lambda_param}, setting to default")
+            self.lambda_param = cfg.DEFAULT_PARAMETERS['lambda']
+        else:
+            # Ensure it's within bounds
+            bounds = cfg.PARAMETER_BOUNDS.get('lambda', (0.0, 2.0))
+            self.lambda_param = np.clip(self.lambda_param, bounds[0], bounds[1])
 
 
 @dataclass
@@ -501,7 +513,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
         return w1 * X1 + w2 * X2
 
 
-def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
+def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, lambda_param: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
     """
     CES combination of AI and human labor using an alternative formulation inspired by
     the structure in FORMULAS.md: Y = ( (A^(1-rho) * L_AI^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
@@ -515,6 +527,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
              rho -> 1: perfect substitutes (Y = L_AI + L_HUMAN)
              rho -> 0: Cobb-Douglas (Y = (L_AI/A)^A * (L_HUMAN/(1-A))^(1-A))
              rho -> -inf: perfect complements (Y = min(L_AI/A, L_HUMAN/(1-A)))
+        lambda_param: Power transformation parameter applied to CES output before normalization
         cognitive_normalization: Normalization constant for cognitive output
     
     Returns:
@@ -524,7 +537,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
         return L_HUMAN * cognitive_normalization
     
     # Input validation
-    if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, cognitive_normalization])):
+    if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, lambda_param, cognitive_normalization])):
         logger.warning("Non-finite inputs to compute_cognitive_output")
         return 0.0
     
@@ -579,7 +592,17 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
             logger.warning(f"Numerical error in Alternative CES (rho={rho}): {e}, using linear fallback.")
             result = a * L_AI + (1-a) * L_HUMAN
             
-    return result * cognitive_normalization
+    # Apply lambda transformation before normalization
+    try:
+        result_with_lambda = np.power(result, lambda_param)
+        if not np.isfinite(result_with_lambda):
+            logger.warning(f"Non-finite result after lambda transformation (lambda={lambda_param}), using original result")
+            result_with_lambda = result
+    except (OverflowError, ValueError) as e:
+        logger.warning(f"Error applying lambda transformation (lambda={lambda_param}): {e}, using original result")
+        result_with_lambda = result
+    
+    return result_with_lambda * cognitive_normalization
 
 
 def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float, zeta: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
@@ -766,7 +789,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
+            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: cognitive_output_0: {cognitive_output_0}")
             initial_aggregate_research_taste = 1.0
         else:
@@ -775,7 +798,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
             cognitive_output_0 = compute_cognitive_output(
                 initial_automation, L_AI_0, L_HUMAN_0, 
-                params.rho_cognitive, params.cognitive_output_normalization
+                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
             )
             logger.info(f"ACTUAL::: cognitive_output_0: {cognitive_output_0}")
         
@@ -793,12 +816,12 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
+            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: cognitive_output_dt: {cognitive_output_dt}")
         else:
             cognitive_output_dt = compute_cognitive_output(
                 initial_automation, L_AI_dt, L_HUMAN_dt,
-                params.rho_cognitive, params.cognitive_output_normalization
+                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
             )
         
         rs_rate_dt = compute_research_stock_rate(
@@ -880,7 +903,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)
+        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
         research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
@@ -888,7 +911,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
         cognitive_output = compute_cognitive_output(
             initial_automation, L_AI, L_HUMAN, 
-            params.rho_cognitive, params.cognitive_output_normalization
+            params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
         )
     
         research_stock_rate = compute_research_stock_rate(
@@ -943,7 +966,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      swe_multiplier * L_HUMAN * cognitive_normalization = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization)
+      swe_multiplier * L_HUMAN * cognitive_normalization = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
     where p = params.rho_cognitive.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
@@ -958,7 +981,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier * L_HUMAN * params.cognitive_output_normalization
+    target_output = swe_multiplier * L_HUMAN**params.lambda_param * params.cognitive_output_normalization
     
     # Define the objective function to minimize
     def objective(A_candidate):
@@ -966,7 +989,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         try:
             actual_output = compute_cognitive_output(
                 A_candidate, L_AI, L_HUMAN, 
-                params.rho_cognitive, params.cognitive_output_normalization
+                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
             )
             return actual_output - target_output
         except Exception as e:
@@ -1419,7 +1442,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization, human_only=True)  
+            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -1433,7 +1456,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             
             # Compute cognitive output with validation
             cognitive_output = compute_cognitive_output(
-                automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.cognitive_output_normalization
+                automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
             )
         
         if not np.isfinite(cognitive_output) or cognitive_output < 0:
@@ -2887,7 +2910,7 @@ class ProgressModel:
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
                     automation_fraction, L_AI, L_HUMAN, 
-                    self.params.rho_cognitive, self.params.cognitive_output_normalization
+                    self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization
                 )
                 cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
                 

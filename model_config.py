@@ -103,7 +103,9 @@ PARAMETER_BOUNDS = {
     'anchor_doubling_time': (0.01, 2),  # doubling time in progress units
     'doubling_decay_rate': (0.001, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
-    'baseline_annual_compute_multiplier': (1.0, 20.0)
+    'baseline_annual_compute_multiplier': (1.0, 20.0),
+    # Lambda parameter bounds
+    'lambda': (0.0, 2.0)
 }
 
 # Validation thresholds for parameter combinations
@@ -177,4 +179,6 @@ DEFAULT_PARAMETERS = {
     'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
+    # Lambda parameter
+    'lambda': 1.0,
 } 

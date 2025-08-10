@@ -189,6 +189,12 @@
                                         <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
                                         <small class="text-muted">Scale factor for parallel coding labor output (log scale: 10^value)</small>
                                     </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="param-label">Lambda (λ): <span id="lambda_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="lambda" step="0.1">
+                                        <small class="text-muted">Power transformation parameter applied to CES output before normalization</small>
+                                    </div>
                                 </div>
                             </div>
                             <div class="param-group">
@@ -696,7 +702,7 @@
             const parameterIds = [
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
                 'automation_fraction_at_superhuman_coder', 'automation_slope', 'swe_multiplier_at_anchor_time',
-                'cognitive_output_normalization', 'zeta', 'ai_research_taste_at_superhuman_coder',
+                'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
                 'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
                 'horizon_extrapolation_type',
                 // Manual horizon fitting parameters
