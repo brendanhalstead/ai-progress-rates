@@ -534,7 +534,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
         Cognitive output
     """
     if human_only:
-        return L_HUMAN * cognitive_normalization
+        return L_HUMAN ** lambda_param * cognitive_normalization 
     
     # Input validation
     if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, lambda_param, cognitive_normalization])):
@@ -966,7 +966,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      swe_multiplier * L_HUMAN * cognitive_normalization = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
+      swe_multiplier * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
     where p = params.rho_cognitive.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
@@ -981,7 +981,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier * L_HUMAN**params.lambda_param * params.cognitive_output_normalization
+    target_output = swe_multiplier * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
@@ -2925,7 +2925,7 @@ class ProgressModel:
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_cognitive_output = L_HUMAN * self.params.cognitive_output_normalization
+                human_only_cognitive_output = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
@@ -2948,7 +2948,7 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = L_HUMAN * self.params.cognitive_output_normalization
+                human_contrib = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization, human_only=True)
                 ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
