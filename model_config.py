@@ -162,7 +162,7 @@ DEFAULT_PARAMETERS = {
     'progress_at_half_sc_automation': 20.0,
     'automation_slope': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
-    'cognitive_output_normalization': 1e-2,
+    'cognitive_output_normalization': 0.3,
     'zeta': 0.55,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
@@ -181,5 +181,5 @@ DEFAULT_PARAMETERS = {
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # Lambda parameter
-    'lambda': 1.0,
+    'lambda': 0.65,
 } 
