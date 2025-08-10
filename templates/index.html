@@ -162,7 +162,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_anchor_time_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="swe_multiplier_at_anchor_time" step="0.1">
+                                        <input type="range" class="range-input form-range" id="swe_multiplier_at_anchor_time" step="0.01">
                                         <small class="text-muted">Software engineering productivity multiplier at the anchor time</small>
                                     </div>
                                 </div>
@@ -657,8 +657,8 @@
             } else if (input.id === 'automation_fraction_at_superhuman_coder') {
                 // Direct percentage display (no logit transformation)
                 displayValue = (value * 100).toFixed(1) + '%';
-            } else if (input.id === 'rho_progress' || input.id === 'rho_cognitive' || input.id === 'lambda') {
-                // Higher precision for substitutability parameters and lambda
+            } else if (input.id === 'rho_progress' || input.id === 'rho_cognitive' || input.id === 'lambda' || input.id === 'swe_multiplier_at_anchor_time') {
+                // Higher precision for substitutability parameters, lambda, and SWE multiplier
                 displayValue = value.toFixed(2);
             } else if (input.id.includes('progress') || input.id === 'automation_slope' || input.id.includes('research_stock')) {
                 displayValue = value.toFixed(1);
