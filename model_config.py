@@ -235,13 +235,13 @@ PLOT_METADATA = {
     'plot_software_efficiency': {
         'title': 'Software Efficiency',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Cumulative Software Progress', 'type': 'linear'},
+        'y_axis': {'title': 'OOMs', 'type': 'linear'},
         'data_keys': ['times', 'software_efficiency']
     },
     'plot_labor_comparison': {
-        'title': 'Labor Comparison',
+        'title': 'Available Labor Pools',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Labor (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'Automated-human equivalents', 'type': 'log'},
         'data_keys': ['time_series']
     },
     'plot_compute_comparison': {
@@ -305,8 +305,8 @@ PLOT_METADATA = {
     'plot_cognitive_components': {
         'title': 'Labor Contributions',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Labor Contribution (log scale)', 'type': 'log'},
-        'data_keys': ['times', 'ai_labor_contributions', 'human_labor_contributions']
+        'y_axis': {'title': 'Nonsense units', 'type': 'log'},
+        'data_keys': ['times', 'cognitive_outputs', 'human_labor_contributions']
     },
     'plot_ai_cognitive_output_multiplier': {
         'title': 'AI Parallel Coding Labor Multiplier',
@@ -439,10 +439,10 @@ TAB_CONFIGURATIONS = {
         'name': 'Coding Labor',
         'rows': 2, 'cols': 2,
         'plots': [
-            {'function': 'plot_cognitive_output_with_compute', 'position': (1, 1)},
+            {'function': 'plot_labor_comparison', 'position': (1, 1)},
             {'function': 'plot_cognitive_components', 'position': (1, 2)},
-            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
-            {'function': 'plot_labor_comparison', 'position': (2, 2)}
+            {'function': 'plot_automation_fraction', 'position': (2, 1)},
+            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 2)}
         ]
     },
     'research_effort': {
@@ -463,9 +463,9 @@ TAB_CONFIGURATIONS = {
         'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_research_stock_rate', 'position': (1, 1)},
-            {'function': 'plot_research_stock', 'position': (1, 2)},
-            {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
-            {'function': 'plot_software_progress_rate', 'position': (2, 2)}
+            {'function': 'plot_software_progress_rate', 'position': (1, 2)},
+            {'function': 'plot_research_stock', 'position': (2,1)},
+            {'function': 'plot_software_efficiency', 'position': (2, 2)}
             
         ]
     },

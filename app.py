@@ -413,11 +413,11 @@ def plot_rate_components(fig, times, progress_rates, training_compute_growth_rat
         row=row, col=col
     )
 
-def plot_cognitive_components(fig, times, ai_labor_contributions, human_labor_contributions, row, col):
+def plot_cognitive_components(fig, times, cognitive_outputs, human_labor_contributions, row, col):
     """Plot cognitive output components (AI vs Human)"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=ai_labor_contributions.tolist(),
-                  name='AI contribution',
+        go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
+                  name='Humans and AIs',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines',
                   customdata=[format_decimal_year_to_month_year(t) for t in times],
@@ -440,8 +440,8 @@ def plot_cognitive_components(fig, times, ai_labor_contributions, human_labor_co
         sc_time = results['sc_time']
         sc_progress = results.get('sc_progress_level')
         if sc_time >= times.min() and sc_time <= times.max():
-            y_min = min(ai_labor_contributions.min(), human_labor_contributions.min())
-            y_max = max(ai_labor_contributions.max(), human_labor_contributions.max())
+            y_min = min(cognitive_outputs.min(), human_labor_contributions.min())
+            y_max = max(cognitive_outputs.max(), human_labor_contributions.max())
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
@@ -1365,7 +1365,7 @@ def get_tab_configurations():
         'plot_aggregate_research_taste': lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c),
         'plot_ai_vs_aggregate_research_taste': lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c),
         'plot_cognitive_output_with_compute': lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c),
-        'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c),
+        'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], data['metrics']['human_labor_contributions'], r, c),
         'plot_ai_cognitive_output_multiplier': lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c),
         'plot_research_stock': lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c),
         'plot_research_stock_rate': lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c),
