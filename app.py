@@ -626,8 +626,8 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=ai_research_taste.tolist(),
                   name='AI Research Taste',
-                  line=dict(color='#17becf', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  line=dict(color='#1f77b4', width=3),
+                  mode='lines+markers', marker=dict(size=4, color='#1f77b4')),
         row=row, col=col
     )
     
@@ -813,8 +813,8 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
-                  line=dict(color='#17becf', width=3),
-                  mode='lines+markers', marker=dict(size=4),
+                  line=dict(color='#1f77b4', width=3),
+                  mode='lines+markers', marker=dict(size=4, color='#1f77b4'),
                   hovertemplate='Year: %{x:.3f}<br>Horizon: %{customdata}<extra></extra>',
                   customdata=[format_time_duration(h) for h in capped_horizon_lengths]),
         row=row, col=col
@@ -830,16 +830,56 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
             sota_p80_labels = [p['model_name'] for p in sota_p80_points]
             sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
-            fig.add_trace(
-                go.Scatter(x=sota_p80_times, y=sota_p80,
-                          name='METR SOTA (p80)',
-                          mode='markers',
-                          marker=dict(color='#2ca02c', size=8, symbol='diamond'),
-                          text=sota_p80_labels,
-                          customdata=sota_p80_formatted,
-                          hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>'),
-                row=row, col=col
-            )
+            # Create color and symbol mapping for different model types
+            model_colors = {
+                'gpt-3.5': '#003000',  # Dark green for GPT models
+                'gpt-4': '#003000',    # Dark green for GPT models 
+                'claude': '#832000',   # Dark red/brown for Claude
+                'o1': '#003000',       # Dark green for O1 (GPT family)
+                'agent': '#40c040',    # Bright green for agents
+                'default': '#215F9A'   # Dark blue for others
+            }
+            
+            model_symbols = {
+                'gpt-3.5': 'triangle-up',
+                'gpt-4': 'square', 
+                'claude': 'diamond',
+                'o1': 'cross',
+                'agent': 'circle',
+                'default': 'circle'
+            }
+            
+            # Group points by model type for better visualization
+            for i, (time, horizon, label, formatted) in enumerate(zip(sota_p80_times, sota_p80, sota_p80_labels, sota_p80_formatted)):
+                # Determine model type from label
+                model_type = 'default'
+                label_lower = label.lower()
+                if ('gpt_3_5' in label_lower or 'gpt-3.5' in label_lower or 'gpt3.5' in label_lower or
+                    'gpt_4' in label_lower or 'gpt-4' in label_lower or 'gpt4' in label_lower or
+                    'o1' in label_lower or 'o3' in label_lower or 
+                    'davinci_002' in label_lower or 'gpt2' in label_lower or 'gpt_2' in label_lower):
+                    model_type = 'gpt-4'  # All GPT family models use the same color
+                elif 'claude' in label_lower:
+                    model_type = 'claude'
+                elif 'agent' in label_lower:
+                    model_type = 'agent'
+                
+                fig.add_trace(
+                    go.Scatter(x=[time], y=[horizon],
+                              name=label,
+                              mode='markers',
+                              marker=dict(
+                                  color=model_colors[model_type], 
+                                  size=10, 
+                                  symbol=model_symbols[model_type],
+                                  line=dict(width=1, color='white')
+                              ),
+                              text=[label],
+                              customdata=[formatted],
+                              hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>',
+                              showlegend=True),
+                    row=row, col=col
+                )
     
     # Add horizontal dashed line for superhuman coder time horizon
     if sc_time_horizon_minutes is not None:
@@ -882,8 +922,8 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
     fig.add_trace(
         go.Scatter(x=progress_values.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
-                  line=dict(color='#17becf', width=3),
-                  mode='lines+markers', marker=dict(size=4),
+                  line=dict(color='#1f77b4', width=3),
+                  mode='lines+markers', marker=dict(size=4, color='#1f77b4'),
                   hovertemplate='Progress: %{x:.3f}<br>Horizon: %{customdata}<extra></extra>',
                   customdata=[format_time_duration(h) for h in capped_horizon_lengths]),
         row=row, col=col
@@ -899,16 +939,56 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
             sota_p80_labels = [p['model_name'] for p in sota_p80_points]
             sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
-            fig.add_trace(
-                go.Scatter(x=sota_p80_progress, y=sota_p80,
-                          name='METR SOTA (p80)',
-                          mode='markers',
-                          marker=dict(color='#2ca02c', size=8, symbol='diamond'),
-                          text=sota_p80_labels,
-                          customdata=sota_p80_formatted,
-                          hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>'),
-                row=row, col=col
-            )
+            # Create color and symbol mapping for different model types
+            model_colors = {
+                'gpt-3.5': '#003000',  # Dark green for GPT models
+                'gpt-4': '#003000',    # Dark green for GPT models 
+                'claude': '#832000',   # Dark red/brown for Claude
+                'o1': '#003000',       # Dark green for O1 (GPT family)
+                'agent': '#40c040',    # Bright green for agents
+                'default': '#215F9A'   # Dark blue for others
+            }
+            
+            model_symbols = {
+                'gpt-3.5': 'triangle-up',
+                'gpt-4': 'square', 
+                'claude': 'diamond',
+                'o1': 'cross',
+                'agent': 'circle',
+                'default': 'circle'
+            }
+            
+            # Group points by model type for better visualization
+            for i, (progress, horizon, label, formatted) in enumerate(zip(sota_p80_progress, sota_p80, sota_p80_labels, sota_p80_formatted)):
+                # Determine model type from label
+                model_type = 'default'
+                label_lower = label.lower()
+                if ('gpt_3_5' in label_lower or 'gpt-3.5' in label_lower or 'gpt3.5' in label_lower or
+                    'gpt_4' in label_lower or 'gpt-4' in label_lower or 'gpt4' in label_lower or
+                    'o1' in label_lower or 'o3' in label_lower or 
+                    'davinci_002' in label_lower or 'gpt2' in label_lower or 'gpt_2' in label_lower):
+                    model_type = 'gpt-4'  # All GPT family models use the same color
+                elif 'claude' in label_lower:
+                    model_type = 'claude'
+                elif 'agent' in label_lower:
+                    model_type = 'agent'
+                
+                fig.add_trace(
+                    go.Scatter(x=[progress], y=[horizon],
+                              name=label,
+                              mode='markers',
+                              marker=dict(
+                                  color=model_colors[model_type], 
+                                  size=10, 
+                                  symbol=model_symbols[model_type],
+                                  line=dict(width=1, color='white')
+                              ),
+                              text=[label],
+                              customdata=[formatted],
+                              hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>',
+                              showlegend=True),
+                    row=row, col=col
+                )
     
     # Add horizontal dashed line for superhuman coder time horizon
     if sc_time_horizon_minutes is not None:
@@ -1165,9 +1245,9 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                 secondary_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
             fig.update_yaxes(**secondary_kwargs)
 
-    # Apply consistent trace styling for scatter line charts
+    # Apply consistent trace styling for scatter line charts (excluding METR data points)
     try:
-        fig.update_traces(line=dict(width=2.5), marker=dict(size=3), selector=dict(type='scatter'))
+        fig.update_traces(line=dict(width=2.5), marker=dict(size=3), selector=dict(type='scatter', mode='lines+markers'))
     except Exception:
         pass
 
