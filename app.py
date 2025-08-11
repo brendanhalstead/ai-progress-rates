@@ -135,7 +135,9 @@ def plot_human_labor(fig, times, values, row, col):
         go.Scatter(x=times.tolist(), y=values.tolist(),
                   name='Human Labor',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>Human Labor: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -145,7 +147,9 @@ def plot_ai_labor(fig, times, values, row, col):
         go.Scatter(x=times.tolist(), y=values.tolist(),
                   name='AI Labor',
                   line=dict(color='#1f77b4', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>AI Labor: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -155,17 +159,21 @@ def plot_experiment_compute(fig, times, values, row, col):
         go.Scatter(x=times.tolist(), y=values.tolist(),
                   name='Experiment Compute',
                   line=dict(color='#2ca02c', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>Experiment Compute: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
-def plot_training_compute(fig, times, values, row, col):
+def plot_training_compute_growth_rate(fig, times, values, row, col):
     """Plot training compute over time"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=values.tolist(),
                   name='Training Compute',
                   line=dict(color='#d62728', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>Training Compute: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -175,7 +183,9 @@ def plot_effective_compute(fig, times, values, row, col):
         go.Scatter(x=times.tolist(), y=values.tolist(),
                   name='Effective Compute',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>Effective Compute: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -185,14 +195,18 @@ def plot_labor_comparison(fig, time_series, row, col):
         go.Scatter(x=time_series.time.tolist(), y=time_series.L_HUMAN.tolist(),
                   name='Human Labor',
                   line=dict(color='#ff7f0e', width=2),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
         go.Scatter(x=time_series.time.tolist(), y=time_series.L_AI.tolist(),
                   name='AI Labor',
                   line=dict(color='#1f77b4', width=2),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
 
@@ -202,14 +216,18 @@ def plot_compute_comparison(fig, time_series, row, col):
         go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
                   name='Experiment Compute',
                   line=dict(color='#2ca02c', width=2),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute.tolist(),
+        go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute_growth_rate.tolist(),
                   name='Training Compute',
                   line=dict(color='#d62728', width=2),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
 
@@ -218,14 +236,29 @@ def plot_cumulative_progress(fig, times, progress, row, col):
     """Plot cumulative progress over time"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=progress.tolist(), 
-                  name='Cumulative Progress',
+                  name='Effective Compute (OOMs)',
                   line=dict(color='#1f77b4', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add training compute and vertical line for SC time if available
     results = session_data.get('results')
+    
+    # Add training compute if available
+    if results and 'training_compute' in results:
+        training_compute = results['training_compute']
+        fig.add_trace(
+            go.Scatter(x=times.tolist(), y=training_compute, 
+                      name='Training Compute',
+                      line=dict(color='#9467bd', width=3),
+                      mode='lines+markers', marker=dict(size=4),
+                      customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, training_compute)],
+                      hovertemplate='Year: %{customdata[0]}<br>Training Compute: %{customdata[1]}<extra></extra>'),
+            row=row, col=col
+        )
     if results and results.get('sc_time') is not None:
         sc_time = results['sc_time']
         sc_progress = results.get('sc_progress_level')
@@ -236,7 +269,7 @@ def plot_cumulative_progress(fig, times, progress, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -245,7 +278,9 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=(automation_fraction*100).tolist(), 
                   name='Automation %', line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
@@ -261,7 +296,7 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -271,7 +306,9 @@ def plot_progress_rate(fig, times, progress_rates, row, col):
         go.Scatter(x=times.tolist(), y=progress_rates.tolist(), 
                   name='Overall Progress Rate',
                   line=dict(color='#2ca02c', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
 
@@ -281,7 +318,9 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
         go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
                   name='Software Progress Rate',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
@@ -297,7 +336,7 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -307,7 +346,9 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
         go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
                   name='Cognitive Output',
                   line=dict(color='#9467bd', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col, secondary_y=False
     )
     
@@ -318,7 +359,9 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
             go.Scatter(x=times.tolist(), y=results['discounted_exp_compute'],
                       name='Discounted Experiment Compute',
                       line=dict(color='#2ca02c', width=3),
-                      mode='lines+markers', marker=dict(size=4)),
+                      mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
             row=row, col=col, secondary_y=secondary_y
         )
     
@@ -335,7 +378,7 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -349,20 +392,24 @@ def plot_progress_vs_automation(fig, progress, automation_fraction, row, col):
         row=row, col=col
     )
 
-def plot_rate_components(fig, times, progress_rates, software_progress_rates, row, col):
+def plot_rate_components(fig, times, progress_rates, training_compute_growth_rates, row, col):
     """Plot rate components comparison"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=progress_rates.tolist(),
                   name='Overall Rate',
                   line=dict(color='#2ca02c', width=2, dash='solid'),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=software_progress_rates.tolist(),
-                  name='Software Rate',
+        go.Scatter(x=times.tolist(), y=training_compute_growth_rates.tolist(),
+                  name='Training Compute Growth Rate',
                   line=dict(color='#ff7f0e', width=2, dash='dash'),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
 
@@ -372,14 +419,18 @@ def plot_cognitive_components(fig, times, ai_labor_contributions, human_labor_co
         go.Scatter(x=times.tolist(), y=ai_labor_contributions.tolist(),
                   name='AI contribution',
                   line=dict(color='#1f77b4', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=human_labor_contributions.tolist(),
                   name='Humans only',
                   line=dict(color='#ff7f0e', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
@@ -397,7 +448,7 @@ def plot_cognitive_components(fig, times, ai_labor_contributions, human_labor_co
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -407,7 +458,9 @@ def plot_research_stock(fig, times, research_stocks, row, col):
         go.Scatter(x=times.tolist(), y=research_stocks.tolist(),
                   name='Research Stock',
                   line=dict(color='#8c564b', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
@@ -423,7 +476,7 @@ def plot_research_stock(fig, times, research_stocks, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -433,7 +486,9 @@ def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
         go.Scatter(x=times.tolist(), y=research_stock_rates.tolist(),
                   name='Research Stock Rate',
                   line=dict(color='#e377c2', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     
@@ -449,7 +504,7 @@ def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -459,7 +514,9 @@ def plot_human_only_progress_rate(fig, times, human_only_progress_rates, row, co
         go.Scatter(x=times.tolist(), y=human_only_progress_rates.tolist(),
                   name='Human-Only Progress Rate',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
 
@@ -469,7 +526,9 @@ def plot_automation_multiplier(fig, times, automation_multipliers, row, col):
         go.Scatter(x=times.tolist(), y=automation_multipliers.tolist(),
                   name='Automation Multiplier',
                   line=dict(color='#d62728', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -481,7 +540,9 @@ def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipli
         go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
                   name='AI Cognitive Output Multiplier',
                   line=dict(color='#9467bd', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -499,7 +560,7 @@ def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipli
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -509,7 +570,9 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
         go.Scatter(x=times.tolist(), y=ai_research_stock_multipliers.tolist(),
                   name='AI Research Stock Multiplier',
                   line=dict(color='#8c564b', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -527,7 +590,7 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -537,7 +600,9 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
         go.Scatter(x=times.tolist(), y=ai_software_progress_multipliers.tolist(),
                   name='AI Software Progress Multiplier',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -555,7 +620,7 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -565,7 +630,9 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
         go.Scatter(x=times.tolist(), y=ai_overall_progress_multipliers.tolist(),
                   name='AI Overall Progress Multiplier',
                   line=dict(color='#2ca02c', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -583,7 +650,7 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -594,28 +661,36 @@ def plot_all_ai_multipliers(fig, times, ai_cognitive_output_multipliers, ai_rese
         go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
                   name='Cognitive Output',
                   line=dict(color='#9467bd', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=ai_research_stock_multipliers.tolist(),
                   name='Research Stock',
                   line=dict(color='#8c564b', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=ai_software_progress_multipliers.tolist(),
                   name='Software Progress',
                   line=dict(color='#ff7f0e', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=ai_overall_progress_multipliers.tolist(),
                   name='Overall Progress',
                   line=dict(color='#2ca02c', width=2),
-                  mode='lines'),
+                  mode='lines',
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1
@@ -643,7 +718,7 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -653,7 +728,9 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
         go.Scatter(x=times.tolist(), y=ai_research_taste_sd.tolist(),
                   name='AI Research Taste (SD)',
                   line=dict(color='#ff7f0e', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=0 (mean of human distribution)
@@ -671,7 +748,7 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -681,7 +758,9 @@ def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row,
         go.Scatter(x=times.tolist(), y=ai_research_taste_quantile.tolist(),
                   name='AI Research Taste (Quantile)',
                   line=dict(color='#e377c2', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference lines at key quantiles
@@ -701,7 +780,7 @@ def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row,
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -711,7 +790,9 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
         go.Scatter(x=times.tolist(), y=aggregate_research_taste.tolist(),
                   name='Aggregate Research Taste',
                   line=dict(color='#bcbd22', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     # Add horizontal reference line at y=1 (no research taste enhancement)
@@ -729,7 +810,7 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {sc_time:.3f}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {sc_time:.3f}<extra></extra>'),
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -766,6 +847,181 @@ def format_time_duration(minutes):
     else:
         years = minutes / 124560
         return f"{years:.0f} years"
+
+def format_decimal_year_to_month_year(decimal_year):
+    """Convert decimal year (e.g., 2025.333) to month-year format (e.g., 'Apr 2025')"""
+    if decimal_year is None or not np.isfinite(decimal_year):
+        return '—'
+    
+    year = int(decimal_year)
+    year_fraction = decimal_year - year
+    
+    # Convert fraction of year to month (0-11), but handle edge case where rounding gives 12
+    month_index = round(year_fraction * 12)
+    
+    # Handle edge case: if month_index is 12, it should be January of next year
+    if month_index >= 12:
+        month_index = 0
+        year += 1
+    
+    # Month abbreviations
+    month_abbreviations = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ]
+    
+    return f"{month_abbreviations[month_index]} {year}"
+
+def format_number_mbt(value):
+    """Convert numbers to M (million), B (billion), T (trillion) format
+    
+    Args:
+        value: Numeric value to format
+        
+    Returns:
+        String with M/B/T notation (e.g., "1.5M", "2.3B", "4.7T")
+    """
+    if value == 0:
+        return "0"
+    
+    abs_value = abs(value)
+    sign = "-" if value < 0 else ""
+    
+    # Handle very large numbers (quadrillions and beyond)
+    if abs_value >= 1e15:
+        # Quadrillion and beyond - use scientific notation for extremely large values
+        exp = int(np.floor(np.log10(abs_value)))
+        mantissa = abs_value / (10 ** exp)
+        formatted = f"{sign}{mantissa:.1f}e{exp}"
+    elif abs_value >= 1e12:
+        # Trillion
+        formatted = f"{sign}{abs_value/1e12:.1f}T"
+    elif abs_value >= 1e9:
+        # Billion
+        formatted = f"{sign}{abs_value/1e9:.1f}B"
+    elif abs_value >= 1e6:
+        # Million
+        formatted = f"{sign}{abs_value/1e6:.1f}M"
+    elif abs_value >= 1e3:
+        # Thousand
+        formatted = f"{sign}{abs_value/1e3:.1f}K"
+    elif abs_value >= 1:
+        # Between 1 and 1000
+        if abs_value >= 100:
+            formatted = f"{sign}{abs_value:.0f}"
+        elif abs_value >= 10:
+            formatted = f"{sign}{abs_value:.1f}"
+        else:
+            formatted = f"{sign}{abs_value:.2f}"
+    elif abs_value >= 0.01:
+        # Small decimals (0.01 to 1)
+        formatted = f"{sign}{abs_value:.2f}"
+    elif abs_value >= 0.001:
+        # Very small decimals (0.001 to 0.01)
+        formatted = f"{sign}{abs_value:.3f}"
+    else:
+        # Extremely small numbers - use scientific notation
+        exp = int(np.floor(np.log10(abs_value)))
+        mantissa = abs_value / (10 ** exp)
+        formatted = f"{sign}{mantissa:.1f}e{exp}"
+    
+    # Clean up trailing zeros and decimal points (but not for scientific notation)
+    if '.' in formatted and 'e' not in formatted:
+        formatted = formatted.rstrip('0').rstrip('.')
+        # Re-add the suffix if it was removed
+        if not formatted.endswith(('K', 'M', 'B', 'T')) and formatted[-1].isdigit():
+            # Need to re-add suffix
+            if abs_value >= 1e12:
+                formatted += "T"
+            elif abs_value >= 1e9:
+                formatted += "B"
+            elif abs_value >= 1e6:
+                formatted += "M"
+            elif abs_value >= 1e3:
+                formatted += "K"
+    
+    return formatted
+
+def get_mbt_tick_values_and_labels(y_values):
+    """Generate tick values and labels using M/B/T notation for log scale axes
+    
+    Args:
+        y_values: Array of y-axis values to determine appropriate tick range
+        
+    Returns:
+        tuple: (tick_values, tick_labels) for plotly tickmode='array'
+    """
+    if len(y_values) == 0:
+        return [], []
+    
+    # Filter out non-positive values for log scale
+    positive_values = y_values[y_values > 0]
+    if len(positive_values) == 0:
+        return [], []
+    
+    min_val = np.min(positive_values)
+    max_val = np.max(positive_values)
+    
+    # Generate tick values on log scale
+    min_exp = int(np.floor(np.log10(min_val)))
+    max_exp = int(np.ceil(np.log10(max_val)))
+    
+    tick_values = []
+    tick_labels = []
+    
+    # Generate ticks at powers of 10 and some intermediate values
+    for exp in range(min_exp, max_exp + 1):
+        base_val = 10 ** exp
+        
+        # Add the power of 10 if it's within or close to our range
+        if base_val >= min_val * 0.1 and base_val <= max_val * 10:
+            tick_values.append(base_val)
+            tick_labels.append(format_number_mbt(base_val))
+            
+            # Add intermediate values (2x and 5x) for better granularity
+            for multiplier in [2, 5]:
+                intermediate_val = base_val * multiplier
+                if intermediate_val >= min_val * 0.5 and intermediate_val <= max_val * 2:
+                    tick_values.append(intermediate_val)
+                    tick_labels.append(format_number_mbt(intermediate_val))
+    
+    # Sort tick values
+    if tick_values:
+        sorted_pairs = sorted(zip(tick_values, tick_labels))
+        tick_values, tick_labels = zip(*sorted_pairs)
+        return list(tick_values), list(tick_labels)
+    
+    return [], []
+
+def get_generic_mbt_ticks_for_log_axis(min_range=None, max_range=None):
+    """Generate generic MBT tick values for log axes when data is not available
+    
+    Args:
+        min_range: Minimum value for the range (default: 1e-3)
+        max_range: Maximum value for the range (default: 1e15)
+        
+    Returns:
+        tuple: (tick_values, tick_labels) for plotly tickmode='array'
+    """
+    if min_range is None:
+        min_range = 1e-3
+    if max_range is None:
+        max_range = 1e15
+    
+    min_exp = int(np.floor(np.log10(min_range)))
+    max_exp = int(np.ceil(np.log10(max_range)))
+    
+    tick_values = []
+    tick_labels = []
+    
+    # Generate ticks at powers of 10
+    for exp in range(min_exp, max_exp + 1):
+        base_val = 10 ** exp
+        if base_val >= min_range and base_val <= max_range:
+            tick_values.append(base_val)
+            tick_labels.append(format_number_mbt(base_val))
+    
+    return tick_values, tick_labels
 
 def get_time_tick_values_and_labels():
     """Generate tick values and labels for time duration y-axis"""
@@ -829,8 +1085,8 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                   name='Model Prediction',
                   line=dict(color='#1f77b4', width=3),
                   mode='lines+markers', marker=dict(size=4, color='#1f77b4'),
-                  hovertemplate='Year: %{x:.3f}<br>Horizon: %{customdata}<extra></extra>',
-                  customdata=[format_time_duration(h) for h in capped_horizon_lengths]),
+                  hovertemplate='Year: %{customdata[1]}<br>Horizon: %{customdata[0]}<extra></extra>',
+                  customdata=[[format_time_duration(h), format_decimal_year_to_month_year(t)] for h, t in zip(capped_horizon_lengths, times)]),
         row=row, col=col
     )
     
@@ -894,8 +1150,8 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                                   line=dict(width=1, color='white')
                               ),
                               text=[label],
-                              customdata=[formatted],
-                              hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>',
+                              customdata=[[formatted, format_decimal_year_to_month_year(time)]],
+                              hovertemplate='<b>%{text}</b><br>Year: %{customdata[1]}<br>p80 Horizon: %{customdata[0]}<extra></extra>',
                               showlegend=True),
                     row=row, col=col
                 )
@@ -1069,7 +1325,7 @@ def get_tab_configurations():
         'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
         'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c),
         'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
-        'plot_training_compute': lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c),
+        'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['time_series'].time, data['time_series'].training_compute_growth_rate, r, c),
         'plot_effective_compute': lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
         'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c),
         'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c),
@@ -1088,7 +1344,7 @@ def get_tab_configurations():
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
         'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c),
         'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
-        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c),
+        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['time_series'].time, data['time_series'].training_compute_growth_rate), r, c),
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
         'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
         'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),
@@ -1243,6 +1499,7 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
             y_axis_kwargs['autorange'] = False
             
         # Handle custom ticks (e.g., for time-formatted axes)
+        custom_ticks_applied = False
         if hasattr(plot_config, 'y_axis_custom_ticks') and plot_config.y_axis_custom_ticks:
             tick_values, tick_labels = get_time_tick_values_and_labels()
             y_axis_kwargs.update({
@@ -1250,19 +1507,50 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                 'tickvals': [val for val in tick_values],
                 'ticktext': [label for val, label in zip(tick_values, tick_labels)],
             })
+            custom_ticks_applied = True
         
-        # Use compact SI ticks on log scale axes
-        if plot_config.y_axis_type == 'log':
-            # Special handling for effective compute which can have very large values
-            if plot_config.function_name == 'plot_effective_compute':
-                y_axis_kwargs.update(dict(
-                    exponentformat='e',     # Use scientific notation (1e10 instead of 10^10)
-                    tickformat='.0e',       # No decimal places in scientific notation
-                    dtick=10,                # Show every 2 orders of magnitude (10^0, 10^2, 10^4, etc)
-                    showexponent='all'      # Always show exponent
-                ))
-            else:
-                y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+        # Use M/B/T notation on log scale axes (instead of SI notation like giga, tera)
+        # But only if custom ticks haven't already been applied
+        if plot_config.y_axis_type == 'log' and not custom_ticks_applied:
+            # Try to use custom M/B/T formatting for all log plots
+            data_keys = plot_config.metadata.get('data_keys', [])
+            custom_formatting_applied = False
+            
+            if data_keys and len(data_keys) >= 2:
+                y_data_key = data_keys[1]  # Second key is usually y-axis data
+                if y_data_key in data and len(data[y_data_key]) > 0:
+                    y_values = np.array(data[y_data_key])
+                    # Filter out non-positive values for log scale
+                    y_values_positive = y_values[y_values > 0]
+                    if len(y_values_positive) > 0:
+                        tick_values, tick_labels = get_mbt_tick_values_and_labels(y_values_positive)
+                        if tick_values:  # Only apply if we got valid tick values
+                            y_axis_kwargs.update({
+                                'tickmode': 'array',
+                                'tickvals': tick_values,
+                                'ticktext': tick_labels,
+                            })
+                            custom_formatting_applied = True
+            
+            # If custom formatting wasn't applied, use generic MBT formatting as fallback
+            if not custom_formatting_applied:
+                # Use generic MBT tick formatting for all log plots
+                tick_values, tick_labels = get_generic_mbt_ticks_for_log_axis()
+                if tick_values:
+                    y_axis_kwargs.update({
+                        'tickmode': 'array',
+                        'tickvals': tick_values,
+                        'ticktext': tick_labels,
+                    })
+                    custom_formatting_applied = True
+                
+                # Final fallback if generic formatting also fails
+                if not custom_formatting_applied:
+                    # Use power notation without SI prefixes, avoiding scientific notation
+                    y_axis_kwargs.update(dict(
+                        exponentformat='power',  # Use 10^n format instead of 1e+n
+                        tickformat='.0f'        # No decimal places, no SI notation
+                    ))
             
         fig.update_yaxes(**y_axis_kwargs)
         
@@ -1280,7 +1568,17 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                 secondary_y=True,
             )
             if plot_config.y_axis_secondary_type == 'log':
-                secondary_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+                # Use MBT notation for secondary axis too
+                tick_values, tick_labels = get_generic_mbt_ticks_for_log_axis()
+                if tick_values:
+                    secondary_kwargs.update({
+                        'tickmode': 'array',
+                        'tickvals': tick_values,
+                        'ticktext': tick_labels,
+                    })
+                else:
+                    # Fallback to power notation for secondary axis, avoiding scientific notation
+                    secondary_kwargs.update(dict(exponentformat='power', tickformat='.0f'))
             fig.update_yaxes(**secondary_kwargs)
 
     # Apply consistent trace styling for scatter line charts (excluding METR data points)
@@ -1383,10 +1681,10 @@ def create_default_time_series():
             L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
             L_AI = np.array([float(row['L_AI']) for row in data])
             experiment_compute = np.array([float(row['experiment_compute']) for row in data])
-            training_compute = np.array([float(row['training_compute']) for row in data])
+            training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
             
             logger.info(f"Loaded time series data: {len(data)} points from {time[0]} to {time[-1]}")
-            return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute)
+            return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
         else:
             logger.warning("input_data.csv not found, falling back to synthetic data")
             raise FileNotFoundError("input_data.csv not found")
@@ -1398,10 +1696,10 @@ def create_default_time_series():
         L_HUMAN = np.ones_like(time) * 1e6
         L_AI = np.logspace(3, 8, len(time))
         experiment_compute = np.logspace(6, 10, len(time))  # Use exponential growth as fallback
-        training_compute = np.logspace(6, 10, len(time))
+        training_compute_growth_rate = np.logspace(6, 10, len(time))
         
         logger.info("Using synthetic fallback data")
-        return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute)
+        return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
 
 def create_default_parameters():
     """Create default model parameters"""
@@ -1414,7 +1712,7 @@ def time_series_to_dict(data: TimeSeriesData):
         'L_HUMAN': data.L_HUMAN.tolist(),
         'L_AI': data.L_AI.tolist(),
         'experiment_compute': data.experiment_compute.tolist(),
-        'training_compute': data.training_compute.tolist()
+        'training_compute_growth_rate': data.training_compute_growth_rate.tolist()
     }
 
 def params_to_dict(params: Parameters):
@@ -1797,9 +2095,9 @@ def upload_data():
         L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
         L_AI = np.array([float(row['L_AI']) for row in data])
         experiment_compute = np.array([float(row['experiment_compute']) for row in data])
-        training_compute = np.array([float(row['training_compute']) for row in data])
+        training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
         
-        time_series = TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute)
+        time_series = TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
         session_data['time_series'] = time_series
         
         return jsonify({

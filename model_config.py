@@ -226,11 +226,11 @@ PLOT_METADATA = {
         'y_axis': {'title': '(scaled) FLOPs', 'type': 'log'},
         'data_keys': ['times', 'experiment_compute']
     },
-    'plot_training_compute': {
+    'plot_training_compute_growth_rate': {
         'title': 'Training Compute Growth Rate',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'OOMs/year', 'type': 'linear'},
-        'data_keys': ['times', 'training_compute']
+        'data_keys': ['times', 'training_compute_growth_rate']
     },
     'plot_effective_compute': {
         'title': 'Effective Compute',
@@ -337,10 +337,10 @@ PLOT_METADATA = {
     
     # Combined Progress plots
     'plot_cumulative_progress': {
-        'title': 'Cumulative Progress',
+        'title': 'Components of Effective Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Progress', 'type': 'linear'},
-        'data_keys': ['times', 'progress']
+        'y_axis': {'title': 'OOMs', 'type': 'linear'},
+        'data_keys': ['times', 'progress', 'training_compute']
     },
     'plot_progress_rate': {
         'title': 'Effective Compute Growth Rate',
@@ -352,7 +352,7 @@ PLOT_METADATA = {
         'title': 'Rate Components',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'OOMs/year', 'type': 'linear', 'range': [0, 10]},
-        'data_keys': ['times', 'progress_rates', 'software_progress_rates']
+        'data_keys': ['times', 'progress_rates', 'training_compute_growth_rate']
     },
     
     # Other Metrics plots
@@ -413,7 +413,7 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_human_labor', 'position': (1, 1)},
             {'function': 'plot_ai_labor', 'position': (1, 2)},
             {'function': 'plot_experiment_compute', 'position': (2, 1)},
-            {'function': 'plot_training_compute', 'position': (2, 2)}
+            {'function': 'plot_training_compute_growth_rate', 'position': (2, 2)}
         ]
     },
     'automation': {

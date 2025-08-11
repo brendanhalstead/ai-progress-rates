@@ -31,7 +31,7 @@ class TimeSeriesData:
     L_HUMAN: np.ndarray  # Human labor supply
     L_AI: np.ndarray  # AI labor supply (human-equivalents)
     experiment_compute: np.ndarray  # Experiment compute budget
-    training_compute: np.ndarray  # Training compute budget
+    training_compute_growth_rate: np.ndarray  # Training compute budget
 
 
 class TasteDistribution:
@@ -727,18 +727,18 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
         return 0.0
 
 
-def compute_overall_progress_rate(software_progress_rate: float, training_compute: float) -> float:
+def compute_overall_progress_rate(software_progress_rate: float, training_compute_growth_rate: float) -> float:
     """
     Sum of software and training progress rates
     
     Args:
         software_progress_rate: Rate from software development (already adjusted by software share)
-        training_compute: Training compute budget
+        training_compute_growth_rate: Training compute budget
     
     Returns:
         Overall progress rate (sum of software and hardware contributions)
     """
-    return software_progress_rate + training_compute
+    return software_progress_rate + training_compute_growth_rate
 
 
 def _log_interp(x: float, xp: np.ndarray, fp: np.ndarray) -> float:
@@ -871,7 +871,7 @@ class InitialConditions:
     L_HUMAN: float
     L_AI: float
     experiment_compute: float
-    training_compute: float
+    training_compute_growth_rate: float
     cognitive_output: float
     research_stock_rate: float
     research_stock: float
@@ -897,7 +897,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
     L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
     experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
-    training_compute = np.interp(start_time, time_series_data.time, time_series_data.training_compute)
+    training_compute_growth_rate = np.interp(start_time, time_series_data.time, time_series_data.training_compute_growth_rate)
 
     if params.human_only:
         initial_automation = 1.0
@@ -934,7 +934,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         L_HUMAN=L_HUMAN,
         L_AI=L_AI,
         experiment_compute=experiment_compute,
-        training_compute=training_compute,
+        training_compute_growth_rate=training_compute_growth_rate,
         cognitive_output=cognitive_output,
         research_stock_rate=research_stock_rate,
         research_stock=research_stock
@@ -1430,10 +1430,10 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         else:
             experiment_compute = np.interp(t, time_series_data.time, time_series_data.experiment_compute)
         
-        training_compute = np.interp(t, time_series_data.time, time_series_data.training_compute)
+        training_compute_growth_rate = np.interp(t, time_series_data.time, time_series_data.training_compute_growth_rate)
         
         # Validate interpolated values
-        if not all(np.isfinite([L_HUMAN, L_AI, experiment_compute, training_compute])):
+        if not all(np.isfinite([L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate])):
             logger.warning(f"Non-finite interpolated values at t={t}")
             return [0.0, 0.0]
         
@@ -1441,7 +1441,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         L_HUMAN = max(0.0, L_HUMAN)
         L_AI = max(0.0, L_AI)
         experiment_compute = max(0.0, experiment_compute)
-        training_compute = max(0.0, training_compute)
+        training_compute_growth_rate = max(0.0, training_compute_growth_rate)
         
         if params.human_only:
             automation_fraction = 0.0
@@ -1494,7 +1494,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         
         # Compute overall progress rate (dP/dt)
         overall_rate = compute_overall_progress_rate(
-            software_progress_rate, training_compute
+            software_progress_rate, training_compute_growth_rate
         )
         
         # Final validation
@@ -2791,7 +2791,7 @@ class ProgressModel:
                 'L_HUMAN': self.data.L_HUMAN,
                 'L_AI': self.data.L_AI,
                 'experiment_compute': self.data.experiment_compute,
-                'training_compute': self.data.training_compute
+                'training_compute_growth_rate': self.data.training_compute_growth_rate
             }
         }
         
@@ -2865,6 +2865,7 @@ class ProgressModel:
         aggregate_research_tastes = []
         cognitive_outputs = []
         software_progress_rates = []
+        software_efficiency = []  # Integral of software_progress_rate
         human_only_research_stock_rates = []
         human_only_software_progress_rates = []
         human_only_progress_rates = []
@@ -2877,6 +2878,7 @@ class ProgressModel:
         discounted_exp_compute = []
         horizon_lengths = []
         effective_compute = []
+        training_compute = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -2905,7 +2907,7 @@ class ProgressModel:
                 L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
                 L_AI = _log_interp(t, self.data.time, self.data.L_AI)
                 experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
-                training_compute = _log_interp(t, self.data.time, self.data.training_compute)
+                training_compute_growth_rate = _log_interp(t, self.data.time, self.data.training_compute_growth_rate)
                 
                 # Compute discounted experiment compute
                 discounted_exp_compute_val = experiment_compute ** self.params.zeta
@@ -2928,6 +2930,18 @@ class ProgressModel:
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
+                # Compute software efficiency (integral of software_progress_rate)
+                if i == 0:
+                    # Initialize software efficiency at 0
+                    software_efficiency_val = 0.0
+                else:
+                    # Trapezoidal integration: add area of trapezoid from previous time step
+                    dt = times[i] - times[i-1]
+                    avg_rate = (software_progress_rates[i] + software_progress_rates[i-1]) / 2.0
+                    software_efficiency_val = software_efficiency[i-1] + avg_rate * dt
+                
+                software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
+                
                 # Calculate human-only progress rate (with automation fraction = 0)
                 human_only_cognitive_output = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
@@ -2944,7 +2958,7 @@ class ProgressModel:
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
-                    human_only_software_rate, training_compute
+                    human_only_software_rate, training_compute_growth_rate
                 )
                 
                 human_only_progress_rates.append(
@@ -2988,6 +3002,20 @@ class ProgressModel:
                     effective_compute_val = 0.0
                 
                 effective_compute.append(effective_compute_val)
+                
+                # Compute training compute (integral of training_compute_growth_rate)
+                if i == 0:
+                    # Initialize training compute at 0
+                    training_compute_val = 0.0
+                else:
+                    # Trapezoidal integration: add area of trapezoid from previous time step
+                    dt = times[i] - times[i-1]
+                    # Get the previous training_compute_growth_rate for trapezoidal rule
+                    prev_training_compute_growth_rate = _log_interp(times[i-1], self.data.time, self.data.training_compute_growth_rate)
+                    avg_growth_rate = (training_compute_growth_rate + prev_training_compute_growth_rate) / 2.0
+                    training_compute_val = training_compute[i-1] + avg_growth_rate * dt
+                
+                training_compute.append(training_compute_val if np.isfinite(training_compute_val) else 0.0)
 
                 
             except Exception as e:
@@ -3004,6 +3032,7 @@ class ProgressModel:
                 aggregate_research_tastes.append(cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)  # Default to no enhancement
                 cognitive_outputs.append(0.0)
                 software_progress_rates.append(0.0)
+                software_efficiency.append(0.0)
                 human_only_progress_rates.append(0.0)
                 human_only_research_stock_rates.append(0.0)
                 human_only_software_progress_rates.append(0.0)
@@ -3016,6 +3045,7 @@ class ProgressModel:
                 discounted_exp_compute.append(0.0)
                 horizon_lengths.append(0.0)
                 effective_compute.append(0.0)
+                training_compute.append(0.0)
         
             
         # Calculate time when superhuman coder level is reached
@@ -3062,6 +3092,7 @@ class ProgressModel:
             'research_stock_rates': research_stock_rates,
             'cognitive_outputs': cognitive_outputs,
             'software_progress_rates': software_progress_rates,
+            'software_efficiency': software_efficiency,
             'human_only_progress_rates': human_only_progress_rates,
             'ai_labor_contributions': ai_labor_contributions,
             'human_labor_contributions': human_labor_contributions,
@@ -3072,6 +3103,7 @@ class ProgressModel:
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
             'effective_compute': effective_compute,
+            'training_compute': training_compute,
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
@@ -3080,7 +3112,7 @@ class ProgressModel:
                 'L_HUMAN': self.data.L_HUMAN,
                 'L_AI': self.data.L_AI,
                 'experiment_compute': self.data.experiment_compute,
-                'training_compute': self.data.training_compute
+                'training_compute_growth_rate': self.data.training_compute_growth_rate
             }
         }
         
@@ -3307,6 +3339,6 @@ def load_time_series_data(filename: str) -> TimeSeriesData:
     L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
     L_AI = np.array([float(row['L_AI']) for row in data])
     experiment_compute = np.array([float(row['experiment_compute']) for row in data])
-    training_compute = np.array([float(row['training_compute']) for row in data])
+    training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
     
-    return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute)
+    return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
