@@ -303,7 +303,7 @@ PLOT_METADATA = {
         'data_keys': ['times', 'cognitive_outputs']
     },
     'plot_cognitive_components': {
-        'title': 'Labor Contributions',
+        'title': 'Normalized Coding Labor, Humans and AIs',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
         'data_keys': ['times', 'cognitive_outputs', 'human_labor_contributions']
