@@ -486,7 +486,7 @@ Average of the research taste distribution, after replacing sub-AI human researc
             {'function': 'plot_cognitive_components', 'position': (2, 2)}
         ],
         'explanation': """
-## Cognitive Output and Coding Labor
+## Coding Labor (from coding automation fraction, human labor, and AI labor)
 
 ### Available labor pools
 See Inputs tab.
@@ -514,7 +514,9 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
             {'function': 'plot_research_stock_rate', 'position': (2, 2)}
         ],
         'explanation': """
-## Research Effort and Capacity
+## Research Effort (from coding labor, experiment compute, and research taste)
+
+Research effort is aggregate research taste times experiment capacity. Experiment capacity is the CES combination of coding labor and experiment compute.
         """
     },
     'software_rd': {
@@ -529,7 +531,8 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
             
         ],
         'explanation': """
-## Software Research & Development
+## Software Research & Development (from research effort)
+This captures the diminishing returns to research effort. We use the same semi-endogenous "software law of motion" as Davidson's FTM. Except that we don't impose physical limits to software efficiency at the moment.
       """
     },
     'combined_progress': {
@@ -542,7 +545,8 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
             {'function': 'plot_rate_components', 'position': (2, 1)},
         ],
         'explanation': """
-## Effective Compute and Combined Progress
+## Effective Compute (from software growth rate and training compute growth rate)
+OOMs/year from hardware combine with OOMs/year from software efficiency to get OOMs/year of effective compute.
         """
     },
     'other_metrics': {
@@ -558,6 +562,7 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
         ],
         'explanation': """
 ## Additional Metrics and Multipliers
+Under construction, don't trust these.
         """
     }
 } 
