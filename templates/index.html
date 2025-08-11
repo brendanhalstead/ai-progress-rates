@@ -152,7 +152,7 @@
                                     <div class="mb-3">
                                         <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_anchor_time_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="swe_multiplier_at_anchor_time" step="0.01">
-                                        <small class="text-muted">Software engineering productivity multiplier at the anchor time</small>
+                                        <small class="text-muted" id="swe_multiplier_anchor_time_text">Coding labor multiplier at the anchor time</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
@@ -637,6 +637,35 @@
             $('input[type="range"]').each(function() {
                 updateDisplayValue(this);
             });
+            
+            // Initialize anchor time display text
+            updateAnchorTimeDisplay();
+        }
+        
+        function formatDecimalYearToDate(decimalYear) {
+            // Convert decimal year (e.g., 2025.25) to readable date format
+            const year = Math.floor(decimalYear);
+            const monthDecimal = (decimalYear - year) * 12;
+            const month = Math.floor(monthDecimal);
+            
+            const monthNames = [
+                'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+            ];
+            
+            return `${monthNames[month]} ${year}`;
+        }
+        
+        function updateAnchorTimeDisplay() {
+            // Update the dynamic anchor time text in the SWE Multiplier section
+            const anchorTimeSlider = document.getElementById('anchor_time');
+            const anchorTimeText = document.getElementById('swe_multiplier_anchor_time_text');
+            
+            if (anchorTimeSlider && anchorTimeText) {
+                const anchorTimeValue = parseFloat(anchorTimeSlider.value);
+                const formattedDate = formatDecimalYearToDate(anchorTimeValue);
+                anchorTimeText.textContent = `Coding labor multiplier at the anchor time (${formattedDate})`;
+            }
         }
         
         function updateDisplayValue(input) {
@@ -654,6 +683,9 @@
                 } else {
                     displayValue = value.toFixed(3);
                 }
+            } else if (input.id === 'anchor_time') {
+                // Format anchor time as readable date
+                displayValue = formatDecimalYearToDate(value);
             } else if (input.id === 'automation_fraction_at_superhuman_coder') {
                 // Direct percentage display (no logit transformation)
                 displayValue = (value * 100).toFixed(1) + '%';
@@ -710,6 +742,11 @@
                 displayElement.textContent = displayValue;
             } else {
                 console.error('Display element not found:', displayId);
+            }
+            
+            // Update anchor time display text if this is the anchor_time parameter
+            if (input.id === 'anchor_time') {
+                updateAnchorTimeDisplay();
             }
         }
         
