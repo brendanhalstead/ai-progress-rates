@@ -149,22 +149,15 @@
                                     </button>
                                 </div>
                                 <div class="collapse" id="codingAutomationParams">
-                                    <div class="row">
-                                        <div class="col-6">
-                                            <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
-                                            <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
-                                            <small class="text-muted">Fraction of SWE tasks automated at the moment SC is achieved</small>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="param-label">Automation Slope: <span id="automation_slope_val">Loading...</span></label>
-                                            <input type="range" class="range-input form-range" id="automation_slope" step="0.1">
-                                            <small class="text-muted">Steepness of automation transition</small>
-                                        </div>
-                                    </div>
                                     <div class="mb-3">
                                         <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_anchor_time_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="swe_multiplier_at_anchor_time" step="0.01">
                                         <small class="text-muted">Software engineering productivity multiplier at the anchor time</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="automation_fraction_at_superhuman_coder" step="0.01">
+                                        <small class="text-muted">Fraction of SWE tasks automated at the moment SC is achieved</small>
                                     </div>
                                 </div>
                             </div>
@@ -667,7 +660,7 @@
             } else if (input.id === 'rho_progress' || input.id === 'rho_cognitive' || input.id === 'lambda' || input.id === 'swe_multiplier_at_anchor_time') {
                 // Higher precision for substitutability parameters, lambda, and SWE multiplier
                 displayValue = value.toFixed(2);
-            } else if (input.id.includes('progress') || input.id === 'automation_slope' || input.id.includes('research_stock')) {
+                                        } else if (input.id.includes('progress') || input.id.includes('research_stock')) {
                 displayValue = value.toFixed(1);
             } else if (input.id === 'cognitive_output_normalization') {
                 // Convert log scale value to actual value
@@ -727,7 +720,7 @@
             // List of expected parameters with their element IDs
             const parameterIds = [
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
-                'automation_fraction_at_superhuman_coder', 'automation_slope', 'swe_multiplier_at_anchor_time',
+                'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_anchor_time',
                 'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
                 'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
                 'horizon_extrapolation_type',
@@ -773,7 +766,7 @@
                             const fallbacks = {
                                 'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
                                 'software_scale': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
-                                'automation_slope': 1.6, 'swe_multiplier_at_anchor_time': 2.0, 'cognitive_output_normalization': 1, 'zeta': 0.4,
+                                'swe_multiplier_at_anchor_time': 2.0, 'cognitive_output_normalization': 1, 'zeta': 0.4,
                                 'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_slope': 1.2,
                                 'sc_time_horizon_minutes': 50000.0,
                                 'anchor_time': 2025.25, 'anchor_horizon': null, 'anchor_doubling_time': null, 'doubling_decay_rate': null
@@ -1680,7 +1673,7 @@
                         'alpha': [0.05, 0.95],
                         'software_scale': [0.1, 10],
                         'automation_fraction_at_superhuman_coder': [0.1, 0.99],
-                        'automation_slope': [0.1, 10],
+
                         'swe_multiplier_at_anchor_time': [1.0, 10.0],
                         'cognitive_output_normalization': [-5, 1],
                         'zeta': [0.1, 1.0],
@@ -1711,7 +1704,7 @@
                 'alpha': { min: 0.05, max: 0.95, value: 0.5 },
                 'software_scale': { min: 0.1, max: 10, value: 1.0, range: '[0.1, 10]' },
                 'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
-                'automation_slope': { min: 0.1, max: 10, value: 2.0 },
+
                 'swe_multiplier_at_anchor_time': { min: 1.0, max: 10.0, value: 2.0 },
                 'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
                 'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' },
@@ -1804,7 +1797,7 @@
                     'alpha': 'Compute Weight',
                     'software_scale': 'Software Scale',
                     'automation_fraction_at_superhuman_coder': 'SC Automation Fraction:',
-                    'automation_slope': 'Automation Slope',
+
                     'swe_multiplier_at_anchor_time': 'SWE Multiplier at Anchor Time',
                     'cognitive_output_normalization': 'Parallel Coding Labor Normalization',
                     'zeta': 'Experiment Compute Discounting',
