@@ -1815,6 +1815,32 @@
         function hideError() {
             $('#errorAlert').hide();
         }
+        function formatDecimalYearToMonthYear(decimalYear) {
+            if (decimalYear === null || decimalYear === undefined || !isFinite(decimalYear)) {
+                return '—';
+            }
+            
+            let year = Math.floor(decimalYear);
+            const yearFraction = decimalYear - year;
+            
+            // Convert fraction of year to month (0-11), but handle edge case where rounding gives 12
+            let monthIndex = Math.round(yearFraction * 12);
+            
+            // Handle edge case: if monthIndex is 12, it should be January of next year
+            if (monthIndex >= 12) {
+                monthIndex = 0;
+                year += 1;
+            }
+            
+            // Month abbreviations
+            const monthAbbreviations = [
+                'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+            ];
+            
+            return `${monthAbbreviations[monthIndex]} ${year}`;
+        }
+
         function updateSummary(summary) {
             try {
                 $('#summaryCards').show();
@@ -1822,8 +1848,8 @@
                     if (n === null || n === undefined || !isFinite(n)) return '—';
                     return Number(n).toFixed(digits).replace(/\.0+$/,'').replace(/\.([1-9])0+$/,'.$1');
                 };
-                // SC Time (years)
-                $('#summary_sc_time').text(summary.sc_time != null ? fmt(summary.sc_time, 3) : '—');
+                // SC Time (formatted as month and year)
+                $('#summary_sc_time').text(summary.sc_time != null ? formatDecimalYearToMonthYear(summary.sc_time) : '—');
                 // SC R&D progress multiplier
                 $('#summary_sc_rd_multiplier').text(summary.sc_sw_multiplier != null ? fmt(summary.sc_sw_multiplier, 2) + 'x' : '—');
             } catch (e) {
