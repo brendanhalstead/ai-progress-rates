@@ -440,9 +440,9 @@ TAB_CONFIGURATIONS = {
         'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_labor_comparison', 'position': (1, 1)},
-            {'function': 'plot_cognitive_components', 'position': (1, 2)},
-            {'function': 'plot_automation_fraction', 'position': (2, 1)},
-            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 2)}
+            {'function': 'plot_automation_fraction', 'position': (1, 2)},
+            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
+            {'function': 'plot_cognitive_components', 'position': (2, 2)}
         ]
     },
     'research_effort': {
