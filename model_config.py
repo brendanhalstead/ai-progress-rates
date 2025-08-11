@@ -429,7 +429,7 @@ This tab shows how the 80% time horizon of frontier AI systems evolves over time
         'explanation': """
 ## Input Time Series
 
-This tab displays the fundamental inputs that drive AI progress in the model:
+This tab displays the exogenous inputs that drive AI progress in the model:
 
 ### Human Labor (Top Left)
 Human researchers and engineers working on AGI development, calculated using data from [this post](https://forum.effectivealtruism.org/posts/xoX936hEvpxToeuLw/estimating-the-substitutability-between-compute-and).
@@ -456,7 +456,7 @@ Factor by which frontier training run compute grows each year, measured in OOMs.
             {'function': 'plot_aggregate_research_taste', 'position': (3, 1)}
         ],
         'explanation': """
-## Automation (of Coding and Research Taste)
+## Automation (from SC time horizon and effective compute)
 
 This tab shows how the current capability level feeds into the production function.
 
@@ -469,7 +469,7 @@ Abstract "percentage of coding tasks performed by AI". Exponentially interpolate
 We assume that each OOM of effective compute increases AI research taste by a fixed number of standard deviations within the human range. 
 The units of research taste are such that if you replace all researchers with researchers of a given taste level, holding experiment capacity constant, research effort scales by that taste level.
 The scale is informed by our survey of frontier AGI researchers, where they gave a median 3.25x ratio in the speedups from replacing everyone with the top researcher vs replacing everyone with the median researcher.
-We assume that research taste (in these units) is lognormally distributed among human researchers with a mean of 1.
+We assume that research taste (in these units) is lognormally distributed among human researchers with a mean of 1. *Note: AI research taste gets capped at +23 standard deviations.*
 
 ### Aggregate Research Taste (Bottom Left)
 Average of the research taste distribution, after replacing sub-AI human researchers with AI researchers.
@@ -547,6 +547,10 @@ This captures the diminishing returns to research effort. We use the same semi-e
         'explanation': """
 ## Effective Compute (from software growth rate and training compute growth rate)
 OOMs/year from hardware combine with OOMs/year from software efficiency to get OOMs/year of effective compute.
+The cumulative OOMs of effective compute feeds back into the functions that determine 
+- time horizon,
+- automation fraction, and  
+- AI research taste.
         """
     },
     'other_metrics': {
