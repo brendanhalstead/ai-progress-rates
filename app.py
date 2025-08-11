@@ -745,7 +745,11 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
 
 def format_time_duration(minutes):
     """Convert minutes to appropriate time unit string"""
-    if minutes < 60:
+    if minutes < 1:
+        # For values under 1 minute, show in seconds
+        seconds = minutes * 60
+        return f"{seconds:.0f} sec"
+    elif minutes < 60:
         return f"{minutes:.0f} min"
     elif minutes < 480:  # Less than 8 hours (1 work day)
         hours = minutes / 60
