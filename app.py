@@ -735,6 +735,55 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
         row=row, col=col
     )
 
+def format_time_duration(minutes):
+    """Convert minutes to appropriate time unit string"""
+    if minutes < 60:
+        return f"{minutes:.0f} min"
+    elif minutes < 480:  # Less than 8 hours (1 work day)
+        hours = minutes / 60
+        return f"{hours:.0f} hrs"
+    elif minutes < 2400:  # Less than 5 work days (1 work week)
+        days = minutes / 480
+        return f"{days:.0f} days"
+    elif minutes < 10380:  # Less than ~21.6 work days (1 work month)
+        weeks = minutes / 2400
+        return f"{weeks:.0f} weeks"
+    elif minutes < 124560:  # Less than 12 work months (1 work year)
+        months = minutes / 10380
+        return f"{months:.0f} months"
+    else:
+        years = minutes / 124560
+        return f"{years:.0f} years"
+
+def get_time_tick_values_and_labels():
+    """Generate tick values and labels for time duration y-axis"""
+    # Define key time boundaries in minutes (matching the image)
+    tick_values = [
+        0.5,    # 30 sec
+        8,      # 8 min
+        30,     # 30 min
+        120,    # 2 hrs
+        480,    # 8 hrs
+        2400,   # 1 week
+        10380,  # 1 month  
+        124560, # 1 year
+        624000  # 5 years
+    ]
+    
+    tick_labels = [
+        "30 sec",
+        "8 min", 
+        "30 min",
+        "2 hrs",
+        "8 hrs",
+        "1 week", 
+        "1 month",
+        "1 year",
+        "5 years"
+    ]
+    
+    return tick_values, tick_labels
+
 def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None):
     """Plot horizon lengths over time with METR benchmark points"""
     # Debug: log horizon length values
@@ -753,7 +802,9 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
         go.Scatter(x=times.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
                   line=dict(color='#17becf', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  hovertemplate='Year: %{x:.3f}<br>Horizon: %{customdata}<extra></extra>',
+                  customdata=[format_time_duration(h) for h in capped_horizon_lengths]),
         row=row, col=col
     )
     
@@ -765,6 +816,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
             sota_p80_times = [p['decimal_year'] for p in sota_p80_points]
             sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
             sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
             fig.add_trace(
                 go.Scatter(x=sota_p80_times, y=sota_p80,
@@ -772,25 +824,37 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                           mode='markers',
                           marker=dict(color='#2ca02c', size=8, symbol='diamond'),
                           text=sota_p80_labels,
-                          hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
+                          customdata=sota_p80_formatted,
+                          hovertemplate='<b>%{text}</b><br>Year: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>'),
                 row=row, col=col
             )
     
     # Add horizontal dashed line for superhuman coder time horizon
     if sc_time_horizon_minutes is not None:
+        sc_formatted = format_time_duration(sc_time_horizon_minutes)
         fig.add_trace(
             go.Scatter(x=[times.min(), times.max()], 
                       y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
                       name='SC Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes/10380:.1f} work months<extra></extra>'),
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_formatted}<extra></extra>'),
             row=row, col=col
         )
     
-    # Set Y-axis range: 0.001 minutes to 1 million minutes
-    fig.update_yaxes(range=[-3, 6], autorange=False, row=row, col=col)  # log10(0.001) = -3 to log10(1,000,000) = 6
-    logger.info(f"Set y-axis range to [-3, 6] for horizon length plot at row={row}, col={col}")
+    # Get custom tick values and labels for time formatting
+    tick_values, tick_labels = get_time_tick_values_and_labels()
+    
+    # Set Y-axis range and custom ticks: 0.001 minutes to 1 million minutes
+    fig.update_yaxes(
+        range=[-3, 6], 
+        autorange=False, 
+        tickmode='array',
+        tickvals=[val for val in tick_values if 0.001 <= val <= 1_000_000],
+        ticktext=[label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+        row=row, col=col
+    )
+    logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length plot at row={row}, col={col}")
 
 def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None, progress_at_sc=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
@@ -807,7 +871,9 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
         go.Scatter(x=progress_values.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
                   line=dict(color='#17becf', width=3),
-                  mode='lines+markers', marker=dict(size=4)),
+                  mode='lines+markers', marker=dict(size=4),
+                  hovertemplate='Progress: %{x:.3f}<br>Horizon: %{customdata}<extra></extra>',
+                  customdata=[format_time_duration(h) for h in capped_horizon_lengths]),
         row=row, col=col
     )
     
@@ -819,6 +885,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
             sota_p80_progress = [p['interpolated_progress'] for p in sota_p80_points]
             sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
             sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
             fig.add_trace(
                 go.Scatter(x=sota_p80_progress, y=sota_p80,
@@ -826,19 +893,21 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                           mode='markers',
                           marker=dict(color='#2ca02c', size=8, symbol='diamond'),
                           text=sota_p80_labels,
-                          hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{y:.2f}<extra></extra>'),
+                          customdata=sota_p80_formatted,
+                          hovertemplate='<b>%{text}</b><br>Progress: %{x:.3f}<br>p80 Horizon: %{customdata}<extra></extra>'),
                 row=row, col=col
             )
     
     # Add horizontal dashed line for superhuman coder time horizon
     if sc_time_horizon_minutes is not None:
+        sc_formatted = format_time_duration(sc_time_horizon_minutes)
         fig.add_trace(
             go.Scatter(x=[progress_values.min(), progress_values.max()], 
                       y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
                       name='SC Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes/10380:.1f} work months<extra></extra>'),
+                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_formatted}<extra></extra>'),
             row=row, col=col
         )
     
@@ -854,9 +923,19 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
             row=row, col=col
         )
     
-    # Set Y-axis range: 0.001 minutes to 1 million minutes
-    fig.update_yaxes(range=[-3, 6], autorange=False, row=row, col=col)  # log10(0.001) = -3 to log10(1,000,000) = 6
-    logger.info(f"Set y-axis range to [-3, 6] for horizon length plot at row={row}, col={col}")
+    # Get custom tick values and labels for time formatting
+    tick_values, tick_labels = get_time_tick_values_and_labels()
+    
+    # Set Y-axis range and custom ticks: 0.001 minutes to 1 million minutes
+    fig.update_yaxes(
+        range=[-3, 6], 
+        autorange=False, 
+        tickmode='array',
+        tickvals=[val for val in tick_values if 0.001 <= val <= 1_000_000],
+        ticktext=[label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+        row=row, col=col
+    )
+    logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length vs progress plot at row={row}, col={col}")
 
 # Tab Configuration
 def get_tab_configurations():
@@ -1075,7 +1154,7 @@ def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
         showlegend=False,
         title_text=tab_config.tab_name,
         plot_bgcolor='white',
-        margin=dict(t=60, b=40, l=60, r=40),  # Set consistent margins
+        margin=dict(t=60, b=40, l=100, r=40),  # Increased left margin for y-axis labels
         template=get_professional_plotly_template(),
     )
     
