@@ -1071,6 +1071,9 @@ def get_time_tick_values_and_labels():
         2491200,  # 20 years
         12456000,   # 100 years
         49824000,   # 400 years
+        199296000,  # 1600 years
+        797184000,  # 6400 years
+        3188736000,  # 25,600 years
         14947200000,   # 120,000 years
     ]
     
@@ -1090,6 +1093,9 @@ def get_time_tick_values_and_labels():
         "20 years",
         "100 years",
         "400 years",
+        "1,600 years",
+        "6,400 years",
+        "25,600 years",
         "120,000 years"
     ]
     
