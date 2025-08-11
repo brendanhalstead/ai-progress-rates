@@ -89,7 +89,7 @@
                                     <div class="mb-3">
                                         <label class="param-label">80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months</label>
                                         <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
-                                        <small class="text-muted">Time horizon length corresponding to superhuman coder achievement (0.1-96 work months)</small>
+                                        <small class="text-muted">Time horizon corresponding to superhuman coder achievement</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">Horizon Extrapolation Type:</label>
@@ -675,15 +675,33 @@
                 const actualValue = Math.pow(10, value);
                 displayValue = actualValue.toExponential(2);
             } else if (input.id === 'sc_time_horizon_minutes') {
-                // Convert log scale value to actual value in minutes, then to work months
+                // Convert log scale value to actual value in minutes, then to work months or work years
                 const actualValueMinutes = Math.pow(10, value);
                 const workMonths = actualValueMinutes / 10380; // 173 hours * 60 mins = 10380 minutes per work month
-                if (workMonths >= 10) {
-                    displayValue = workMonths.toFixed(0);
-                } else if (workMonths >= 1) {
-                    displayValue = workMonths.toFixed(1);
-                } else {
-                    displayValue = workMonths.toFixed(2);
+                const workYears = actualValueMinutes / 124560; // 124560 minutes per work year
+                
+                // Update the label unit based on the value
+                const labelElement = document.querySelector('#sc_time_horizon_minutes').closest('.mb-3').querySelector('label.param-label');
+                if (labelElement) {
+                    if (workMonths > 12) {
+                        labelElement.innerHTML = '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work years';
+                        if (workYears >= 10) {
+                            displayValue = workYears.toFixed(0);
+                        } else if (workYears >= 1) {
+                            displayValue = workYears.toFixed(1);
+                        } else {
+                            displayValue = workYears.toFixed(2);
+                        }
+                    } else {
+                        labelElement.innerHTML = '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months';
+                        if (workMonths >= 10) {
+                            displayValue = workMonths.toFixed(0);
+                        } else if (workMonths >= 1) {
+                            displayValue = workMonths.toFixed(1);
+                        } else {
+                            displayValue = workMonths.toFixed(2);
+                        }
+                    }
                 }
             } else if (input.id.includes('normalization')) {
                 if (value < 0.001) {
