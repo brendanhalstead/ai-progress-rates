@@ -737,9 +737,20 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
 
 def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None):
     """Plot horizon lengths over time with METR benchmark points"""
-    # Plot the model trajectory
+    # Debug: log horizon length values
+    logger.info(f"Horizon lengths range: min={np.min(horizon_lengths):.6f}, max={np.max(horizon_lengths):.6f}, median={np.median(horizon_lengths):.6f}")
+    
+    # Cap horizon lengths at 1 million minutes to prevent scale distortion
+    max_horizon = 1_000_000  # 1 million minutes
+    min_horizon = 0.001  # 0.001 minutes
+    capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
+    num_capped = np.sum(horizon_lengths > max_horizon)
+    if num_capped > 0:
+        logger.info(f"Capped {num_capped} horizon length values above {max_horizon} minutes")
+    
+    # Plot the model trajectory with capped values
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=horizon_lengths.tolist(),
+        go.Scatter(x=times.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
                   line=dict(color='#17becf', width=3),
                   mode='lines+markers', marker=dict(size=4)),
@@ -776,12 +787,24 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                       hovertemplate=f'Superhuman Coder Time Horizon: {sc_time_horizon_minutes/10380:.1f} work months<extra></extra>'),
             row=row, col=col
         )
+    
+    # Set Y-axis range: 0.001 minutes to 1 million minutes
+    fig.update_yaxes(range=[-3, 6], autorange=False, row=row, col=col)  # log10(0.001) = -3 to log10(1,000,000) = 6
+    logger.info(f"Set y-axis range to [-3, 6] for horizon length plot at row={row}, col={col}")
 
 def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None, progress_at_sc=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
-    # Plot the model trajectory
+    # Cap horizon lengths at 1 million minutes to prevent scale distortion
+    max_horizon = 1_000_000  # 1 million minutes
+    min_horizon = 0.001  # 0.001 minutes
+    capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
+    num_capped = np.sum(horizon_lengths > max_horizon)
+    if num_capped > 0:
+        logger.info(f"Capped {num_capped} horizon length values above {max_horizon} minutes in vs_progress plot")
+    
+    # Plot the model trajectory with capped values
     fig.add_trace(
-        go.Scatter(x=progress_values.tolist(), y=horizon_lengths.tolist(),
+        go.Scatter(x=progress_values.tolist(), y=capped_horizon_lengths.tolist(),
                   name='Model Prediction',
                   line=dict(color='#17becf', width=3),
                   mode='lines+markers', marker=dict(size=4)),
@@ -830,6 +853,10 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                       hovertemplate=f'Progress at Superhuman Coder: {progress_at_sc:.1f}<extra></extra>'),
             row=row, col=col
         )
+    
+    # Set Y-axis range: 0.001 minutes to 1 million minutes
+    fig.update_yaxes(range=[-3, 6], autorange=False, row=row, col=col)  # log10(0.001) = -3 to log10(1,000,000) = 6
+    logger.info(f"Set y-axis range to [-3, 6] for horizon length plot at row={row}, col={col}")
 
 # Tab Configuration
 def get_tab_configurations():
@@ -856,6 +883,21 @@ def get_tab_configurations():
     Then add new_tab to the return list.
     """
     
+    # Time Horizons Tab
+    time_horizons_plots = [
+        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')), 1, 1,
+                  y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
+    ]
+    
+    time_horizons_tab = TabConfig(
+        tab_id="time_horizons",
+        tab_name="Time Horizons",
+        plots=time_horizons_plots,
+        rows=1,
+        cols=1,
+        specs=[[{"secondary_y": False}]]
+    )
+
     # Inputs Tab
     inputs_plots = [
         PlotConfig("Human Labor", lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c), 1, 1,
@@ -987,9 +1029,7 @@ def get_tab_configurations():
                   y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
         PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
                   y_axis_title="Human-Only Rate", y_axis_type="linear"),
-        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')), 3, 2,
-                  y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
-        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('parameters', {}).get('progress_at_sc')), 4, 1,
+        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('parameters', {}).get('progress_at_sc')), 3, 2,
                   x_axis_title="Cumulative Progress", y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
     ]
     
@@ -997,15 +1037,14 @@ def get_tab_configurations():
         tab_id="other_metrics",
         tab_name="Other Metrics",
         plots=other_metrics_plots,
-        rows=4,
+        rows=3,
         cols=2,
         specs=[[{"secondary_y": False}, {"secondary_y": False}],
                [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False, "colspan": 2}, None]]
+               [{"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    return [inputs_tab, automation_tab, cognitive_output_tab, software_rd_tab, combined_progress_tab, other_metrics_tab]
+    return [time_horizons_tab, inputs_tab, automation_tab, cognitive_output_tab, software_rd_tab, combined_progress_tab, other_metrics_tab]
 
 def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
     """Create a plotly figure for a specific tab"""
@@ -1080,28 +1119,52 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                     dtick_years = max(1, int(round(span / target_ticks)))
             except Exception:
                 dtick_years = 2
+            # Set x-axis range to start at 2019 and end at end_year for time horizons plot only
+            x_range = None
+            if plot_config.title == "Horizon Length vs Time":
+                if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
+                    # Force x-axis to start at 2019 for time horizons plot
+                    range_start = 2019
+                    # Use end_year from time_range if available, otherwise use tmax
+                    time_range = data.get('time_range')
+                    range_end = time_range[1] if time_range and len(time_range) >= 2 else tmax
+                    x_range = [range_start, range_end]
+            
             fig.update_xaxes(
                 type='linear', tickformat='d', dtick=dtick_years,
                 tickangle=0, automargin=True,
+                range=x_range,
                 row=row, col=col,
             )
         
-        # Update primary y-axis
-        y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
-        y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
-        y_axis_kwargs = dict(
-            title_text=plot_config.y_axis_title,
-            type=y_axis_type,
-            rangemode=y_axis_range_mode,
-            row=row, col=col,
-            gridcolor='#ebedf0',
-            ticks='outside', tickcolor='#bdbdbd', ticklen=6,
-            secondary_y=False,
-        )
-        # Use compact SI ticks on log scale axes
-        if plot_config.y_axis_type == 'log':
-            y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
-        fig.update_yaxes(**y_axis_kwargs)
+        # Update primary y-axis, but skip horizon length plots that set their own range
+        if 'Horizon Length' not in plot_config.title:
+            y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
+            y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
+            y_axis_kwargs = dict(
+                title_text=plot_config.y_axis_title,
+                type=y_axis_type,
+                rangemode=y_axis_range_mode,
+                row=row, col=col,
+                gridcolor='#ebedf0',
+                ticks='outside', tickcolor='#bdbdbd', ticklen=6,
+                secondary_y=False,
+            )
+            # Use compact SI ticks on log scale axes
+            if plot_config.y_axis_type == 'log':
+                y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+            fig.update_yaxes(**y_axis_kwargs)
+        else:
+            # For horizon length plots, only update styling without affecting range
+            fig.update_yaxes(
+                title_text=plot_config.y_axis_title,
+                type='log',  # Ensure log scale is set
+                gridcolor='#ebedf0',
+                ticks='outside', tickcolor='#bdbdbd', ticklen=6,
+                exponentformat='power', tickformat='.1s',  # Log scale formatting
+                row=row, col=col,
+                secondary_y=False,
+            )
         
         # Update secondary y-axis if present
         if plot_config.secondary_y and plot_config.y_axis_secondary_title:
@@ -1126,7 +1189,7 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
     except Exception:
         pass
 
-def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
+def create_multi_tab_dashboard(metrics: Dict[str, Any], time_range: List[float] = None) -> Dict[str, go.Figure]:
     """Create dashboard with multiple tabs"""
     
     # Validate and clean metrics data
@@ -1185,7 +1248,8 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any]) -> Dict[str, go.Figure]:
         'time_series': session_data['time_series'],
         'metrics': cleaned_metrics,
         'metr_data': metr_data,
-        'parameters': params_to_dict(session_data.get('current_params', Parameters())) if session_data.get('current_params') else {}
+        'parameters': params_to_dict(session_data.get('current_params', Parameters())) if session_data.get('current_params') else {},
+        'time_range': time_range
     }
     
     # Get tab configurations
@@ -1434,7 +1498,7 @@ def compute_model():
     session_data['results'] = all_metrics
     
     # Create multi-tab dashboard using the calculated metrics
-    figures = create_multi_tab_dashboard(all_metrics)
+    figures = create_multi_tab_dashboard(all_metrics, time_range)
     
     # Convert figures to JSON format
     plots = {}
@@ -1713,7 +1777,7 @@ def estimate_params():
                 session_data['results'] = all_metrics
                 
                 # Create multi-tab dashboard
-                figures = create_multi_tab_dashboard(all_metrics)
+                figures = create_multi_tab_dashboard(all_metrics, time_range)
                 
                 # Convert figures to JSON format
                 plots = {}

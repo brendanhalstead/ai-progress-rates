@@ -445,37 +445,45 @@
                         const pid = window.plotIds[key];
                         if (!pid) return;
                         const plotEl = document.getElementById(pid);
-                        if (!plotEl) return;
-                        const layout = (window.plotData[key] && window.plotData[key].layout) ? { ...window.plotData[key].layout } : {};
-                        layout.paper_bgcolor = bg;
-                        layout.plot_bgcolor = bg;
-                        layout.font = { ...(layout.font || {}), color: fg };
-                        layout.title = { ...(layout.title || {}), font: { ...(layout.title?.font || {}), color: fg } };
-                        layout.hoverlabel = { ...(layout.hoverlabel || {}), bgcolor: hoverBg, bordercolor: hoverBorder, font: { ...(layout.hoverlabel?.font || {}), color: fg } };
-                        if (Array.isArray(layout.annotations)) {
-                            layout.annotations = layout.annotations.map(a => ({
+                        if (!plotEl || !plotEl._fullLayout) return; // Skip if plot not fully initialized
+                        // Get current layout to preserve axis settings that were applied after initial creation
+                        const currentLayout = plotEl.layout || {};
+                        const layout = {
+                            paper_bgcolor: bg,
+                            plot_bgcolor: bg,
+                            font: { ...(currentLayout.font || {}), color: fg },
+                            title: { ...(currentLayout.title || {}), font: { ...(currentLayout.title?.font || {}), color: fg } },
+                            hoverlabel: { ...(currentLayout.hoverlabel || {}), bgcolor: hoverBg, bordercolor: hoverBorder, font: { ...(currentLayout.hoverlabel?.font || {}), color: fg } }
+                        };
+                        if (Array.isArray(currentLayout.annotations)) {
+                            layout.annotations = currentLayout.annotations.map(a => ({
                                 ...a,
                                 font: { ...(a.font || {}), color: fg }
                             }));
                         }
+                        // Only update theme-related properties, preserve axis ranges and other settings
                         Plotly.relayout(plotEl, layout);
                     });
                 } else {
                     // Single plot mode fallback
                     const el = document.getElementById('plotDiv');
-                    if (el) {
-                        const ly = el.layout ? JSON.parse(JSON.stringify(el.layout)) : {};
-                        ly.paper_bgcolor = bg;
-                        ly.plot_bgcolor = bg;
-                        ly.font = { ...(ly.font || {}), color: fg };
-                        ly.title = { ...(ly.title || {}), font: { ...(ly.title?.font || {}), color: fg } };
-                        ly.hoverlabel = { ...(ly.hoverlabel || {}), bgcolor: hoverBg, bordercolor: hoverBorder, font: { ...(ly.hoverlabel?.font || {}), color: fg } };
-                        if (Array.isArray(ly.annotations)) {
-                            ly.annotations = ly.annotations.map(a => ({
+                    if (el && el._fullLayout) { // Skip if plot not fully initialized
+                        // Get current layout to preserve axis settings
+                        const currentLayout = el.layout || {};
+                        const ly = {
+                            paper_bgcolor: bg,
+                            plot_bgcolor: bg,
+                            font: { ...(currentLayout.font || {}), color: fg },
+                            title: { ...(currentLayout.title || {}), font: { ...(currentLayout.title?.font || {}), color: fg } },
+                            hoverlabel: { ...(currentLayout.hoverlabel || {}), bgcolor: hoverBg, bordercolor: hoverBorder, font: { ...(currentLayout.hoverlabel?.font || {}), color: fg } }
+                        };
+                        if (Array.isArray(currentLayout.annotations)) {
+                            ly.annotations = currentLayout.annotations.map(a => ({
                                 ...a,
                                 font: { ...(a.font || {}), color: fg }
                             }));
                         }
+                        // Only update theme-related properties, preserve axis ranges and other settings
                         Plotly.relayout(el, ly);
                     }
                 }
@@ -918,14 +926,16 @@
                 if (plots[tab.id]) {
                     setTimeout(() => {
                         try {
-                            // Ensure plot layout uses consistent height
+                            // Ensure plot layout uses consistent height while preserving all axis settings
                             const plotLayout = { ...plots[tab.id].layout };
                             if (plotLayout.height && plotLayout.height !== 1280) {
                                 console.log(`Adjusting plot layout height from ${plotLayout.height} to match container`);
                                 plotLayout.height = undefined; // Let it use container dimensions
                             }
                             
-                            // Apply theme-aware backgrounds
+
+                            
+                            // Apply theme-aware backgrounds without overriding axis settings
                             const theme = document.documentElement.getAttribute('data-theme') || 'light';
                             const isDark = theme === 'dark';
                             plotLayout.paper_bgcolor = isDark ? '#0f172a' : 'white';

@@ -1,4 +1,6 @@
 Tabs:
+    Time Horizons:
+        Horizon Length vs Progress
     Inputs:
         Human Labor
         Effective Inference Compute (AI Labor)
@@ -27,3 +29,4 @@ Tabs:
         AI Software Progress Multiplier
         AI Overall Progress Multiplier
         Human-only Progress Rate
+        Horizon Length vs Time
