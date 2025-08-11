@@ -827,7 +827,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
         if sota_p80_points:
             sota_p80_times = [p['decimal_year'] for p in sota_p80_points]
             sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
-            sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            sota_p80_labels = [p['model_name'] for p in sota_p80_points]
             sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
             fig.add_trace(
@@ -896,7 +896,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
         if sota_p80_points:
             sota_p80_progress = [p['interpolated_progress'] for p in sota_p80_points]
             sota_p80 = [p['p80_horizon_length'] for p in sota_p80_points]
-            sota_p80_labels = [f"{p['model_name']} ({p['agent_configuration']})" for p in sota_p80_points]
+            sota_p80_labels = [p['model_name'] for p in sota_p80_points]
             sota_p80_formatted = [format_time_duration(h) for h in sota_p80]
             
             fig.add_trace(
