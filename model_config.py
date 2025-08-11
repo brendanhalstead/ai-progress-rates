@@ -311,27 +311,27 @@ PLOT_METADATA = {
     'plot_ai_cognitive_output_multiplier': {
         'title': 'AI Parallel Coding Labor Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Parallel Coding Labor Multiplier (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'Coding labor per human', 'type': 'log'},
         'data_keys': ['times', 'ai_cognitive_output_multipliers']
     },
     
     # Software R&D plots
     'plot_research_stock': {
-        'title': 'Research Stock',
+        'title': 'Cumulative Research Effort',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Research Stock (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'mysterious unit (dollars??)', 'type': 'log'},
         'data_keys': ['times', 'research_stocks']
     },
     'plot_research_stock_rate': {
-        'title': 'Research Stock Rate',
+        'title': 'Research Effort',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Research Stock Rate (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'mysterious unit (dollars/year??)', 'type': 'log'},
         'data_keys': ['times', 'research_stock_rates']
     },
     'plot_software_progress_rate': {
         'title': 'Software Progress Rate',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Software Rate', 'type': 'linear'},
+        'y_axis': {'title': 'OOMs/year', 'type': 'linear'},
         'data_keys': ['times', 'software_progress_rates']
     },
     
@@ -359,19 +359,19 @@ PLOT_METADATA = {
     'plot_ai_research_stock_multiplier': {
         'title': 'AI Research Stock Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Research Stock Multiplier (log scale)', 'type': 'log'},
+        'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_research_stock_multipliers']
     },
     'plot_ai_software_progress_multiplier': {
         'title': 'AI Software Progress Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Software Progress Multiplier (log scale)', 'type': 'log'},
+        'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_software_progress_multipliers']
     },
     'plot_ai_overall_progress_multiplier': {
         'title': 'AI Overall Progress Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Overall Progress Multiplier (log scale)', 'type': 'log'},
+        'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_overall_progress_multipliers']
     },
     'plot_all_ai_multipliers': {
@@ -446,8 +446,9 @@ TAB_CONFIGURATIONS = {
         'plots': [
             {'function': 'plot_research_stock_rate', 'position': (1, 1)},
             {'function': 'plot_research_stock', 'position': (1, 2)},
-            {'function': 'plot_software_progress_rate', 'position': (2, 1)},
-            {'function': 'plot_compute_comparison', 'position': (2, 2)}
+            {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
+            {'function': 'plot_software_progress_rate', 'position': (2, 2)}
+            
         ]
     },
     'combined_progress': {
@@ -467,11 +468,10 @@ TAB_CONFIGURATIONS = {
         'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_ai_cognitive_output_multiplier', 'position': (1, 1)},
-            {'function': 'plot_ai_research_stock_multiplier', 'position': (1, 2)},
-            {'function': 'plot_ai_software_progress_multiplier', 'position': (2, 1)},
-            {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 2)},
-            {'function': 'plot_human_only_progress_rate', 'position': (3, 1)},
-            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 2)}
+            {'function': 'plot_ai_software_progress_multiplier', 'position': (1, 2)},
+            {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
+            {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
+            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)}
         ]
     }
 } 
