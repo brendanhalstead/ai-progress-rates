@@ -392,3 +392,21 @@ results:
           estimate: 0.298999
         is_sota: false
     release_date: 2024-06-07
+  gpt_5:
+    agents:
+      flock-secret:
+        p50_horizon_length:
+          estimate: 137.318539
+          ci_low: 66.869835
+          ci_high: 271.115115
+        p80_horizon_length:
+          estimate: 26.372464
+          ci_low: 8.719275
+          ci_high: 63.817358
+        average_score:
+          estimate: 0.696053
+        usage:
+          working_time: 9658.390037162699
+          usd: 58.939969999999995
+        is_sota: true
+    release_date: 2025-08-07

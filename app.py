@@ -837,6 +837,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                 'claude': '#832000',   # Dark red/brown for Claude
                 'o1': '#003000',       # Dark green for O1 (GPT family)
                 'agent': '#40c040',    # Bright green for agents
+                'grok': '#000000',     # Black for X.ai Grok models
                 'default': '#215F9A'   # Dark blue for others
             }
             
@@ -846,6 +847,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                 'claude': 'diamond',
                 'o1': 'cross',
                 'agent': 'circle',
+                'grok': 'x',
                 'default': 'circle'
             }
             
@@ -856,11 +858,14 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                 label_lower = label.lower()
                 if ('gpt_3_5' in label_lower or 'gpt-3.5' in label_lower or 'gpt3.5' in label_lower or
                     'gpt_4' in label_lower or 'gpt-4' in label_lower or 'gpt4' in label_lower or
+                    'gpt_5' in label_lower or 'gpt-5' in label_lower or 'gpt5' in label_lower or
                     'o1' in label_lower or 'o3' in label_lower or 
                     'davinci_002' in label_lower or 'gpt2' in label_lower or 'gpt_2' in label_lower):
                     model_type = 'gpt-4'  # All GPT family models use the same color
                 elif 'claude' in label_lower:
                     model_type = 'claude'
+                elif 'grok' in label_lower:
+                    model_type = 'grok'
                 elif 'agent' in label_lower:
                     model_type = 'agent'
                 
@@ -946,6 +951,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                 'claude': '#832000',   # Dark red/brown for Claude
                 'o1': '#003000',       # Dark green for O1 (GPT family)
                 'agent': '#40c040',    # Bright green for agents
+                'grok': '#000000',     # Black for X.ai Grok models
                 'default': '#215F9A'   # Dark blue for others
             }
             
@@ -955,6 +961,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                 'claude': 'diamond',
                 'o1': 'cross',
                 'agent': 'circle',
+                'grok': 'x',
                 'default': 'circle'
             }
             
@@ -965,11 +972,14 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                 label_lower = label.lower()
                 if ('gpt_3_5' in label_lower or 'gpt-3.5' in label_lower or 'gpt3.5' in label_lower or
                     'gpt_4' in label_lower or 'gpt-4' in label_lower or 'gpt4' in label_lower or
+                    'gpt_5' in label_lower or 'gpt-5' in label_lower or 'gpt5' in label_lower or
                     'o1' in label_lower or 'o3' in label_lower or 
                     'davinci_002' in label_lower or 'gpt2' in label_lower or 'gpt_2' in label_lower):
                     model_type = 'gpt-4'  # All GPT family models use the same color
                 elif 'claude' in label_lower:
                     model_type = 'claude'
+                elif 'grok' in label_lower:
+                    model_type = 'grok'
                 elif 'agent' in label_lower:
                     model_type = 'agent'
                 
@@ -1173,7 +1183,11 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                     tmax = float(np.nanmax(mt)) if mt is not None and len(mt) > 1 else None
                 if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
                     span = max(0.0, tmax - tmin)
-                    target_ticks = 6.0
+                    # Use more frequent ticks for Time Horizon Lengths graph
+                    if plot_config.title == "Time Horizon Lengths":
+                        target_ticks = 24.0  # More frequent ticks for time horizon plot
+                    else:
+                        target_ticks = 6.0  # Default for other plots
                     dtick_years = max(1, int(round(span / target_ticks)))
             except Exception:
                 dtick_years = 2
