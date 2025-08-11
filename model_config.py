@@ -99,7 +99,7 @@ PARAMETER_BOUNDS = {
     'progress_at_half_ai_research_taste': (1.0, 500),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
-    'sc_time_horizon_minutes': (1000, 1000000),
+    'sc_time_horizon_minutes': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
     'anchor_time': (2020.0, 2030.0),
     'anchor_horizon': (0.01, 100),  # minutes
@@ -195,14 +195,14 @@ PLOT_METADATA = {
     'plot_horizon_lengths': {
         'title': 'Time Horizon Lengths',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 6], 'custom_ticks': True},
+        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 11], 'custom_ticks': True},
         'data_keys': ['times', 'horizon_lengths'],
         'special_handling': ['metr_data', 'sc_time_horizon_minutes']
     },
     'plot_horizon_lengths_vs_progress': {
         'title': 'Horizon Length vs Progress',
         'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
-        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 6], 'custom_ticks': True},
+        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 11], 'custom_ticks': True},
         'data_keys': ['progress_values', 'horizon_lengths'],
         'special_handling': ['metr_data', 'sc_time_horizon_minutes', 'progress_at_sc']
     },

@@ -31,7 +31,7 @@ from progress_model import (
     compute_research_stock_rate, compute_overall_progress_rate,
     calculate_initial_research_stock, setup_model, compute_initial_conditions
 )
-from model_config import PLOT_METADATA, TAB_CONFIGURATIONS
+from model_config import PLOT_METADATA, TAB_CONFIGURATIONS, PARAMETER_BOUNDS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -771,27 +771,41 @@ def get_time_tick_values_and_labels():
     """Generate tick values and labels for time duration y-axis"""
     # Define key time boundaries in minutes (matching the image)
     tick_values = [
-        0.5,    # 30 sec
-        8,      # 8 min
-        30,     # 30 min
-        120,    # 2 hrs
-        480,    # 8 hrs
-        2400,   # 1 week
-        10380,  # 1 month  
-        124560, # 1 year
-        624000  # 5 years
+        0.033333,  # 2 sec
+        0.5,       # 30 sec
+        2,         # 2 min
+        8,         # 8 min
+        30,        # 30 min
+        120,       # 2 hrs
+        480,       # 8 hrs
+        2400,      # 1 week
+        10380,     # 1 month  
+        41520,    # 4 months
+        124560,    # 1 year
+        622800,    # 5 years
+        2491200,  # 20 years
+        12456000,   # 100 years
+        49824000,   # 400 years
+        14947200000,   # 120,000 years
     ]
     
     tick_labels = [
+        "2 sec",
         "30 sec",
+        "2 min",
         "8 min", 
         "30 min",
         "2 hrs",
         "8 hrs",
         "1 week", 
         "1 month",
+        "4 months",
         "1 year",
-        "5 years"
+        "5 years",
+        "20 years",
+        "100 years",
+        "400 years",
+        "120,000 years"
     ]
     
     return tick_values, tick_labels
@@ -802,7 +816,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
     logger.info(f"Horizon lengths range: min={np.min(horizon_lengths):.6f}, max={np.max(horizon_lengths):.6f}, median={np.median(horizon_lengths):.6f}")
     
     # Cap horizon lengths at 1 million minutes to prevent scale distortion
-    max_horizon = 1_000_000  # 1 million minutes
+    max_horizon = PARAMETER_BOUNDS['sc_time_horizon_minutes'][1]  # 1 million minutes
     min_horizon = 0.001  # 0.001 minutes
     capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
     num_capped = np.sum(horizon_lengths > max_horizon)
@@ -903,20 +917,20 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
     tick_values, tick_labels = get_time_tick_values_and_labels()
     
     # Set Y-axis range and custom ticks: 0.001 minutes to 1 million minutes
-    fig.update_yaxes(
-        range=[-3, 6], 
-        autorange=False, 
-        tickmode='array',
-        tickvals=[val for val in tick_values if 0.001 <= val <= 1_000_000],
-        ticktext=[label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
-        row=row, col=col
-    )
-    logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length plot at row={row}, col={col}")
+    # fig.update_yaxes(
+    #     range=[-3, 6], 
+    #     autorange=False, 
+    #     tickmode='array',
+    #     tickvals=[val for val in tick_values if 0.001 <= val <= 1_000_000],
+    #     ticktext=[label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+    #     row=row, col=col
+    # )
+    # logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length plot at row={row}, col={col}")
 
 def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None, progress_at_sc=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
     # Cap horizon lengths at 1 million minutes to prevent scale distortion
-    max_horizon = 1_000_000  # 1 million minutes
+    max_horizon = PARAMETER_BOUNDS['sc_time_horizon_minutes'][1]  # 1 million minutes
     min_horizon = 0.001  # 0.001 minutes
     capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
     num_capped = np.sum(horizon_lengths > max_horizon)
@@ -1033,8 +1047,8 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
         range=[-3, 6], 
         autorange=False, 
         tickmode='array',
-        tickvals=[val for val in tick_values if 0.001 <= val <= 1_000_000],
-        ticktext=[label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+        tickvals=[val for val in tick_values],
+        ticktext=[label for val, label in zip(tick_values, tick_labels)],
         row=row, col=col
     )
     logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length vs progress plot at row={row}, col={col}")
@@ -1233,8 +1247,8 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
             tick_values, tick_labels = get_time_tick_values_and_labels()
             y_axis_kwargs.update({
                 'tickmode': 'array',
-                'tickvals': [val for val in tick_values if 0.001 <= val <= 1_000_000],
-                'ticktext': [label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+                'tickvals': [val for val in tick_values],
+                'ticktext': [label for val, label in zip(tick_values, tick_labels)],
             })
         
         # Use compact SI ticks on log scale axes

@@ -368,8 +368,8 @@ class Parameters:
             logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
             self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
         else:
-            # Clamp to reasonable bounds (1k to 1M minutes)
-            self.sc_time_horizon_minutes = np.clip(self.sc_time_horizon_minutes, 1000.0, 1000000.0)
+            # Clamp to reasonable bounds
+            self.sc_time_horizon_minutes = np.clip(self.sc_time_horizon_minutes, cfg.PARAMETER_BOUNDS['sc_time_horizon_minutes'][0], cfg.PARAMETER_BOUNDS['sc_time_horizon_minutes'][1])
         
         # Sanitize categorical parameters
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
