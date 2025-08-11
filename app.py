@@ -80,7 +80,7 @@ class TabConfig:
     """Configuration for a tab containing multiple plots"""
     def __init__(self, tab_id: str, tab_name: str, plots: List[PlotConfig], 
                  rows: int, cols: int, subplot_titles: List[str] = None,
-                 specs: List[List[Dict]] = None):
+                 specs: List[List[Dict]] = None, explanation: str = None):
         self.tab_id = tab_id
         self.tab_name = tab_name
         self.plots = plots
@@ -88,6 +88,7 @@ class TabConfig:
         self.cols = cols
         self.subplot_titles = subplot_titles or [plot.title for plot in plots]
         self.specs = specs
+        self.explanation = explanation
 
 # Professional Plotly Theme
 def get_professional_plotly_template() -> go.layout.Template:
@@ -1408,7 +1409,8 @@ def get_tab_configurations():
             plots=plots,
             rows=tab_config['rows'],
             cols=tab_config['cols'],
-            subplot_titles=tab_config.get('subplot_titles')
+            subplot_titles=tab_config.get('subplot_titles'),
+            explanation=tab_config.get('explanation')
         )
         tabs.append(tab)
     
@@ -1942,7 +1944,7 @@ def compute_model():
     
     # Get tab metadata including row information for proper sizing
     tab_configs = get_tab_configurations()
-    tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
+    tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows, 'explanation': tab.explanation} for tab in tab_configs]
     
     # Prepare summary focusing on SC metrics
     summary = {
@@ -2221,7 +2223,7 @@ def estimate_params():
                 
                 # Get tab metadata including row information for proper sizing
                 tab_configs = get_tab_configurations()
-                tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows} for tab in tab_configs]
+                tabs_info = [{'id': tab.tab_id, 'name': tab.tab_name, 'rows': tab.rows, 'explanation': tab.explanation} for tab in tab_configs]
                 
                 # Validate the optimization results
                 initial_obj = getattr(estimated_params, '_initial_objective', None)
@@ -2724,7 +2726,8 @@ def get_tab_config():
                 'tab_name': tab_config.tab_name,
                 'rows': tab_config.rows,
                 'cols': tab_config.cols,
-                'plots': plot_info
+                'plots': plot_info,
+                'explanation': tab_config.explanation
             })
         
         return jsonify({

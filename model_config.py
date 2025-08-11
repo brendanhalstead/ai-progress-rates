@@ -409,7 +409,12 @@ TAB_CONFIGURATIONS = {
         'subplot_titles': [''],  # Empty title to avoid duplication with tab title
         'plots': [
             {'function': 'plot_horizon_lengths', 'position': (1, 1)},
-        ]
+        ],
+        'explanation': """
+## Time Horizons
+
+This tab shows how the 80% time horizon of frontier AI systems evolves over time. The red dashed line shows the required time horizon for the Superhuman Coder milestone. The SC time horizon can be adjusted in the sidebar.
+        """
     },
     'inputs': {
         'id': 'inputs',
@@ -420,7 +425,24 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_ai_labor', 'position': (1, 2)},
             {'function': 'plot_experiment_compute', 'position': (2, 1)},
             {'function': 'plot_training_compute_growth_rate', 'position': (2, 2)}
-        ]
+        ],
+        'explanation': """
+## Input Time Series
+
+This tab displays the fundamental inputs that drive AI progress in the model:
+
+### Human Labor (Top Left)
+Human researchers and engineers working on AGI development, calculated using data from [this post](https://forum.effectivealtruism.org/posts/xoX936hEvpxToeuLw/estimating-the-substitutability-between-compute-and).
+
+### AI Labor (Top Right) 
+Inference compute budget for running agents to be spread across automated tasks. Measured in human-equivalents.
+
+### Experiment Compute (Bottom Left)
+Basically assumed to scale with training compute. Normalized arbitrarily to 1 in 2019.
+
+### Training Compute Growth Rate (Bottom Right)
+Factor by which frontier training run compute grows each year, measured in OOMs.
+        """
     },
     'automation': {
         'id': 'automation',
@@ -432,7 +454,26 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_ai_research_taste', 'position': (2, 1)},
             {'function': 'plot_ai_research_taste_quantile', 'position': (2, 2)},
             {'function': 'plot_aggregate_research_taste', 'position': (3, 1)}
-        ]
+        ],
+        'explanation': """
+## Automation (of Coding and Research Taste)
+
+This tab shows how the current capability level feeds into the production function.
+
+### Coding Automation Fraction (Top Left)
+Abstract "percentage of coding tasks performed by AI". Exponentially interpolates between two anchors, using the current effective OOMs:
+1. At (anchor time), it should equal (whatever percentage makes the coding labor multiplier equal a given value). set both of these in the sidebar.
+2. At SC, it should equal 100%.
+
+### Various plots of research taste
+We assume that each OOM of effective compute increases AI research taste by a fixed number of standard deviations within the human range. 
+The units of research taste are such that if you replace all researchers with researchers of a given taste level, holding experiment capacity constant, research effort scales by that taste level.
+The scale is informed by our survey of frontier AGI researchers, where they gave a median 3.25x ratio in the speedups from replacing everyone with the top researcher vs replacing everyone with the median researcher.
+We assume that research taste (in these units) is lognormally distributed among human researchers with a mean of 1.
+
+### Aggregate Research Taste (Bottom Left)
+Average of the research taste distribution, after replacing sub-AI human researchers with AI researchers.
+        """
     },
     'cognitive_output': {
         'id': 'cognitive-output',
@@ -443,7 +484,23 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_automation_fraction', 'position': (1, 2)},
             {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
             {'function': 'plot_cognitive_components', 'position': (2, 2)}
-        ]
+        ],
+        'explanation': """
+## Cognitive Output and Coding Labor
+
+### Available labor pools
+See Inputs tab.
+
+### Coding Automation Fraction
+See Automation tab.
+
+### AI Cognitive Output Multiplier (Bottom Left)
+Obtained by taking the combined coding labor and dividing it by the human labor.
+
+### Cognitive Components (Bottom Right)
+Depicts the actual combined coding labor that gets passed into the next tab. The combination is given by (insert equation).
+
+        """
     },
     'research_effort': {
         'id': 'research-effort',
@@ -455,7 +512,10 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_experiment_capacity', 'position': (1, 2)},
             {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
             {'function': 'plot_research_stock_rate', 'position': (2, 2)}
-        ]
+        ],
+        'explanation': """
+## Research Effort and Capacity
+        """
     },
     'software_rd': {
         'id': 'software-rd',
@@ -467,7 +527,10 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_research_stock', 'position': (2,1)},
             {'function': 'plot_software_efficiency', 'position': (2, 2)}
             
-        ]
+        ],
+        'explanation': """
+## Software Research & Development
+      """
     },
     'combined_progress': {
         'id': 'combined-progress',
@@ -477,7 +540,10 @@ TAB_CONFIGURATIONS = {
         'plots': [
             {'function': 'plot_cumulative_progress', 'position': (1, 1)},
             {'function': 'plot_rate_components', 'position': (2, 1)},
-        ]
+        ],
+        'explanation': """
+## Effective Compute and Combined Progress
+        """
     },
     'other_metrics': {
         'id': 'other-metrics',
@@ -489,6 +555,9 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
             {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
             {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)}
-        ]
+        ],
+        'explanation': """
+## Additional Metrics and Multipliers
+        """
     }
 } 
