@@ -494,7 +494,7 @@ See Inputs tab.
 ### Coding Automation Fraction
 See Automation tab.
 
-### AI Cognitive Output Multiplier (Bottom Left)
+### AI Coding Labor Multiplier (Bottom Left)
 Obtained by taking the (pre-discounting) combined coding labor and dividing it by the (pre-discounting) human labor.
 
 ### Normalized Coding Labor (Bottom Right)
