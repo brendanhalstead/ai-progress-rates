@@ -966,7 +966,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      swe_multiplier * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
+      (swe_multiplier)**params.lambda_param * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
     where p = params.rho_cognitive.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
@@ -981,7 +981,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
+    target_output = swe_multiplier**params.lambda_param * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
@@ -2979,7 +2979,7 @@ class ProgressModel:
                 ai_labor_contributions.append(ai_contrib)
 
                 # Calculate automation multipliers on various quantities
-                ai_cognitive_output_multipliers.append(cognitive_output / human_contrib if ai_contrib > 0 else 0.0)
+                ai_cognitive_output_multipliers.append((cognitive_output / human_contrib)**(1.0/self.params.lambda_param) if ai_contrib > 0 else 0.0)
                 ai_research_stock_multipliers.append(research_stock_rates[i] / human_only_research_stock_rate if human_only_research_stock_rate > 0 else 0.0)
                 ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
