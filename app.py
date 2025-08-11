@@ -1108,7 +1108,8 @@ def get_tab_configurations():
             tab_name=tab_config['name'], 
             plots=plots,
             rows=tab_config['rows'],
-            cols=tab_config['cols']
+            cols=tab_config['cols'],
+            subplot_titles=tab_config.get('subplot_titles')
         )
         tabs.append(tab)
     
@@ -1238,7 +1239,16 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
         
         # Use compact SI ticks on log scale axes
         if plot_config.y_axis_type == 'log':
-            y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+            # Special handling for effective compute which can have very large values
+            if plot_config.function_name == 'plot_effective_compute':
+                y_axis_kwargs.update(dict(
+                    exponentformat='e',     # Use scientific notation (1e10 instead of 10^10)
+                    tickformat='.0e',       # No decimal places in scientific notation
+                    dtick=10,                # Show every 2 orders of magnitude (10^0, 10^2, 10^4, etc)
+                    showexponent='all'      # Always show exponent
+                ))
+            else:
+                y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
             
         fig.update_yaxes(**y_axis_kwargs)
         

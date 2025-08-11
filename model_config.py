@@ -42,7 +42,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 # Manual Horizon Fitting Parameters
 DEFAULT_ANCHOR_TIME = 2025.25
 DEFAULT_ANCHOR_HORIZON = 15  # Will be optimized if None
-DEFAULT_ANCHOR_DOUBLING_TIME = 0.850  # Will be optimized if None
+DEFAULT_ANCHOR_DOUBLING_TIME = 0.650  # Will be optimized if None
 DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 
 # AI Research Taste clipping bounds
@@ -52,6 +52,8 @@ AI_RESEARCH_TASTE_MAX_SD = 30
 
 # Baseline Annual Compute Multiplier
 BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
+
+BASE_FOR_SOFTWARE_LOM = 10.0
 
 # =============================================================================
 # MODEL RATE & VALUE CAPS
@@ -86,7 +88,7 @@ PARAMETER_BOUNDS = {
     'rho_progress': (-1, 1),
     'alpha': (0.05, 0.95),
     'software_scale': (0.1, 10),
-    'automation_fraction_at_superhuman_coder': (0.1, 0.99),
+    'automation_fraction_at_superhuman_coder': (0.1, 1.0),
     'progress_at_half_sc_automation': (1.0, 500),
     'automation_slope': (0.1, 10.0),
     'swe_multiplier_at_anchor_time': (1.0, 10.0),
@@ -157,8 +159,8 @@ DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
     'rho_progress': -0.15,
     'alpha': 0.7,
-    'software_scale': 1.4,
-    'automation_fraction_at_superhuman_coder': 0.99,
+    'software_scale': 2.25,
+    'automation_fraction_at_superhuman_coder': 1.0,
     'progress_at_half_sc_automation': 20.0,
     'automation_slope': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
@@ -209,25 +211,25 @@ PLOT_METADATA = {
     'plot_human_labor': {
         'title': 'Human Labor',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Human Labor (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'Total AGI Researchers', 'type': 'log'},
         'data_keys': ['times', 'L_HUMAN']
     },
     'plot_ai_labor': {
         'title': 'AI Labor',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'AI Labor (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'Human Equivalents', 'type': 'log'},
         'data_keys': ['times', 'L_AI']
     },
     'plot_experiment_compute': {
         'title': 'Experiment Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Experiment Compute (log scale)', 'type': 'log'},
+        'y_axis': {'title': '(scaled) FLOPs', 'type': 'log'},
         'data_keys': ['times', 'experiment_compute']
     },
     'plot_training_compute': {
-        'title': 'Training Compute',
+        'title': 'Training Compute Growth Rate',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Training Compute (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'OOMs/year', 'type': 'linear'},
         'data_keys': ['times', 'training_compute']
     },
     'plot_effective_compute': {
@@ -251,39 +253,39 @@ PLOT_METADATA = {
     
     # Automation plots
     'plot_automation_fraction': {
-        'title': 'Automation Fraction',
+        'title': 'Coding Automation Fraction',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Automation (%)', 'type': 'linear'},
+        'y_axis': {'title': 'SWE Tasks Automated, %', 'type': 'linear'},
         'data_keys': ['times', 'automation_fraction']
     },
     'plot_progress_vs_automation': {
         'title': 'Progress vs Automation',
         'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
-        'y_axis': {'title': 'Automation (%)', 'type': 'linear'},
+        'y_axis': {'title': 'SWE Tasks Automated, %', 'type': 'linear'},
         'data_keys': ['progress', 'automation_fraction']
     },
     'plot_ai_research_taste': {
         'title': 'AI Research Taste',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'AI Research Taste', 'type': 'linear'},
+        'y_axis': {'title': 'Research effort per unit experiment', 'type': 'log'},
         'data_keys': ['times', 'ai_research_taste']
     },
     'plot_ai_research_taste_sd': {
         'title': 'AI Research Taste (Standard Deviations)',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'AI Research Taste (Standard Deviations)', 'type': 'linear'},
+        'y_axis': {'title': 'Std. Dev. from OB Median', 'type': 'linear'},
         'data_keys': ['times', 'ai_research_taste_sd']
     },
     'plot_ai_research_taste_quantile': {
         'title': 'AI Research Taste (Quantile)',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'AI Research Taste (Quantile)', 'type': 'linear'},
+        'y_axis': {'title': 'Quantile Among OB Researchers', 'type': 'linear'},
         'data_keys': ['times', 'ai_research_taste_quantile']
     },
     'plot_aggregate_research_taste': {
-        'title': 'Aggregate Research Taste',
+        'title': 'Aggregate Research Taste, Humans and AIs',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Aggregate Research Taste', 'type': 'linear'},
+        'y_axis': {'title': 'Research effort per unit experiment', 'type': 'log'},
         'data_keys': ['times', 'aggregate_research_taste']
     },
     'plot_ai_vs_aggregate_research_taste': {
@@ -341,15 +343,15 @@ PLOT_METADATA = {
         'data_keys': ['times', 'progress']
     },
     'plot_progress_rate': {
-        'title': 'Overall Progress Rate',
+        'title': 'Effective Compute Growth Rate',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Overall Rate', 'type': 'linear'},
+        'y_axis': {'title': 'OOMs/year', 'type': 'linear'},
         'data_keys': ['times', 'progress_rates']
     },
     'plot_rate_components': {
         'title': 'Rate Components',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Rate', 'type': 'linear'},
+        'y_axis': {'title': 'OOMs/year', 'type': 'linear', 'range': [0, 10]},
         'data_keys': ['times', 'progress_rates', 'software_progress_rates']
     },
     
@@ -398,6 +400,7 @@ TAB_CONFIGURATIONS = {
         'id': 'time-horizons',
         'name': 'Time Horizons',
         'rows': 1, 'cols': 1,
+        'subplot_titles': [''],  # Empty title to avoid duplication with tab title
         'plots': [
             {'function': 'plot_horizon_lengths', 'position': (1, 1)},
         ]
@@ -419,16 +422,15 @@ TAB_CONFIGURATIONS = {
         'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_automation_fraction', 'position': (1, 1)},
-            {'function': 'plot_progress_vs_automation', 'position': (1, 2)},
+            {'function': 'plot_ai_research_taste_sd', 'position': (1, 2)},
             {'function': 'plot_ai_research_taste', 'position': (2, 1)},
-            {'function': 'plot_ai_research_taste_sd', 'position': (2, 2)},
-            {'function': 'plot_ai_research_taste_quantile', 'position': (3, 1)},
-            {'function': 'plot_aggregate_research_taste', 'position': (3, 2)}
+            {'function': 'plot_ai_research_taste_quantile', 'position': (2, 2)},
+            {'function': 'plot_aggregate_research_taste', 'position': (3, 1)}
         ]
     },
     'cognitive_output': {
         'id': 'cognitive-output',
-        'name': 'Parallel Coding Labor',
+        'name': 'Coding Labor',
         'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_cognitive_output_with_compute', 'position': (1, 1)},
@@ -450,7 +452,7 @@ TAB_CONFIGURATIONS = {
     },
     'combined_progress': {
         'id': 'combined-progress',
-        'name': 'Combined Progress',
+        'name': 'Effective Compute',
         'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_progress_rate', 'position': (1, 1)},

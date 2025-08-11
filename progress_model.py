@@ -712,15 +712,15 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
         if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
             logger.warning(f"Invalid software progress rate: {software_progress_rate}")
             return 0.0
-        
-            # Apply software progress share multiplier: s
+        # Apply software progress share multiplier: s
         final_rate = software_progress_rate * software_scale
+        rate_at_base_for_software_lom = final_rate * 1.0 / np.log(cfg.BASE_FOR_SOFTWARE_LOM)
         
         if not np.isfinite(final_rate) or final_rate < 0:
             logger.warning(f"Invalid final software progress rate after share multiplier: {final_rate}")
             return 0.0
         
-        return final_rate
+        return rate_at_base_for_software_lom
         
     except (ZeroDivisionError, OverflowError) as e:
         logger.warning(f"Error computing software progress rate: {e}")
