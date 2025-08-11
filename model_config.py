@@ -42,7 +42,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 # Manual Horizon Fitting Parameters
 DEFAULT_ANCHOR_TIME = 2025.25
 DEFAULT_ANCHOR_HORIZON = 15  # Will be optimized if None
-DEFAULT_ANCHOR_DOUBLING_TIME = 0.650  # Will be optimized if None
+DEFAULT_ANCHOR_DOUBLING_TIME = 0.550  # Will be optimized if None
 DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 
 # AI Research Taste clipping bounds
