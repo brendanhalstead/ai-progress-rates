@@ -344,7 +344,7 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
     """Plot cognitive output with discounted experiment compute"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
-                  name='Cognitive Output',
+                  name='Normalized Coding Labor',
                   line=dict(color='#9467bd', width=3),
                   mode='lines+markers', marker=dict(size=4),
                   customdata=[format_decimal_year_to_month_year(t) for t in times],
@@ -501,6 +501,34 @@ def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[research_stock_rates.min(), research_stock_rates.max()],
+                          name='Superhuman Coder Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
+def plot_experiment_capacity(fig, times, experiment_capacity, row, col):
+    """Plot experiment capacity over time"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=experiment_capacity.tolist(),
+                  name='Experiment Capacity',
+                  line=dict(color='#2ca02c', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[experiment_capacity.min(), experiment_capacity.max()],
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
@@ -1341,6 +1369,7 @@ def get_tab_configurations():
         'plot_ai_cognitive_output_multiplier': lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c),
         'plot_research_stock': lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c),
         'plot_research_stock_rate': lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c),
+        'plot_experiment_capacity': lambda fig, data, r, c: plot_experiment_capacity(fig, data['metrics']['times'], data['metrics']['experiment_capacity'], r, c),
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
         'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c),
         'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
@@ -2338,7 +2367,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
         
         # Write metadata header with SC information if available
         if results.get('sc_time') is not None:
@@ -2372,6 +2401,11 @@ def export_csv():
 
             if 'research_stock_rates' in results and i < len(results['research_stock_rates']):
                 row.append(results['research_stock_rates'][i])
+            else:
+                row.append(0.0)
+
+            if 'experiment_capacity' in results and i < len(results['experiment_capacity']):
+                row.append(results['experiment_capacity'][i])
             else:
                 row.append(0.0)
 

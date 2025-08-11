@@ -297,9 +297,9 @@ PLOT_METADATA = {
     
     # Cognitive Output plots
     'plot_cognitive_output_with_compute': {
-        'title': 'Parallel Coding Labor',
+        'title': 'Inputs to Experiment Capacity',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Parallel Coding Labor (log scale)', 'type': 'log'},
+        'y_axis': {'title': 'Nonsense units', 'type': 'log'},
         'data_keys': ['times', 'cognitive_outputs']
     },
     'plot_cognitive_components': {
@@ -327,6 +327,12 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'mysterious unit (dollars/year??)', 'type': 'log'},
         'data_keys': ['times', 'research_stock_rates']
+    },
+    'plot_experiment_capacity': {
+        'title': 'Experiment Capacity',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Effort per unit taste', 'type': 'log'},
+        'data_keys': ['times', 'experiment_capacity']
     },
     'plot_software_progress_rate': {
         'title': 'Software Progress Rate',
@@ -437,6 +443,18 @@ TAB_CONFIGURATIONS = {
             {'function': 'plot_cognitive_components', 'position': (1, 2)},
             {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
             {'function': 'plot_labor_comparison', 'position': (2, 2)}
+        ]
+    },
+    'research_effort': {
+        'id': 'research-effort',
+        'name': 'Research Effort',
+        'rows': 2, 'cols': 2,
+        'plots': [
+            {'function': 'plot_cognitive_output_with_compute', 'position': (1, 1)},
+            
+            {'function': 'plot_experiment_capacity', 'position': (1, 2)},
+            {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
+            {'function': 'plot_research_stock_rate', 'position': (2, 2)}
         ]
     },
     'software_rd': {

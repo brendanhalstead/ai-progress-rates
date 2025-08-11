@@ -2879,6 +2879,7 @@ class ProgressModel:
         horizon_lengths = []
         effective_compute = []
         training_compute = []
+        experiment_capacity = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -2902,6 +2903,11 @@ class ProgressModel:
                 ai_research_taste_sds.append(ai_research_taste_sd if np.isfinite(ai_research_taste_sd) else 0.0)
                 ai_research_taste_quantiles.append(ai_research_taste_quantile if np.isfinite(ai_research_taste_quantile) else 0.0)
                 aggregate_research_tastes.append(aggregate_research_taste)
+                
+                # Compute experiment capacity (research_stock_rate / aggregate_research_taste)
+                current_research_stock_rate = research_stock_rates[i]
+                exp_capacity = current_research_stock_rate / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
+                experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
                 
                 # Interpolate input time series to current time
                 L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
@@ -3046,6 +3052,7 @@ class ProgressModel:
                 horizon_lengths.append(0.0)
                 effective_compute.append(0.0)
                 training_compute.append(0.0)
+                experiment_capacity.append(0.0)
         
             
         # Calculate time when superhuman coder level is reached
@@ -3104,6 +3111,7 @@ class ProgressModel:
             'horizon_lengths': horizon_lengths,
             'effective_compute': effective_compute,
             'training_compute': training_compute,
+            'experiment_capacity': experiment_capacity,
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
