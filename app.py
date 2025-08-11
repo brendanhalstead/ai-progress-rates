@@ -1095,7 +1095,7 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                 dtick_years = 2
             # Set x-axis range to start at 2019 and end at end_year for time horizons plot only
             x_range = None
-            if plot_config.title == "Horizon Length vs Time":
+            if plot_config.title == "Time Horizon Lengths":
                 if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
                     # Force x-axis to start at 2019 for time horizons plot
                     range_start = 2019
