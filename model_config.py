@@ -232,11 +232,11 @@ PLOT_METADATA = {
         'y_axis': {'title': 'OOMs/year', 'type': 'linear'},
         'data_keys': ['times', 'training_compute_growth_rate']
     },
-    'plot_effective_compute': {
-        'title': 'Effective Compute',
+    'plot_software_efficiency': {
+        'title': 'Software Efficiency',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Effective Compute (log scale)', 'type': 'log'},
-        'data_keys': ['times', 'effective_compute']
+        'y_axis': {'title': 'Cumulative Software Progress', 'type': 'linear'},
+        'data_keys': ['times', 'software_efficiency']
     },
     'plot_labor_comparison': {
         'title': 'Labor Comparison',
@@ -454,12 +454,11 @@ TAB_CONFIGURATIONS = {
     'combined_progress': {
         'id': 'combined-progress',
         'name': 'Effective Compute',
-        'rows': 2, 'cols': 2,
+        'rows': 2, 'cols': 1,
+        'subplot_titles': ['', 'Components of effective compute growth'],
         'plots': [
-            {'function': 'plot_progress_rate', 'position': (1, 1)},
-            {'function': 'plot_rate_components', 'position': (1, 2)},
-            {'function': 'plot_cumulative_progress', 'position': (2, 1)},
-            {'function': 'plot_effective_compute', 'position': (2, 2)}
+            {'function': 'plot_cumulative_progress', 'position': (1, 1)},
+            {'function': 'plot_rate_components', 'position': (2, 1)},
         ]
     },
     'other_metrics': {

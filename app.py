@@ -177,15 +177,15 @@ def plot_training_compute_growth_rate(fig, times, values, row, col):
         row=row, col=col
     )
 
-def plot_effective_compute(fig, times, values, row, col):
-    """Plot effective compute over time"""
+def plot_software_efficiency(fig, times, values, row, col):
+    """Plot software efficiency over time"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=values.tolist(),
-                  name='Effective Compute',
+                  name='Software Efficiency',
                   line=dict(color='#ff7f0e', width=3),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
-                  hovertemplate='Year: %{customdata[0]}<br>Effective Compute: %{customdata[1]}<extra></extra>'),
+                  customdata=[(format_decimal_year_to_month_year(t), f"{v:.3f}") for t, v in zip(times, values)],
+                  hovertemplate='Year: %{customdata[0]}<br>Software Efficiency: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -396,7 +396,7 @@ def plot_rate_components(fig, times, progress_rates, training_compute_growth_rat
     """Plot rate components comparison"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=progress_rates.tolist(),
-                  name='Overall Rate',
+                  name='Effective Compute Growth Rate',
                   line=dict(color='#2ca02c', width=2, dash='solid'),
                   mode='lines',
                   customdata=[format_decimal_year_to_month_year(t) for t in times],
@@ -1326,7 +1326,7 @@ def get_tab_configurations():
         'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c),
         'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
         'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['time_series'].time, data['time_series'].training_compute_growth_rate, r, c),
-        'plot_effective_compute': lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
+        'plot_software_efficiency': lambda fig, data, r, c: plot_software_efficiency(fig, data['metrics']['times'], data['metrics']['software_efficiency'], r, c),
         'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c),
         'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c),
         'plot_automation_fraction': lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c),
@@ -1462,7 +1462,7 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                     dtick_years = max(1, int(round(span / target_ticks)))
             except Exception:
                 dtick_years = 2
-            # Set x-axis range to start at 2019 and end at end_year for time horizons plot only
+            # Set x-axis range for specific plots to ensure alignment
             x_range = None
             if plot_config.title == "Time Horizon Lengths":
                 if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
@@ -1472,6 +1472,14 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                     time_range = data.get('time_range')
                     range_end = time_range[1] if time_range and len(time_range) >= 2 else tmax
                     x_range = [range_start, range_end]
+            elif plot_config.title in ["Components of Effective Compute", "Rate Components"]:
+                # Ensure both effective compute graphs have the same x-axis range for proper alignment
+                # since one is the derivative of the other
+                if tmin is not None and tmax is not None and np.isfinite(tmin) and np.isfinite(tmax):
+                    # Use simulation end year from time_range if available, otherwise use tmax
+                    time_range = data.get('time_range')
+                    range_end = time_range[1] if time_range and len(time_range) >= 2 else tmax
+                    x_range = [tmin, range_end]
             
             fig.update_xaxes(
                 type='linear', tickformat='d', dtick=dtick_years,
