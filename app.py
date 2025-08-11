@@ -31,6 +31,7 @@ from progress_model import (
     compute_research_stock_rate, compute_overall_progress_rate,
     calculate_initial_research_stock, setup_model, compute_initial_conditions
 )
+from model_config import PLOT_METADATA, TAB_CONFIGURATIONS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,26 +48,33 @@ session_data = {
 
 # Plot Configuration System
 class PlotConfig:
-    """Configuration for a single plot"""
-    def __init__(self, title: str, plot_func: Callable, row: int, col: int, 
-                 secondary_y: bool = False, 
-                 x_axis_title: str = "Time",
-                 y_axis_title: str = None,
-                 y_axis_type: str = "linear",
-                 y_axis_secondary_title: str = None,
-                 y_axis_secondary_type: str = "linear",
-                 **kwargs):
-        self.title = title
+    """Configuration for a single plot using centralized metadata"""
+    def __init__(self, function_name: str, plot_func: Callable, row: int, col: int):
+        self.function_name = function_name
         self.plot_func = plot_func
         self.row = row
         self.col = col
-        self.secondary_y = secondary_y
-        self.x_axis_title = x_axis_title
-        self.y_axis_title = y_axis_title or title
-        self.y_axis_type = y_axis_type
-        self.y_axis_secondary_title = y_axis_secondary_title
-        self.y_axis_secondary_type = y_axis_secondary_type
-        self.kwargs = kwargs
+        
+        # Load configuration from centralized metadata
+        if function_name not in PLOT_METADATA:
+            raise ValueError(f"Unknown plot function: {function_name}")
+        
+        metadata = PLOT_METADATA[function_name]
+        self.title = metadata['title']
+        self.x_axis_title = metadata['x_axis']['title']
+        self.x_axis_type = metadata['x_axis'].get('type', 'linear')
+        self.y_axis_title = metadata['y_axis']['title']
+        self.y_axis_type = metadata['y_axis'].get('type', 'linear')
+        self.y_axis_range = metadata['y_axis'].get('range')
+        self.y_axis_custom_ticks = metadata['y_axis'].get('custom_ticks', False)
+        
+        # Secondary y-axis support (for future extension)
+        self.secondary_y = False
+        self.y_axis_secondary_title = None
+        self.y_axis_secondary_type = "linear"
+        
+        # Store full metadata for advanced use cases
+        self.metadata = metadata
 
 class TabConfig:
     """Configuration for a tab containing multiple plots"""
@@ -940,190 +948,77 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
 # Tab Configuration
 def get_tab_configurations():
     """
-    Get the configuration for all tabs and their plots.
+    Get the configuration for all tabs and their plots using centralized metadata.
     
-    This function provides a clean, configuration-based approach to organizing plots.
-    To add a new tab, create a new TabConfig with its plots.
-    To move plots between tabs, simply move the PlotConfig objects.
-    To add new plots, create new plot functions and PlotConfig objects.
-    
-    Example of adding a new tab:
-    
-    new_plots = [
-        PlotConfig("My Plot", lambda fig, data, r, c: my_plot_function(fig, data, r, c), 1, 1),
-    ]
-    new_tab = TabConfig(
-        tab_id="my_tab",
-        tab_name="My Custom Tab", 
-        plots=new_plots,
-        rows=1, cols=1
-    )
-    
-    Then add new_tab to the return list.
+    This function now generates tab configurations from the centralized TAB_CONFIGURATIONS
+    in model_config.py, providing a true single source of truth for plot organization.
     """
     
-    # Time Horizons Tab
-    time_horizons_plots = [
-        PlotConfig("Horizon Length vs Time", lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')), 1, 1,
-                  y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
-    ]
+    # Mapping of plot function names to actual functions
+    plot_function_map = {
+        'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')),
+        'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('progress_at_sc')),
+        'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
+        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c),
+        'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
+        'plot_training_compute': lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c),
+        'plot_effective_compute': lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
+        'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c),
+        'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c),
+        'plot_automation_fraction': lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c),
+        'plot_progress_vs_automation': lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c),
+        'plot_ai_research_taste': lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c),
+        'plot_ai_research_taste_sd': lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c),
+        'plot_ai_research_taste_quantile': lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c),
+        'plot_aggregate_research_taste': lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c),
+        'plot_ai_vs_aggregate_research_taste': lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c),
+        'plot_cognitive_output_with_compute': lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c),
+        'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c),
+        'plot_ai_cognitive_output_multiplier': lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c),
+        'plot_research_stock': lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c),
+        'plot_research_stock_rate': lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c),
+        'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
+        'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c),
+        'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
+        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c),
+        'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
+        'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
+        'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),
+        'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
+        'plot_human_only_progress_rate': lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c),
+        'plot_automation_multiplier': lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c),
+    }
     
-    time_horizons_tab = TabConfig(
-        tab_id="time_horizons",
-        tab_name="Time Horizons",
-        plots=time_horizons_plots,
-        rows=1,
-        cols=1,
-        specs=[[{"secondary_y": False}]]
-    )
-
-    # Inputs Tab
-    inputs_plots = [
-        PlotConfig("Human Labor", lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c), 1, 1,
-                  y_axis_title="Human Labor (log scale)", y_axis_type="log"),
-        PlotConfig("Effective Inference Compute (AI Labor)", lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c), 1, 2,
-                  y_axis_title="AI Labor (log scale)", y_axis_type="log"),
-        PlotConfig("Experiment Compute", lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c), 2, 1,
-                  y_axis_title="Experiment Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Training Compute Growth Rate (normalized)", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 2, 2,
-                  y_axis_title="Training Compute (log scale)", y_axis_type="log"),
-    ]
+    # Generate tab configurations from centralized config
+    tabs = []
+    for tab_key, tab_config in TAB_CONFIGURATIONS.items():
+        plots = []
+        for plot_def in tab_config['plots']:
+            function_name = plot_def['function']
+            row, col = plot_def['position']
+            
+            if function_name not in plot_function_map:
+                logger.warning(f"Unknown plot function: {function_name}")
+                continue
+                
+            plot_config = PlotConfig(
+                function_name=function_name,
+                plot_func=plot_function_map[function_name],
+                row=row,
+                col=col
+            )
+            plots.append(plot_config)
+            
+        tab = TabConfig(
+            tab_id=tab_config['id'],
+            tab_name=tab_config['name'], 
+            plots=plots,
+            rows=tab_config['rows'],
+            cols=tab_config['cols']
+        )
+        tabs.append(tab)
     
-    inputs_tab = TabConfig(
-        tab_id="inputs",
-        tab_name="Inputs",
-        plots=inputs_plots,
-        rows=2,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    # SWE Automation and Taste Tab
-    automation_plots = [
-        PlotConfig("Automation Fraction", lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c), 1, 1,
-                  y_axis_title="Automation (%)"),
-        PlotConfig("Progress vs Automation", lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c), 1, 2,
-                  x_axis_title="Cumulative Progress", y_axis_title="Automation (%)"),
-        PlotConfig("AI Research Taste", lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c), 2, 1,
-                  y_axis_title="AI Research Taste"),
-        PlotConfig("AI Research Taste (SD)", lambda fig, data, r, c: plot_ai_research_taste_sd(fig, data['metrics']['times'], data['metrics']['ai_research_taste_sd'], r, c), 2, 2,
-                  y_axis_title="AI Research Taste (Standard Deviations)"),
-        PlotConfig("AI Research Taste (Quantile)", lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c), 3, 1,
-                  y_axis_title="AI Research Taste (Quantile)"),
-        PlotConfig("Aggregate Research Taste", lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c), 3, 2,
-                  y_axis_title="Aggregate Research Taste"),
-        PlotConfig("AI vs Aggregate Research Taste", lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c), 4, 1,
-                  x_axis_title="AI Research Taste", y_axis_title="Aggregate Research Taste"),
-    ]
-    
-    automation_tab = TabConfig(
-        tab_id="automation",
-        tab_name="SWE Automation and Taste",
-        plots=automation_plots,
-        rows=4,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    # Parallel Coding Labor Production Tab
-    cognitive_output_plots = [
-        PlotConfig("Parallel Coding Labor", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
-                  y_axis_title="Parallel Coding Labor (log scale)", y_axis_type="log"),
-        PlotConfig("Parallel Coding Labor Components", lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['ai_labor_contributions'], data['metrics']['human_labor_contributions'], r, c), 1, 2,
-                  y_axis_title="Labor Contribution (log scale)", y_axis_type="log"),
-        PlotConfig("AI Parallel Coding Labor Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 2, 1,
-                  y_axis_title="Parallel Coding Labor Multiplier (log scale)", y_axis_type="log"),
-    ]
-    
-    cognitive_output_tab = TabConfig(
-        tab_id="cognitive_output",
-        tab_name="Parallel Coding Labor",
-        plots=cognitive_output_plots,
-        rows=2,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False, "colspan": 2}, None]]
-    )
-    
-    # Software R&D Tab
-    software_rd_plots = [
-        PlotConfig("Parallel Coding Labor & Discounted Exp. Compute", lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c), 1, 1,
-                  y_axis_title="Parallel Coding Labor & Discounted Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Research Effort", lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c), 1, 2,
-                  y_axis_title="Research Stock Rate (log scale)", y_axis_type="log"),
-        PlotConfig("Cumulative Stock of Research Effort", lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c), 2, 1,
-                  y_axis_title="Research Stock (log scale)", y_axis_type="log"),
-        PlotConfig("Software Progress Rate", lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c), 2, 2,
-                  y_axis_title="Software Rate", y_axis_type="linear"),
-    ]
-    
-    software_rd_tab = TabConfig(
-        tab_id="software_rd",
-        tab_name="Software R&D",
-        plots=software_rd_plots,
-        rows=2,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    # Combined Progress Production Tab
-    combined_progress_plots = [
-        PlotConfig("Training Compute Growth Rate (Hardware Progress Rate)", lambda fig, data, r, c: plot_training_compute(fig, data['time_series'].time, data['time_series'].training_compute, r, c), 1, 1,
-                  y_axis_title="Training Compute (log scale)", y_axis_type="log"),
-        PlotConfig("Progress Rate Components", lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], data['metrics']['software_progress_rates'], r, c), 1, 2,
-                  y_axis_title="Rate", y_axis_type="linear"),
-        PlotConfig("Overall Progress Rate", lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c), 2, 1,
-                  y_axis_title="Overall Rate", y_axis_type="linear"),
-        PlotConfig("Cumulative Progress", lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c), 2, 2,
-                  y_axis_title="Progress"),
-        PlotConfig("Effective Compute", lambda fig, data, r, c: plot_effective_compute(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c), 3, 1,
-                  y_axis_title="Effective Compute (log scale)", y_axis_type="log"),
-    ]
-    
-    combined_progress_tab = TabConfig(
-        tab_id="combined_progress",
-        tab_name="Combined Progress Production",
-        plots=combined_progress_plots,
-        rows=3,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False, "colspan": 2}, None]]
-    )
-    
-    # Other Metrics Tab
-    other_metrics_plots = [
-        PlotConfig("AI Parallel Coding Labor Multiplier", lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c), 1, 1,
-                  y_axis_title="Parallel Coding Labor Multiplier (log scale)", y_axis_type="log"),
-        PlotConfig("AI Research Stock Multiplier", lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c), 1, 2,
-                  y_axis_title="Research Stock Multiplier (log scale)", y_axis_type="log"),
-        PlotConfig("AI Software Progress Multiplier", lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c), 2, 1,
-                  y_axis_title="Software Progress Multiplier (log scale)", y_axis_type="log"),
-        PlotConfig("AI Overall Progress Multiplier", lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c), 2, 2,
-                  y_axis_title="Overall Progress Multiplier (log scale)", y_axis_type="log"),
-        PlotConfig("Human-only Progress Rate", lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c), 3, 1,
-                  y_axis_title="Human-Only Rate", y_axis_type="linear"),
-        PlotConfig("Horizon Length vs Progress", lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('parameters', {}).get('progress_at_sc')), 3, 2,
-                  x_axis_title="Cumulative Progress", y_axis_title="Horizon Length (log scale)", y_axis_type="log"),
-    ]
-    
-    other_metrics_tab = TabConfig(
-        tab_id="other_metrics",
-        tab_name="Other Metrics",
-        plots=other_metrics_plots,
-        rows=3,
-        cols=2,
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    return [time_horizons_tab, inputs_tab, automation_tab, cognitive_output_tab, software_rd_tab, combined_progress_tab, other_metrics_tab]
+    return tabs
 
 def create_tab_figure(tab_config: TabConfig, data: Dict[str, Any]) -> go.Figure:
     """Create a plotly figure for a specific tab"""
@@ -1216,34 +1111,38 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                 row=row, col=col,
             )
         
-        # Update primary y-axis, but skip horizon length plots that set their own range
-        if 'Horizon Length' not in plot_config.title:
-            y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
-            y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
-            y_axis_kwargs = dict(
-                title_text=plot_config.y_axis_title,
-                type=y_axis_type,
-                rangemode=y_axis_range_mode,
-                row=row, col=col,
-                gridcolor='#ebedf0',
-                ticks='outside', tickcolor='#bdbdbd', ticklen=6,
-                secondary_y=False,
-            )
-            # Use compact SI ticks on log scale axes
-            if plot_config.y_axis_type == 'log':
-                y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
-            fig.update_yaxes(**y_axis_kwargs)
-        else:
-            # For horizon length plots, only update styling without affecting range
-            fig.update_yaxes(
-                title_text=plot_config.y_axis_title,
-                type='log',  # Ensure log scale is set
-                gridcolor='#ebedf0',
-                ticks='outside', tickcolor='#bdbdbd', ticklen=6,
-                exponentformat='power', tickformat='.1s',  # Log scale formatting
-                row=row, col=col,
-                secondary_y=False,
-            )
+        # Update primary y-axis using centralized configuration
+        y_axis_type = plot_config.y_axis_type if plot_config.y_axis_type != "linear" else None
+        y_axis_range_mode = 'tozero' if plot_config.y_axis_type == "linear" else None
+        y_axis_kwargs = dict(
+            title_text=plot_config.y_axis_title,
+            type=y_axis_type,
+            rangemode=y_axis_range_mode,
+            row=row, col=col,
+            gridcolor='#ebedf0',
+            ticks='outside', tickcolor='#bdbdbd', ticklen=6,
+            secondary_y=False,
+        )
+        
+        # Handle custom y-axis ranges (e.g., for horizon length plots)
+        if hasattr(plot_config, 'y_axis_range') and plot_config.y_axis_range is not None:
+            y_axis_kwargs['range'] = plot_config.y_axis_range
+            y_axis_kwargs['autorange'] = False
+            
+        # Handle custom ticks (e.g., for time-formatted axes)
+        if hasattr(plot_config, 'y_axis_custom_ticks') and plot_config.y_axis_custom_ticks:
+            tick_values, tick_labels = get_time_tick_values_and_labels()
+            y_axis_kwargs.update({
+                'tickmode': 'array',
+                'tickvals': [val for val in tick_values if 0.001 <= val <= 1_000_000],
+                'ticktext': [label for val, label in zip(tick_values, tick_labels) if 0.001 <= val <= 1_000_000],
+            })
+        
+        # Use compact SI ticks on log scale axes
+        if plot_config.y_axis_type == 'log':
+            y_axis_kwargs.update(dict(exponentformat='power', tickformat='.1s'))
+            
+        fig.update_yaxes(**y_axis_kwargs)
         
         # Update secondary y-axis if present
         if plot_config.secondary_y and plot_config.y_axis_secondary_title:

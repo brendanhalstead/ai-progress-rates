@@ -182,4 +182,294 @@ DEFAULT_PARAMETERS = {
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # Lambda parameter
     'lambda': 0.65,
+}
+
+# =============================================================================
+# PLOT CONFIGURATION - SINGLE SOURCE OF TRUTH
+# =============================================================================
+
+PLOT_METADATA = {
+    # Time Horizons plots
+    'plot_horizon_lengths': {
+        'title': 'Time Horizon Lengths',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 6], 'custom_ticks': True},
+        'data_keys': ['times', 'horizon_lengths'],
+        'special_handling': ['metr_data', 'sc_time_horizon_minutes']
+    },
+    'plot_horizon_lengths_vs_progress': {
+        'title': 'Horizon Length vs Progress',
+        'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
+        'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 6], 'custom_ticks': True},
+        'data_keys': ['progress_values', 'horizon_lengths'],
+        'special_handling': ['metr_data', 'sc_time_horizon_minutes', 'progress_at_sc']
+    },
+    
+    # Input plots
+    'plot_human_labor': {
+        'title': 'Human Labor',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Human Labor (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'L_HUMAN']
+    },
+    'plot_ai_labor': {
+        'title': 'AI Labor',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'AI Labor (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'L_AI']
+    },
+    'plot_experiment_compute': {
+        'title': 'Experiment Compute',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Experiment Compute (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'experiment_compute']
+    },
+    'plot_training_compute': {
+        'title': 'Training Compute',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Training Compute (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'training_compute']
+    },
+    'plot_effective_compute': {
+        'title': 'Effective Compute',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Effective Compute (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'effective_compute']
+    },
+    'plot_labor_comparison': {
+        'title': 'Labor Comparison',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Labor (log scale)', 'type': 'log'},
+        'data_keys': ['time_series']
+    },
+    'plot_compute_comparison': {
+        'title': 'Compute Comparison',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Compute (log scale)', 'type': 'log'},
+        'data_keys': ['time_series']
+    },
+    
+    # Automation plots
+    'plot_automation_fraction': {
+        'title': 'Automation Fraction',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Automation (%)', 'type': 'linear'},
+        'data_keys': ['times', 'automation_fraction']
+    },
+    'plot_progress_vs_automation': {
+        'title': 'Progress vs Automation',
+        'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
+        'y_axis': {'title': 'Automation (%)', 'type': 'linear'},
+        'data_keys': ['progress', 'automation_fraction']
+    },
+    'plot_ai_research_taste': {
+        'title': 'AI Research Taste',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'AI Research Taste', 'type': 'linear'},
+        'data_keys': ['times', 'ai_research_taste']
+    },
+    'plot_ai_research_taste_sd': {
+        'title': 'AI Research Taste (Standard Deviations)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'AI Research Taste (Standard Deviations)', 'type': 'linear'},
+        'data_keys': ['times', 'ai_research_taste_sd']
+    },
+    'plot_ai_research_taste_quantile': {
+        'title': 'AI Research Taste (Quantile)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'AI Research Taste (Quantile)', 'type': 'linear'},
+        'data_keys': ['times', 'ai_research_taste_quantile']
+    },
+    'plot_aggregate_research_taste': {
+        'title': 'Aggregate Research Taste',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Aggregate Research Taste', 'type': 'linear'},
+        'data_keys': ['times', 'aggregate_research_taste']
+    },
+    'plot_ai_vs_aggregate_research_taste': {
+        'title': 'AI vs Aggregate Research Taste',
+        'x_axis': {'title': 'AI Research Taste', 'type': 'linear'},
+        'y_axis': {'title': 'Aggregate Research Taste', 'type': 'linear'},
+        'data_keys': ['ai_research_taste', 'aggregate_research_taste']
+    },
+    
+    # Cognitive Output plots
+    'plot_cognitive_output_with_compute': {
+        'title': 'Parallel Coding Labor',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Parallel Coding Labor (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'cognitive_outputs']
+    },
+    'plot_cognitive_components': {
+        'title': 'Labor Contributions',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Labor Contribution (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_labor_contributions', 'human_labor_contributions']
+    },
+    'plot_ai_cognitive_output_multiplier': {
+        'title': 'AI Parallel Coding Labor Multiplier',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Parallel Coding Labor Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_cognitive_output_multipliers']
+    },
+    
+    # Software R&D plots
+    'plot_research_stock': {
+        'title': 'Research Stock',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Research Stock (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'research_stocks']
+    },
+    'plot_research_stock_rate': {
+        'title': 'Research Stock Rate',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Research Stock Rate (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'research_stock_rates']
+    },
+    'plot_software_progress_rate': {
+        'title': 'Software Progress Rate',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Software Rate', 'type': 'linear'},
+        'data_keys': ['times', 'software_progress_rates']
+    },
+    
+    # Combined Progress plots
+    'plot_cumulative_progress': {
+        'title': 'Cumulative Progress',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Progress', 'type': 'linear'},
+        'data_keys': ['times', 'progress']
+    },
+    'plot_progress_rate': {
+        'title': 'Overall Progress Rate',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Overall Rate', 'type': 'linear'},
+        'data_keys': ['times', 'progress_rates']
+    },
+    'plot_rate_components': {
+        'title': 'Rate Components',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Rate', 'type': 'linear'},
+        'data_keys': ['times', 'progress_rates', 'software_progress_rates']
+    },
+    
+    # Other Metrics plots
+    'plot_ai_research_stock_multiplier': {
+        'title': 'AI Research Stock Multiplier',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Research Stock Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_research_stock_multipliers']
+    },
+    'plot_ai_software_progress_multiplier': {
+        'title': 'AI Software Progress Multiplier',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Software Progress Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_software_progress_multipliers']
+    },
+    'plot_ai_overall_progress_multiplier': {
+        'title': 'AI Overall Progress Multiplier',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Overall Progress Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_overall_progress_multipliers']
+    },
+    'plot_all_ai_multipliers': {
+        'title': 'All AI Multipliers',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_cognitive_output_multipliers', 'ai_research_stock_multipliers', 
+                     'ai_software_progress_multipliers', 'ai_overall_progress_multipliers']
+    },
+    'plot_human_only_progress_rate': {
+        'title': 'Human-Only Progress Rate',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Human-Only Rate', 'type': 'linear'},
+        'data_keys': ['times', 'human_only_progress_rates']
+    },
+    'plot_automation_multiplier': {
+        'title': 'Automation Multiplier',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Automation Multiplier', 'type': 'linear'},
+        'data_keys': ['times', 'automation_multipliers']
+    }
+}
+
+TAB_CONFIGURATIONS = {
+    'time_horizons': {
+        'id': 'time-horizons',
+        'name': 'Time Horizons',
+        'rows': 1, 'cols': 1,
+        'plots': [
+            {'function': 'plot_horizon_lengths', 'position': (1, 1)},
+        ]
+    },
+    'inputs': {
+        'id': 'inputs',
+        'name': 'Inputs',
+        'rows': 2, 'cols': 2,
+        'plots': [
+            {'function': 'plot_human_labor', 'position': (1, 1)},
+            {'function': 'plot_ai_labor', 'position': (1, 2)},
+            {'function': 'plot_experiment_compute', 'position': (2, 1)},
+            {'function': 'plot_training_compute', 'position': (2, 2)}
+        ]
+    },
+    'automation': {
+        'id': 'automation',
+        'name': 'Automation',
+        'rows': 3, 'cols': 2,
+        'plots': [
+            {'function': 'plot_automation_fraction', 'position': (1, 1)},
+            {'function': 'plot_progress_vs_automation', 'position': (1, 2)},
+            {'function': 'plot_ai_research_taste', 'position': (2, 1)},
+            {'function': 'plot_ai_research_taste_sd', 'position': (2, 2)},
+            {'function': 'plot_ai_research_taste_quantile', 'position': (3, 1)},
+            {'function': 'plot_aggregate_research_taste', 'position': (3, 2)}
+        ]
+    },
+    'cognitive_output': {
+        'id': 'cognitive-output',
+        'name': 'Parallel Coding Labor',
+        'rows': 2, 'cols': 2,
+        'plots': [
+            {'function': 'plot_cognitive_output_with_compute', 'position': (1, 1)},
+            {'function': 'plot_cognitive_components', 'position': (1, 2)},
+            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
+            {'function': 'plot_labor_comparison', 'position': (2, 2)}
+        ]
+    },
+    'software_rd': {
+        'id': 'software-rd',
+        'name': 'Software R&D',
+        'rows': 2, 'cols': 2,
+        'plots': [
+            {'function': 'plot_research_stock_rate', 'position': (1, 1)},
+            {'function': 'plot_research_stock', 'position': (1, 2)},
+            {'function': 'plot_software_progress_rate', 'position': (2, 1)},
+            {'function': 'plot_compute_comparison', 'position': (2, 2)}
+        ]
+    },
+    'combined_progress': {
+        'id': 'combined-progress',
+        'name': 'Combined Progress',
+        'rows': 2, 'cols': 2,
+        'plots': [
+            {'function': 'plot_progress_rate', 'position': (1, 1)},
+            {'function': 'plot_rate_components', 'position': (1, 2)},
+            {'function': 'plot_cumulative_progress', 'position': (2, 1)},
+            {'function': 'plot_effective_compute', 'position': (2, 2)}
+        ]
+    },
+    'other_metrics': {
+        'id': 'other-metrics',
+        'name': 'Other Metrics',
+        'rows': 3, 'cols': 2,
+        'plots': [
+            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (1, 1)},
+            {'function': 'plot_ai_research_stock_multiplier', 'position': (1, 2)},
+            {'function': 'plot_ai_software_progress_multiplier', 'position': (2, 1)},
+            {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 2)},
+            {'function': 'plot_human_only_progress_rate', 'position': (3, 1)},
+            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 2)}
+        ]
+    }
 } 
