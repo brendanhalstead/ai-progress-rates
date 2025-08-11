@@ -48,7 +48,7 @@ DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
 AI_RESEARCH_TASTE_MAX = 1e10  # Match the upper bound from PARAMETER_BOUNDS
-AI_RESEARCH_TASTE_MAX_SD = 30
+AI_RESEARCH_TASTE_MAX_SD = 23
 
 # Baseline Annual Compute Multiplier
 BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
