@@ -497,7 +497,7 @@ See Automation tab.
 ### AI Cognitive Output Multiplier (Bottom Left)
 Obtained by taking the combined coding labor and dividing it by the human labor.
 
-### Cognitive Components (Bottom Right)
+### Normalized Coding Labor (Bottom Right)
 Depicts the actual combined coding labor that gets passed into the next tab. The combination is given by (insert equation).
 
         """
