@@ -127,7 +127,7 @@
                                             <input type="range" class="range-input form-range" id="anchor_doubling_time" step="0.01" disabled>
                                             <small class="text-muted">Months required to double time horizon from anchor value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at anchor time.</small>
                                         </div>
-                                        <div class="mb-2">
+                                        <div class="mb-2" id="doubling_decay_rate_group">
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="auto_fit_doubling_decay_rate">
                                                 <label class="form-check-label" for="auto_fit_doubling_decay_rate">Auto-fit Doubling Decay Rate</label>
@@ -622,6 +622,9 @@
             
             // Add event listeners to select dropdowns
             $('select').on('change', function() {
+                if (this.id === 'horizon_extrapolation_type') {
+                    updateHorizonExtrapolationVisibility();
+                }
                 // Auto-update if enabled
                 if ($('#autoUpdate').is(':checked')) {
                     clearTimeout(window.updateTimer);
@@ -640,6 +643,8 @@
             
             // Initialize anchor time display text
             updateAnchorTimeDisplay();
+            // Initialize visibility for horizon extrapolation dependent controls
+            updateHorizonExtrapolationVisibility();
         }
         
         function formatDecimalYearToDate(decimalYear) {
@@ -666,6 +671,16 @@
                 const formattedDate = formatDecimalYearToDate(anchorTimeValue);
                 anchorTimeText.textContent = `Coding labor multiplier at the anchor time (${formattedDate})`;
             }
+        }
+
+        function updateHorizonExtrapolationVisibility() {
+            // Show doubling decay rate controls only when decaying doubling time is selected
+            const typeSelect = document.getElementById('horizon_extrapolation_type');
+            const decayGroup = document.getElementById('doubling_decay_rate_group');
+            if (!decayGroup) return;
+            const selected = typeSelect ? typeSelect.value : '';
+            const shouldShow = selected === 'decaying doubling time' || selected === 'Decaying doubling time' || selected === 'Decaying Doubling Time';
+            decayGroup.style.display = shouldShow ? '' : 'none';
         }
         
         function updateDisplayValue(input) {
