@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Rollouts</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Monte Carlo Rollouts</h3>
+            <div>
+                <a class="btn btn-outline-secondary" href="/">Back to Model</a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Run Settings</span>
+                        <div class="btn-group btn-group-sm">
+                            <button id="loadGeneratedBtn" class="btn btn-outline-primary">Generated Defaults</button>
+                            <button id="loadFromFileBtn" class="btn btn-outline-secondary">From sampling_config.yaml</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <label class="form-label">Seed</label>
+                                <input type="number" class="form-control form-control-sm" id="seed" value="42">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Samples</label>
+                                <input type="number" class="form-control form-control-sm" id="num_samples" value="1000" min="1">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Initial Progress</label>
+                                <input type="number" class="form-control form-control-sm" id="initial_progress" value="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Start Year</label>
+                                <input type="number" class="form-control form-control-sm" id="start_year" value="2012">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">End Year</label>
+                                <input type="number" class="form-control form-control-sm" id="end_year" value="2035">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Input Data CSV (optional absolute path)</label>
+                            <input type="text" class="form-control form-control-sm" id="input_data" placeholder="/abs/path/to/input_data.csv">
+                            <div class="form-text">Leave blank to use default at input_data.csv.</div>
+                        </div>
+                        <div class="d-grid">
+                            <button id="runBtn" class="btn btn-primary">Run Monte Carlo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">Job Status</div>
+                    <div class="card-body">
+                        <div id="jobStatus" class="small text-muted">No job started.</div>
+                        <pre id="jobLog" class="mt-2" style="max-height: 220px; overflow: auto; background: var(--surface-2); padding: 8px;"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Parameter Distributions</span>
+                        <div>
+                            <button id="addParamBtn" class="btn btn-sm btn-outline-success">Add Parameter</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 70vh; overflow: auto;">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle" id="distTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 220px;">Parameter</th>
+                                        <th style="width: 120px;">Distribution</th>
+                                        <th>Spec</th>
+                                        <th style="width: 60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="distBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Rollout Analysis</span>
+                        <span class="small text-muted">Auto-generated after run</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="analysisEmpty" class="text-muted small">Run a job to see the SC-time distribution and sensitivity plots here.</div>
+                        <div id="analysisWrap" class="row g-3" style="display:none;">
+                            <div class="col-12">
+                                <label class="form-label small">SC-time Distribution</label>
+                                <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Spearman (top)</label>
+                                <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Permutation Importance (top)</label>
+                                <img id="imgSensPerm" class="img-fluid rounded border" alt="Sensitivity Permutation" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = null;
+        let jobId = null;
+        let pollTimer = null;
+
+        function field(name, placeholder = '', value = '') {
+            return `<input type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+        }
+
+        function numberField(name, placeholder = '', value = '') {
+            return `<input type="number" step="any" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+        }
+
+        function selectDist(name, value) {
+            const opts = ['fixed','uniform','normal','lognormal','beta','choice'];
+            return `<select class="form-select form-select-sm dist-select" data-key="${name}">` +
+                opts.map(o => `<option value="${o}" ${o===value?'selected':''}>${o}</option>`).join('') + `</select>`;
+        }
+
+        function renderSpecInputs(dist, spec) {
+            // Render a compact spec editor row based on dist type
+            const s = spec || {};
+            if (dist === 'fixed') {
+                return `${numberField('value', 'value', s.value ?? '')}`;
+            }
+            if (dist === 'uniform') {
+                return `<div class="row g-1">
+                    <div class="col-6">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-6">${numberField('max','max', s.max ?? '')}</div>
+                </div>`;
+            }
+            if (dist === 'normal') {
+                return `<div class="row g-1">
+                    <div class="col-4">${numberField('mean','mean', s.mean ?? '')}</div>
+                    <div class="col-4">${numberField('sd','sd', s.sd ?? s.sigma ?? '')}</div>
+                    <div class="col-2">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-2">${numberField('max','max', s.max ?? '')}</div>
+                </div>`;
+            }
+            if (dist === 'lognormal') {
+                return `<div class="row g-1">
+                    <div class="col-4">${numberField('mu','mu', s.mu ?? '')}</div>
+                    <div class="col-4">${numberField('sigma','sigma', s.sigma ?? '')}</div>
+                    <div class="col-2">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-2">${numberField('max','max', s.max ?? '')}</div>
+                </div>`;
+            }
+            if (dist === 'beta') {
+                return `<div class="row g-1">
+                    <div class="col-3">${numberField('alpha','alpha', s.alpha ?? '')}</div>
+                    <div class="col-3">${numberField('beta','beta', s.beta ?? '')}</div>
+                    <div class="col-3">${numberField('min','min', s.min ?? 0)}</div>
+                    <div class="col-3">${numberField('max','max', s.max ?? 1)}</div>
+                </div>`;
+            }
+            if (dist === 'choice') {
+                const values = Array.isArray(s.values) ? s.values.join(',') : '';
+                const probs = Array.isArray(s.p) ? s.p.join(',') : '';
+                return `<div class="row g-1">
+                    <div class="col-8"><input type="text" class="form-control form-control-sm dist-field" data-key="values" placeholder='comma-separated values' value="${values}"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm dist-field" data-key="p" placeholder='probs (optional)' value="${probs}"></div>
+                </div>`;
+            }
+            return '';
+        }
+
+        function toSpecObject(row) {
+            const dist = row.querySelector('.dist-select').value;
+            const spec = { dist };
+            row.querySelectorAll('.dist-field').forEach(el => {
+                const k = el.getAttribute('data-key');
+                let v = el.value;
+                if (['values','p'].includes(k)) {
+                    if (k === 'values') {
+                        spec.values = v.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                    } else if (k === 'p') {
+                        const arr = v.split(',').map(s => s.trim()).filter(s => s.length > 0).map(parseFloat);
+                        if (arr.length > 0) spec.p = arr;
+                    }
+                } else {
+                    // numeric fields
+                    if (v !== '') spec[k] = parseFloat(v);
+                }
+            });
+            // Auto add clip_to_bounds when bounds are present
+            if ((spec.min !== undefined || spec.max !== undefined) && dist !== 'fixed' && dist !== 'choice') {
+                spec.clip_to_bounds = true;
+            }
+            return spec;
+        }
+
+        function addRow(paramName, distSpec) {
+            const tbody = document.getElementById('distBody');
+            const tr = document.createElement('tr');
+            const dist = (distSpec && distSpec.dist) || 'fixed';
+            tr.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm param-name" value="${paramName || ''}" placeholder="parameter name"></td>
+                <td>${selectDist('dist', dist)}</td>
+                <td class="spec-cell">${renderSpecInputs(dist, distSpec)}</td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-danger remove-row">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+
+            tr.querySelector('.dist-select').addEventListener('change', (e) => {
+                const d = e.target.value;
+                tr.querySelector('.spec-cell').innerHTML = renderSpecInputs(d, {});
+            });
+            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+        }
+
+        function renderConfig(cfg) {
+            currentConfig = cfg || {};
+            // Fill top-level fields
+            document.getElementById('seed').value = currentConfig.seed ?? 42;
+            document.getElementById('num_samples').value = currentConfig.num_samples ?? currentConfig.num_rollouts ?? 1000;
+            document.getElementById('initial_progress').value = currentConfig.initial_progress ?? 0.0;
+            if (Array.isArray(currentConfig.time_range) && currentConfig.time_range.length === 2) {
+                document.getElementById('start_year').value = currentConfig.time_range[0];
+                document.getElementById('end_year').value = currentConfig.time_range[1];
+            }
+            document.getElementById('input_data').value = currentConfig.input_data || '';
+
+            // Render parameter rows
+            const tbody = document.getElementById('distBody');
+            tbody.innerHTML = '';
+            const params = currentConfig.parameters || {};
+            Object.keys(params).forEach(name => addRow(name, params[name]));
+        }
+
+        async function loadDefaultConfig(source='generated') {
+            const res = await fetch(`/api/monte-carlo/default-config?source=${source}`);
+            const data = await res.json();
+            if (data.success) {
+                renderConfig(data.config);
+            } else {
+                alert(data.error || 'Failed to load default config');
+            }
+        }
+
+        function collectConfigFromUI() {
+            const cfg = {
+                seed: parseInt(document.getElementById('seed').value || '42'),
+                num_samples: parseInt(document.getElementById('num_samples').value || '1000'),
+                initial_progress: parseFloat(document.getElementById('initial_progress').value || '0'),
+                time_range: [
+                    parseFloat(document.getElementById('start_year').value || '2012'),
+                    parseFloat(document.getElementById('end_year').value || '2035')
+                ],
+                input_data: (document.getElementById('input_data').value || '').trim() || null,
+                parameters: {}
+            };
+            document.querySelectorAll('#distBody tr').forEach(tr => {
+                const name = tr.querySelector('.param-name').value.trim();
+                if (!name) return;
+                cfg.parameters[name] = toSpecObject(tr);
+            });
+            return cfg;
+        }
+
+        async function startRun() {
+            const cfg = collectConfigFromUI();
+            document.getElementById('runBtn').disabled = true;
+            document.getElementById('jobStatus').textContent = 'Submitting job...';
+            document.getElementById('jobLog').textContent = '';
+            try {
+                const res = await fetch('/api/monte-carlo/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to start job');
+                jobId = data.job_id;
+                document.getElementById('jobStatus').textContent = `Job ${jobId} started...`;
+                pollJob();
+            } catch (e) {
+                document.getElementById('jobStatus').textContent = `Error: ${e.message}`;
+                document.getElementById('runBtn').disabled = false;
+            }
+        }
+
+        async function pollJob() {
+            if (!jobId) return;
+            try {
+                const res = await fetch(`/api/monte-carlo/status/${jobId}?tail=80`);
+                const data = await res.json();
+                if (data.success) {
+                    const j = data.job;
+                    const status = j.status;
+                    const outDir = j.output_dir ? ` | output: ${j.output_dir}` : '';
+                    document.getElementById('jobStatus').textContent = `Status: ${status}${outDir}`;
+                    document.getElementById('jobLog').textContent = (data.log_tail || []).join('\n');
+                    if (status === 'running') {
+                        clearTimeout(pollTimer);
+                        pollTimer = setTimeout(pollJob, 1500);
+                    } else {
+                        document.getElementById('runBtn').disabled = false;
+                        // Attempt to show artifacts if the job succeeded
+                        if (status === 'succeeded') {
+                            renderArtifacts(j);
+                        }
+                    }
+                } else {
+                    document.getElementById('jobStatus').textContent = data.error || 'Job not found';
+                    document.getElementById('runBtn').disabled = false;
+                }
+            } catch (e) {
+                document.getElementById('jobStatus').textContent = `Error polling job: ${e.message}`;
+                document.getElementById('runBtn').disabled = false;
+            }
+        }
+
+        function renderArtifacts(job) {
+            const artifacts = job.artifacts || [];
+            const hasAny = (name) => artifacts.includes(name);
+            const ts = Date.now();
+            const base = (name) => `/api/monte-carlo/artifact/${jobId}/${encodeURIComponent(name)}?t=${ts}`;
+
+            const wrap = document.getElementById('analysisWrap');
+            const empty = document.getElementById('analysisEmpty');
+
+            // Show section
+            wrap.style.display = 'flex';
+            empty.style.display = 'none';
+
+            // Toggle and set image sources based on available artifacts
+            const scWrap = document.getElementById('imgScHist').closest('.col-12');
+            const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
+            const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
+
+            if (hasAny('sc_time_hist.png')) {
+                document.getElementById('imgScHist').src = base('sc_time_hist.png');
+                scWrap.style.display = '';
+            } else {
+                scWrap.style.display = 'none';
+            }
+            if (hasAny('sensitivity_spearman_top.png')) {
+                document.getElementById('imgSensSpearman').src = base('sensitivity_spearman_top.png');
+                spWrap.style.display = '';
+            } else {
+                spWrap.style.display = 'none';
+            }
+            if (hasAny('sensitivity_permutation_top.png')) {
+                document.getElementById('imgSensPerm').src = base('sensitivity_permutation_top.png');
+                pmWrap.style.display = '';
+            } else {
+                pmWrap.style.display = 'none';
+            }
+        }
+
+        document.getElementById('loadGeneratedBtn').addEventListener('click', () => loadDefaultConfig('generated'));
+        document.getElementById('loadFromFileBtn').addEventListener('click', () => loadDefaultConfig('file'));
+        document.getElementById('runBtn').addEventListener('click', startRun);
+        document.getElementById('addParamBtn').addEventListener('click', () => addRow('', { dist: 'fixed', value: 0 }));
+
+        // Initial load
+        loadDefaultConfig('generated');
+    </script>
+</body>
+</html>
+

@@ -46,6 +46,14 @@ session_data = {
     'results': None
 }
 
+# Register blueprints
+try:
+    from monte_carlo import mc_bp
+    app.register_blueprint(mc_bp)
+except Exception as _e:
+    # Defer blueprint errors to runtime logs; core app should still function
+    logger.warning(f"Monte Carlo blueprint not registered: {_e}")
+
 # Plot Configuration System
 class PlotConfig:
     """Configuration for a single plot using centralized metadata"""
