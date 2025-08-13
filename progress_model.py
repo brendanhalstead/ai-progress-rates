@@ -2178,7 +2178,7 @@ class ProgressModel:
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution()
     
-    def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray):
+    def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
         Estimate horizon trajectory by fitting to log(p80_horizon_length) vs progress.
         Uses provided human-only progress trajectory to get progress values at model release dates.
@@ -2190,6 +2190,8 @@ class ProgressModel:
         Args:
             human_only_times: Time array from human-only trajectory computation
             human_only_progress: Progress array from human-only trajectory computation
+            anchor_progress_rate: Progress rate at anchor time (progress units per time unit),
+                                 used to convert anchor_doubling_time from time units to progress units
             
         Returns:
             Function that maps progress to horizon length
@@ -2310,8 +2312,11 @@ class ProgressModel:
                     
                     # If anchor_doubling_time is provided, use it to calculate slope
                     if self.params.anchor_doubling_time is not None:
+                        # Convert anchor_doubling_time from time units to progress units
+                        # doubling_time_in_progress_units = doubling_time_in_time_units * progress_rate
+                        doubling_time_in_progress_units = self.params.anchor_doubling_time * anchor_progress_rate
                         # slope = log(2) / doubling_time (in progress units)
-                        slope = np.log(2) / self.params.anchor_doubling_time
+                        slope = np.log(2) / doubling_time_in_progress_units
                     else:
                         # Optimize slope using data, but fix intercept using anchor point
                         def fit_slope_only(slope_val):
@@ -2327,6 +2332,8 @@ class ProgressModel:
                     
                     logger.info(f"Manual exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
                     logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}, horizon={self.params.anchor_horizon:.4f}")
+                    if self.params.anchor_doubling_time is not None:
+                        logger.info(f"Anchor doubling time (time units): {self.params.anchor_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
                 else:
                     # Use automatic curve fitting
                     popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
@@ -2374,7 +2381,10 @@ class ProgressModel:
                     
                     # Handle T_0 (anchor_doubling_time)
                     if self.params.anchor_doubling_time is not None:
-                        fixed_params['T_0'] = self.params.anchor_doubling_time
+                        # Convert anchor_doubling_time from time units to progress units
+                        # doubling_time_in_progress_units = doubling_time_in_time_units * progress_rate
+                        doubling_time_in_progress_units = self.params.anchor_doubling_time * anchor_progress_rate
+                        fixed_params['T_0'] = doubling_time_in_progress_units
                     else:
                         params_to_optimize.append('T_0')
                     
@@ -2387,7 +2397,7 @@ class ProgressModel:
                     if len(params_to_optimize) == 0:
                         # All parameters specified (Case 8)
                         H_0 = self.params.anchor_horizon
-                        T_0 = self.params.anchor_doubling_time
+                        T_0 = doubling_time_in_progress_units
                         A_0 = self.params.doubling_decay_rate
                         logger.info(f"Manual decaying doubling time: All parameters specified")
                     elif len(params_to_optimize) == 1:
@@ -2522,7 +2532,7 @@ class ProgressModel:
                     if self.params.anchor_horizon is not None:
                         logger.info(f"Anchor horizon: {self.params.anchor_horizon:.4f}")
                     if self.params.anchor_doubling_time is not None:
-                        logger.info(f"Anchor doubling time: {self.params.anchor_doubling_time:.4f}")
+                        logger.info(f"Anchor doubling time (time units): {self.params.anchor_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
                     
                     # Store anchor_progress for use in horizon_trajectory function
                     anchor_progress_for_trajectory = anchor_progress
@@ -2765,6 +2775,7 @@ class ProgressModel:
         # Anchor stats at params.anchor_time
         anchor_time = human_only_params.anchor_time
         anchor_progress = np.interp(anchor_time, times, progress_values)
+        anchor_progress_rate = np.interp(anchor_time, times, progress_rates)
         # Interpolate human and AI labor at anchor time using log-space when positive
         if np.all(self.data.L_HUMAN > 0):
             anchor_human_labor = _log_interp(anchor_time, self.data.time, self.data.L_HUMAN)
@@ -2783,6 +2794,7 @@ class ProgressModel:
             'research_stock_rates': research_stock_rates,
             'anchor_stats': {
                 'progress': anchor_progress,
+                'progress_rate': anchor_progress_rate,
                 'human_labor': anchor_human_labor,
                 'ai_labor': anchor_ai_labor
             },
@@ -2814,7 +2826,8 @@ class ProgressModel:
         
         # estimate horizon trajectory from METR data using human-only trajectory
         try:
-            self.estimate_horizon_trajectory(human_only_times, human_only_progress)
+            anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
+            self.estimate_horizon_trajectory(human_only_times, human_only_progress, anchor_progress_rate)
         except Exception as e:
             logger.warning(f"Failed to estimate horizon trajectory: {e}")
             self.horizon_trajectory = None
@@ -3085,6 +3098,17 @@ class ProgressModel:
         else:
             sc_sw_multiplier = None
         
+        # Calculate progress rate at anchor time
+        anchor_time = self.params.anchor_time
+        anchor_progress_rate = None
+        if anchor_time is not None:
+            # Check if anchor time is within our trajectory
+            if times[0] <= anchor_time <= times[-1]:
+                anchor_progress_rate = np.interp(anchor_time, times, progress_rates)
+                logger.info(f"Progress rate at anchor time ({anchor_time:.3f}): {anchor_progress_rate:.6f}")
+            else:
+                logger.warning(f"Anchor time {anchor_time:.3f} is outside trajectory range [{times[0]:.3f}, {times[-1]:.3f}]")
+        
         # Store comprehensive results
         self.results = {
             'times': times,
@@ -3115,6 +3139,8 @@ class ProgressModel:
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
+            'anchor_time': anchor_time,  # Anchor time for manual horizon fitting
+            'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

@@ -98,7 +98,7 @@
                                             <option value="exponential">Exponential</option>
                                             <option value="decaying doubling time">Decaying Doubling Time</option>
                                         </select>
-                                        <small class="text-muted">Method for extrapolating progress beyond the time horizon</small>
+                                        <small class="text-muted">Method for extrapolating time horizon as a function of effective compute</small>
                                     </div>
                                     
                                     <!-- Manual Horizon Fitting Parameters -->
@@ -123,9 +123,9 @@
                                                 <input class="form-check-input" type="checkbox" id="auto_fit_anchor_doubling_time">
                                                 <label class="form-check-label" for="auto_fit_anchor_doubling_time">Auto-fit Anchor Doubling Time</label>
                                             </div>
-                                            <label class="param-label">Anchor Doubling "Time": <span id="anchor_doubling_time_val">Loading...</span> effective OOMs</label>
+                                            <label class="param-label">Anchor Doubling Time: <span id="anchor_doubling_time_val">Loading...</span> months</label>
                                             <input type="range" class="range-input form-range" id="anchor_doubling_time" step="0.01" disabled>
-                                            <small class="text-muted">OOMs of effective compute required to double anchor horizon</small>
+                                            <small class="text-muted">Months required to double time horizon from anchor value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at anchor time.</small>
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
@@ -134,7 +134,7 @@
                                             </div>
                                             <label class="param-label">Doubling Decay Rate: <span id="doubling_decay_rate_val">Loading...</span></label>
                                             <input type="range" class="range-input form-range" id="doubling_decay_rate" step="0.001" disabled>
-                                            <small class="text-muted">Decay per doubling of doubling "time"</small>
+                                            <small class="text-muted">Controls the aggressiveness of the superexponential function. The OOMs of effective compute required for each successive doubling of time horizon decreases by this amount.</small>
                                         </div>
                                     </div>
                                 </div>
@@ -675,13 +675,21 @@
             
             console.log('Updating slider:', input.id, 'to value:', value);
             
-            // Special handling for optional parameters - show "Auto-fit" when checkbox is checked
-            if (input.id === 'anchor_horizon' || input.id === 'anchor_doubling_time' || input.id === 'doubling_decay_rate') {
+			// Special handling for optional parameters - show "Auto-fit" when checkbox is checked
+			if (input.id === 'anchor_horizon' || input.id === 'anchor_doubling_time' || input.id === 'doubling_decay_rate') {
                 const autoFitCheckbox = document.getElementById('auto_fit_' + input.id);
                 if (autoFitCheckbox && autoFitCheckbox.checked) {
                     displayValue = 'Auto-fit';
                 } else {
-                    displayValue = value.toFixed(3);
+					if (input.id === 'anchor_doubling_time') {
+						// Display in decimal months instead of decimal years
+						displayValue = (value * 12).toFixed(1);
+					} else if (input.id === 'doubling_decay_rate') {
+						// Display as percentage
+						displayValue = (value * 100).toFixed(1) + '%';
+					} else {
+						displayValue = value.toFixed(3);
+					}
                 }
             } else if (input.id === 'anchor_time') {
                 // Format anchor time as readable date
@@ -1912,6 +1920,8 @@
                 $('#summary_sc_time').text(summary.sc_time != null ? formatDecimalYearToMonthYear(summary.sc_time) : '—');
                 // SC R&D progress multiplier
                 $('#summary_sc_rd_multiplier').text(summary.sc_sw_multiplier != null ? fmt(summary.sc_sw_multiplier, 2) + 'x' : '—');
+                // Progress rate at anchor time
+                $('#summary_anchor_progress_rate').text(summary.anchor_progress_rate != null ? fmt(summary.anchor_progress_rate, 3) : '—');
             } catch (e) {
                 console.warn('Failed to update summary', e);
             }
