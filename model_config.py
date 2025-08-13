@@ -159,15 +159,15 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
-    'rho_progress': -0.15,
-    'alpha': 0.7,
+    'rho_progress': -0.137,
+    'alpha': 0.69,
     'software_scale': 2.25,
     'automation_fraction_at_superhuman_coder': 1.0,
     'progress_at_half_sc_automation': 20.0,
     'automation_slope': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
     'cognitive_output_normalization': 0.3,
-    'zeta': 0.55,
+    'zeta': 0.56,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
@@ -186,7 +186,7 @@ DEFAULT_PARAMETERS = {
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # Lambda parameter
-    'lambda': 0.65,
+    'lambda': 0.57,
 }
 
 # =============================================================================
