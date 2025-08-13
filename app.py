@@ -1774,6 +1774,7 @@ def params_to_dict(params: Parameters):
         'cognitive_output_normalization': params.cognitive_output_normalization,
         'zeta': params.zeta,
         'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
+        'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
         'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
         'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
@@ -1957,6 +1958,14 @@ def compute_model():
         'time_range': time_range
     }
     
+    # Add anchor taste slope metric if available
+    if model.results.get('ai_research_taste_slope_per_anchor_progress_year') is not None:
+        summary['ai_research_taste_slope_per_anchor_progress_year'] = float(model.results['ai_research_taste_slope_per_anchor_progress_year'])
+
+    # Add anchor progress rate if available
+    if model.results.get('anchor_progress_rate') is not None:
+        summary['anchor_progress_rate'] = float(model.results['anchor_progress_rate'])
+
     # Add SC timing information if available
     if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
         summary['sc_time'] = float(model.results['sc_time'])
@@ -2043,6 +2052,11 @@ def get_parameter_config():
                     'description': 'AI research taste when AI reaches superhuman coding ability',
                     'units': 'fraction'
                 },
+                'ai_research_taste_at_superhuman_coder_sd': {
+                    'name': 'Max AI Research Taste (SD)',
+                    'description': 'AI research taste at superhuman coder specified in human-range standard deviations',
+                    'units': 'SD'
+                },
                 'progress_at_half_ai_research_taste': {
                     'name': 'Half-Max AI Research Taste Progress',
                     'description': 'Progress level at 50% of max AI research taste (sigmoid mode)',
@@ -2055,7 +2069,7 @@ def get_parameter_config():
                 },
                 'taste_schedule_type': {
                     'name': 'AI Research Taste Schedule Type',
-                    'description': 'Type of curve for AI research taste evolution',
+                    'description': 'Unit convention for SD-based schedule',
                     'units': 'categorical'
                 },
                 'progress_at_sc': {

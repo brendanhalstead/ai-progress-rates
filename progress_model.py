@@ -263,6 +263,8 @@ class Parameters:
     swe_multiplier_at_anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_anchor_time'])
     # AI Research Taste sigmoid parameters
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
+    # Optional: allow specifying the superhuman-coder taste as SD within the human range
+    ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
     progress_at_half_ai_research_taste: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste'])
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
@@ -344,6 +346,15 @@ class Parameters:
             self.automation_slope = np.clip(self.automation_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
         
         # Sanitize AI research taste parameters
+        # If SD-specification is provided, convert to raw taste via TasteDistribution
+        if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
+            try:
+                taste_distribution_tmp = TasteDistribution()
+                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_superhuman_coder_sd))
+                if np.isfinite(converted_taste):
+                    self.ai_research_taste_at_superhuman_coder = float(converted_taste)
+            except Exception as e:
+                logger.warning(f"Failed converting ai_research_taste_at_superhuman_coder_sd to taste: {e}")
         if not np.isfinite(self.ai_research_taste_at_superhuman_coder):
             logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
             self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
@@ -1148,6 +1159,10 @@ def compute_ai_research_taste(cumulative_progress: float, params: Parameters) ->
         cumulative_progress = 0.0
     
     # Choose computation method based on schedule type
+    # Map UI-level schedule options to internal logic
+    ui_type = params.taste_schedule_type
+    if ui_type == "SDs per effective OOM" or ui_type == "SDs per progress-year":
+        return _compute_ai_research_taste_sd_per_progress(cumulative_progress, params)
     if params.taste_schedule_type == "sigmoid":
         return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
     elif params.taste_schedule_type == "exponential":
@@ -3108,6 +3123,14 @@ class ProgressModel:
                 logger.info(f"Progress rate at anchor time ({anchor_time:.3f}): {anchor_progress_rate:.6f}")
             else:
                 logger.warning(f"Anchor time {anchor_time:.3f} is outside trajectory range [{times[0]:.3f}, {times[-1]:.3f}]")
+
+        # Compute AI research taste slope in SD per anchor-progress-year (SD/year at anchor)
+        ai_taste_slope_per_anchor_progress_year = None
+        try:
+            if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate):
+                ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
+        except Exception as e:
+            logger.warning(f"Failed computing taste slope per anchor-progress-year: {e}")
         
         # Store comprehensive results
         self.results = {
@@ -3141,6 +3164,7 @@ class ProgressModel:
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
             'anchor_time': anchor_time,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
+            'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

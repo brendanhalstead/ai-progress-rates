@@ -230,25 +230,31 @@
                                 </div>
                                 <div class="collapse" id="aiResearchTasteParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Schedule Type:</label>
+                                        <label class="param-label">Schedule Type (units):</label>
                                         <select class="form-select form-select-sm" id="taste_schedule_type">
-                                            <option value="exponential">Exponential</option>
-                                            <option value="sigmoid">Sigmoid</option>
-                                            <option value="sd_per_progress">SD per Progress</option>
+                                            <option value="SDs per effective OOM">SDs per effective OOM</option>
+                                            <option value="SDs per progress-year">SDs per progress-year</option>
                                         </select>
-                                        <small class="text-muted">Type of curve for AI research taste evolution</small>
+                                        <small class="text-muted">Choose the unit convention for SD-based schedule</small>
                                     </div>
                                     
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-6" id="sc_taste_fraction_group">
                                             <label class="param-label">SC Research Taste: <span id="ai_research_taste_at_superhuman_coder_val">Loading...</span></label>
                                             <input type="range" class="range-input form-range" id="ai_research_taste_at_superhuman_coder" step="0.01">
                                             <small class="text-muted">Research Taste at SC (units: multiplier on research effort)</small>
                                         </div>
-                                        <div class="col-6">
-                                            <label class="param-label">AI Research Taste Slope: <span id="ai_research_taste_slope_val">Loading...</span></label>
+                                        <div class="col-6" id="sc_taste_sd_group" style="display:none;">
+                                            <label class="param-label">SC Research Taste (SD): <span id="ai_research_taste_at_superhuman_coder_sd_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="ai_research_taste_at_superhuman_coder_sd" step="0.1">
+                                            <small class="text-muted">SC taste in human-range standard deviations</small>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <label class="param-label">AI Research Taste Slope: <span id="ai_research_taste_slope_val">Loading...</span> SD/effective-OOM</label>
                                             <input type="range" class="range-input form-range" id="ai_research_taste_slope" step="0.1">
-                                            <small class="text-muted">Steepness of research taste curve</small>
+                                            <small class="text-muted" id="ai_research_taste_slope_info">Steepness of research taste curve</small>
                                         </div>
                                     </div>
                                 </div>
@@ -624,6 +630,8 @@
             $('select').on('change', function() {
                 if (this.id === 'horizon_extrapolation_type') {
                     updateHorizonExtrapolationVisibility();
+                } else if (this.id === 'taste_schedule_type') {
+                    updateTasteUnitsVisibility();
                 }
                 // Auto-update if enabled
                 if ($('#autoUpdate').is(':checked')) {
@@ -645,6 +653,8 @@
             updateAnchorTimeDisplay();
             // Initialize visibility for horizon extrapolation dependent controls
             updateHorizonExtrapolationVisibility();
+            // Initialize SD/fraction visibility per schedule type
+            updateTasteUnitsVisibility();
         }
         
         function formatDecimalYearToDate(decimalYear) {
@@ -682,11 +692,52 @@
             const shouldShow = selected === 'decaying doubling time' || selected === 'Decaying doubling time' || selected === 'Decaying Doubling Time';
             decayGroup.style.display = shouldShow ? '' : 'none';
         }
+
+        function updateTasteUnitsVisibility() {
+            const typeSelect = document.getElementById('taste_schedule_type');
+            const scTasteFractionGroup = document.getElementById('sc_taste_fraction_group');
+            const scTasteSdGroup = document.getElementById('sc_taste_sd_group');
+            if (!typeSelect || !scTasteFractionGroup || !scTasteSdGroup) return;
+            const selected = typeSelect.value;
+            const useSD = selected === 'SDs per effective OOM' || selected === 'SDs per progress-year';
+            scTasteSdGroup.style.display = useSD ? '' : 'none';
+            scTasteFractionGroup.style.display = useSD ? 'none' : '';
+
+            // Adjust column widths to prevent squashing
+            if (useSD) {
+                scTasteSdGroup.classList.remove('col-6');
+                scTasteSdGroup.classList.add('col-12');
+                scTasteFractionGroup.classList.remove('col-6');
+                scTasteFractionGroup.classList.add('col-12');
+            } else {
+                scTasteSdGroup.classList.remove('col-12');
+                scTasteSdGroup.classList.add('col-6');
+                scTasteFractionGroup.classList.remove('col-12');
+                scTasteFractionGroup.classList.add('col-6');
+            }
+
+            const slopeInfoEl = document.getElementById('ai_research_taste_slope_info');
+            if (slopeInfoEl) {
+                if (selected === 'SDs per effective OOM') {
+                    slopeInfoEl.textContent = 'Slope: SD per effective OOM';
+                } else if (selected === 'SDs per progress-year') {
+                    slopeInfoEl.textContent = 'Slope: SD per anchor-progress-year';
+                }
+            }
+        }
         
         function updateDisplayValue(input) {
             const value = parseFloat(input.value);
             const displayId = input.id + '_val';
             let displayValue;
+
+            if (!isFinite(value)) {
+                const displayElement = document.getElementById(displayId);
+                if (displayElement) {
+                    displayElement.textContent = '—';
+                }
+                return;
+            }
             
             console.log('Updating slider:', input.id, 'to value:', value);
             
@@ -712,6 +763,8 @@
             } else if (input.id === 'automation_fraction_at_superhuman_coder') {
                 // Direct percentage display (no logit transformation)
                 displayValue = (value * 100).toFixed(1) + '%';
+            } else if (input.id === 'ai_research_taste_at_superhuman_coder_sd') {
+                displayValue = value.toFixed(2) + ' SD';
             } else if (input.id === 'rho_progress' || input.id === 'rho_cognitive' || input.id === 'lambda' || input.id === 'swe_multiplier_at_anchor_time') {
                 // Higher precision for substitutability parameters, lambda, and SWE multiplier
                 displayValue = value.toFixed(2);
@@ -782,6 +835,7 @@
                 'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
                 'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_anchor_time',
                 'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
+                'ai_research_taste_at_superhuman_coder_sd',
                 'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
                 'horizon_extrapolation_type',
                 // Manual horizon fitting parameters
@@ -827,7 +881,7 @@
                                 'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
                                 'software_scale': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
                                 'swe_multiplier_at_anchor_time': 2.0, 'cognitive_output_normalization': 1, 'zeta': 0.4,
-                                'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_slope': 1.2,
+                                'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_at_superhuman_coder_sd': null, 'ai_research_taste_slope': 1.2,
                                 'sc_time_horizon_minutes': 50000.0,
                                 'anchor_time': 2025.25, 'anchor_horizon': null, 'anchor_doubling_time': null, 'doubling_decay_rate': null
                             };
@@ -1937,6 +1991,17 @@
                 $('#summary_sc_rd_multiplier').text(summary.sc_sw_multiplier != null ? fmt(summary.sc_sw_multiplier, 2) + 'x' : '—');
                 // Progress rate at anchor time
                 $('#summary_anchor_progress_rate').text(summary.anchor_progress_rate != null ? fmt(summary.anchor_progress_rate, 3) : '—');
+
+                // Update AI Research Taste Slope info text under the slider
+                const slopeInfoEl = document.getElementById('ai_research_taste_slope_info');
+                if (slopeInfoEl) {
+                    const slope = summary.ai_research_taste_slope_per_anchor_progress_year;
+                    if (slope !== undefined && slope !== null && isFinite(slope)) {
+                        slopeInfoEl.textContent = `Slope at anchor: ${fmt(slope, 2)} SD/anchor-progress-year`;
+                    } else {
+                        slopeInfoEl.textContent = 'Steepness of research taste curve';
+                    }
+                }
             } catch (e) {
                 console.warn('Failed to update summary', e);
             }

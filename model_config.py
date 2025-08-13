@@ -31,9 +31,10 @@ AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
 MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
 
-# Research Taste Schedule Configuration
-TASTE_SCHEDULE_TYPES = ["exponential", "sigmoid", "sd_per_progress"]  # Available schedule types
-DEFAULT_TASTE_SCHEDULE_TYPE = "sd_per_progress"
+# Research Taste Schedule Configuration (UI-level options)
+# Internally, both SD-based options map to 'sd_per_progress' logic; units differ in UI only
+TASTE_SCHEDULE_TYPES = ["SDs per effective OOM", "SDs per progress-year"]
+DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per effective OOM"
 
 # Horizon Extrapolation Configuration
 HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
@@ -42,7 +43,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 # Manual Horizon Fitting Parameters
 DEFAULT_ANCHOR_TIME = 2025.25
 DEFAULT_ANCHOR_HORIZON = 15  # Will be optimized if None
-DEFAULT_ANCHOR_DOUBLING_TIME = 0.550  # Will be optimized if None
+DEFAULT_ANCHOR_DOUBLING_TIME = 0.460  # Will be optimized if None
 DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 
 # AI Research Taste clipping bounds
@@ -96,6 +97,7 @@ PARAMETER_BOUNDS = {
     'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
     # AI Research Taste parameter bounds
     'ai_research_taste_at_superhuman_coder': (0.1, 5),
+    'ai_research_taste_at_superhuman_coder_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
     'progress_at_half_ai_research_taste': (1.0, 500),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
@@ -168,6 +170,7 @@ DEFAULT_PARAMETERS = {
     'zeta': 0.55,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
+    'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
     'progress_at_half_ai_research_taste': 30.0,
     'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
