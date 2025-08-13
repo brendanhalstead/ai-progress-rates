@@ -170,36 +170,31 @@ def _read_horizon_trajectories(rollouts_file: Path) -> Tuple[np.ndarray, List[np
 
 
 def _get_time_tick_values_and_labels() -> Tuple[List[float], List[str]]:
-    """Tick values and labels matching the web app's horizon plot.
+    """Tick values and labels using work-time units (minutes, log scale).
 
-    Units are minutes on a log scale.
+    Matches get_time_tick_values_and_labels() in app.py
+    (e.g., 1 week = 5 work days = 2,400 minutes; 1 year = work-year minutes).
     """
-    # Accurate minute conversions
-    minutes_per_hour = 60
-    minutes_per_day = 24 * minutes_per_hour
-    minutes_per_week = 7 * minutes_per_day
-    minutes_per_year = 365.25 * minutes_per_day
-
     tick_values = [
-        2 / 60.0,              # 2 sec
-        30 / 60.0,             # 30 sec
-        2,                     # 2 min
-        8,                     # 8 min
-        30,                    # 30 min
-        2 * minutes_per_hour,  # 2 hrs
-        8 * minutes_per_hour,  # 8 hrs
-        minutes_per_week,      # 1 week
-        minutes_per_year / 12, # 1 month (avg)
-        4 * minutes_per_year / 12, # 4 months
-        minutes_per_year,      # 1 year
-        5 * minutes_per_year,  # 5 years
-        20 * minutes_per_year, # 20 years
-        100 * minutes_per_year,# 100 years
-        400 * minutes_per_year,# 400 years
-        1600 * minutes_per_year,# 1,600 years
-        6400 * minutes_per_year,# 6,400 years
-        25600 * minutes_per_year,# 25,600 years
-        120000 * minutes_per_year,# 120,000 years
+        0.033333,   # 2 sec
+        0.5,        # 30 sec
+        2,          # 2 min
+        8,          # 8 min
+        30,         # 30 min
+        120,        # 2 hrs
+        480,        # 8 hrs
+        2400,       # 1 week (work week)
+        10380,      # 1 month (work month)
+        41520,      # 4 months (work months)
+        124560,     # 1 year (work year)
+        622800,     # 5 years (work years)
+        2491200,    # 20 years (work years)
+        12456000,   # 100 years (work years)
+        49824000,   # 400 years (work years)
+        199296000,  # 1,600 years (work years)
+        797184000,  # 6,400 years (work years)
+        3188736000, # 25,600 years (work years)
+        14947200000,# 120,000 years (work years)
     ]
     tick_labels = [
         "2 sec",
@@ -336,7 +331,7 @@ def plot_horizon_trajectories(
         if points:
             xs = [p[0] for p in points]
             ys = [p[1] for p in points]
-            plt.scatter(xs, ys, color="black", s=18, label="External Benchmarks (p80)")
+            plt.scatter(xs, ys, color="black", s=18, label="External Benchmarks (p80)", zorder=10)
 
     # Axes and formatting
     plt.yscale("log")
