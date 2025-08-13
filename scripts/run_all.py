@@ -70,8 +70,14 @@ def main() -> None:
     print(f"Resolved run directory: {run_dir}")
 
     # 2) Plots
-    plot_cmd = [sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir)]
-    _run(plot_cmd)
+    # 2a) SC time histogram
+    _run([sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "sc_hist"]) 
+    # 2b) Horizon trajectories (full)
+    _run([sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "horizon_trajectories"]) 
+    # 2c) Horizon trajectories, stopping at SC for each rollout
+    _run([sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "horizon_trajectories", "--stop-at-sc"]) 
+    # 2d) Histogram of horizon at SC
+    _run([sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "horizon_at_sc_hist"]) 
 
     # 3) Sensitivity analysis (+ plots)
     sens_cmd = [sys.executable, str(SCRIPTS_DIR / "sensitivity_analysis.py"), "--run-dir", str(run_dir), "--plot"]
