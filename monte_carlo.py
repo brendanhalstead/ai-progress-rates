@@ -12,6 +12,7 @@ import time
 import threading
 import subprocess
 from pathlib import Path
+import zipfile
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, render_template, request, send_file, abort
@@ -364,4 +365,42 @@ def get_artifact(job_id: str, filename: str):
     if not target.exists() or not target.is_file():
         return jsonify({"success": False, "error": "Artifact not found"}), 404
     return send_file(str(target))
+
+
+@mc_bp.route("/api/monte-carlo/download/<job_id>", methods=["GET"])
+def download_run_zip(job_id: str):
+    # Create and stream a ZIP of the entire timestamped output directory for this job
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+    out_dir_str = job.get("output_dir")
+    if not out_dir_str:
+        return jsonify({"success": False, "error": "Output directory not set yet"}), 404
+    out_dir = Path(out_dir_str)
+    if not out_dir.exists() or not out_dir.is_dir():
+        return jsonify({"success": False, "error": "Output directory not found"}), 404
+
+    # Prepare zip path under tmp dir for this job
+    zip_tmp_dir = OUTPUTS_DIR / "tmp" / job_id
+    _ensure_dir(zip_tmp_dir)
+    zip_name = f"{out_dir.name}.zip"
+    zip_path = zip_tmp_dir / zip_name
+
+    # Build zip fresh each request to ensure it includes all artifacts
+    try:
+        with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            # Add files recursively; preserve relative paths under the timestamp folder
+            for root, dirs, files in os.walk(out_dir):
+                root_path = Path(root)
+                for file_name in files:
+                    file_path = root_path / file_name
+                    # Compute archive name relative to parent of out_dir so that zip contains the timestamp folder
+                    arcname = str(out_dir.name / file_path.relative_to(out_dir)) if False else str(Path(out_dir.name) / file_path.relative_to(out_dir))
+                    zf.write(str(file_path), arcname)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to build zip: {e}"}), 500
+
+    # Stream the zip file
+    return send_file(str(zip_path), as_attachment=True, download_name=zip_name)
 

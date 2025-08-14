@@ -110,6 +110,17 @@
                     <div class="card-body">
                         <div id="analysisEmpty" class="text-muted small">Run a job to see the SC-time distribution and sensitivity plots here.</div>
                         <div id="analysisWrap" class="row g-3" style="display:none;">
+                            <div class="col-12 d-flex gap-2 align-items-center">
+                                <button id="btnDownloadZip" class="btn btn-sm btn-outline-primary">Download all outputs (ZIP)</button>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Download individual files
+                                    </button>
+                                    <ul class="dropdown-menu" id="downloadMenu">
+                                        <!-- Populated dynamically based on artifacts and common files -->
+                                    </ul>
+                                </div>
+                            </div>
                             <div class="col-12">
                                 <label class="form-label small">SC-time Distribution</label>
                                 <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
@@ -161,6 +172,11 @@
                 </div>`;
             }
             if (dist === 'normal') {
+                const sdVal = (s.sd ?? s.sigma);
+                const defMin = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean - 3 * sdVal) : -10;
+                const defMax = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean + 3 * sdVal) : 10;
+                const sliderMin = (s.min !== undefined) ? s.min : defMin;
+                const sliderMax = (s.max !== undefined) ? s.max : defMax;
                 return `<div class="row g-1">
                     <div class="col-3">${numberField('mean','mean', s.mean ?? '')}</div>
                     <div class="col-3">${numberField('sd','sd', s.sd ?? s.sigma ?? '')}</div>
@@ -168,9 +184,22 @@
                     <div class="col-3">${numberField('ci80_high','CI80 high (90%)', s.ci80_high ?? '')}</div>
                     <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
                     <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
+                    <div class="col-12 mt-1">
+                        <input type="range" class="form-range ci80-slider-low" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
+                        <input type="range" class="form-range ci80-slider-high mt-1" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
                 </div>`;
             }
             if (dist === 'lognormal') {
+                const sigmaVal = (s.sigma ?? s.sd);
+                const defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
+                const defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
+                const sliderMin = (s.min !== undefined) ? s.min : defMin;
+                const sliderMax = (s.max !== undefined) ? s.max : defMax;
                 return `<div class="row g-1">
                     <div class="col-3">${numberField('mu','mu (log)', s.mu ?? '')}</div>
                     <div class="col-3">${numberField('sigma','sigma (log)', s.sigma ?? '')}</div>
@@ -178,6 +207,14 @@
                     <div class="col-3">${numberField('ci80_high','CI80 high', s.ci80_high ?? '')}</div>
                     <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
                     <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
+                    <div class="col-12 mt-1">
+                        <input type="range" class="form-range ci80-slider-low" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
+                        <input type="range" class="form-range ci80-slider-high mt-1" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
                 </div>`;
             }
             if (dist === 'beta') {
@@ -224,6 +261,206 @@
             return spec;
         }
 
+        // ----- Slider and field synchronization helpers -----
+        const Z80 = 1.2815515655446004; // 10th/90th quantile z-score
+
+        function isFiniteNumber(value) {
+            const n = typeof value === 'number' ? value : parseFloat(value);
+            return Number.isFinite(n);
+        }
+
+        function parseNum(value) {
+            const n = parseFloat(value);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function updateSliderLabels(specCell, lowVal, highVal) {
+            const lowSpan = specCell.querySelector('.ci80-low-val');
+            const highSpan = specCell.querySelector('.ci80-high-val');
+            if (lowSpan) lowSpan.textContent = isFiniteNumber(lowVal) ? String(lowVal) : '';
+            if (highSpan) highSpan.textContent = isFiniteNumber(highVal) ? String(highVal) : '';
+        }
+
+        function clamp(value, min, max) {
+            if (!Number.isFinite(value)) return value;
+            if (Number.isFinite(min) && value < min) return min;
+            if (Number.isFinite(max) && value > max) return max;
+            return value;
+        }
+
+        function computeNormalCI(mean, sd) {
+            if (!isFiniteNumber(mean) || !isFiniteNumber(sd)) return [null, null];
+            const low = mean - Z80 * sd;
+            const high = mean + Z80 * sd;
+            return [low, high];
+        }
+
+        function computeLognormalCI(mu, sigma) {
+            if (!isFiniteNumber(mu) || !isFiniteNumber(sigma)) return [null, null];
+            const low = Math.exp(mu - Z80 * sigma);
+            const high = Math.exp(mu + Z80 * sigma);
+            return [low, high];
+        }
+
+        function bindRowInteractions(tr) {
+            const dist = tr.querySelector('.dist-select')?.value;
+            if (dist !== 'normal' && dist !== 'lognormal') return;
+            const specCell = tr.querySelector('.spec-cell');
+            const lowSlider = specCell.querySelector('.ci80-slider-low');
+            const highSlider = specCell.querySelector('.ci80-slider-high');
+            const lowField = specCell.querySelector('.dist-field[data-key="ci80_low"]');
+            const highField = specCell.querySelector('.dist-field[data-key="ci80_high"]');
+            const minField = specCell.querySelector('.dist-field[data-key="min"]');
+            const maxField = specCell.querySelector('.dist-field[data-key="max"]');
+            const meanField = specCell.querySelector('.dist-field[data-key="mean"]');
+            const sdField = specCell.querySelector('.dist-field[data-key="sd"]');
+            const muField = specCell.querySelector('.dist-field[data-key="mu"]');
+            const sigmaField = specCell.querySelector('.dist-field[data-key="sigma"]');
+
+            if (!lowSlider || !highSlider || !lowField || !highField) return;
+
+            function getBounds() {
+                const defaultMin = parseNum(lowSlider.getAttribute('data-default-min'));
+                const defaultMax = parseNum(lowSlider.getAttribute('data-default-max'));
+                const minVal = parseNum(minField?.value);
+                const maxVal = parseNum(maxField?.value);
+                const minB = isFiniteNumber(minVal) ? minVal : defaultMin;
+                const maxB = isFiniteNumber(maxVal) ? maxVal : defaultMax;
+                return [minB, maxB];
+            }
+
+            function applyBoundsToSliders() {
+                const [minB, maxB] = getBounds();
+                if (isFiniteNumber(minB)) {
+                    lowSlider.min = String(minB);
+                    highSlider.min = String(minB);
+                }
+                if (isFiniteNumber(maxB)) {
+                    lowSlider.max = String(maxB);
+                    highSlider.max = String(maxB);
+                }
+            }
+
+            function setSlidersFromFieldsOrDefaults() {
+                applyBoundsToSliders();
+                const [minB, maxB] = getBounds();
+                let lowVal = parseNum(lowField.value);
+                let highVal = parseNum(highField.value);
+
+                if (!isFiniteNumber(lowVal) || !isFiniteNumber(highVal)) {
+                    if (dist === 'normal') {
+                        const mean = parseNum(meanField?.value);
+                        const sd = parseNum(sdField?.value) ?? parseNum(sigmaField?.value);
+                        const [dl, dh] = computeNormalCI(mean, sd);
+                        lowVal = lowVal ?? dl;
+                        highVal = highVal ?? dh;
+                    } else if (dist === 'lognormal') {
+                        const mu = parseNum(muField?.value);
+                        const sigma = parseNum(sigmaField?.value) ?? parseNum(sdField?.value);
+                        const [dl, dh] = computeLognormalCI(mu, sigma);
+                        lowVal = lowVal ?? dl;
+                        highVal = highVal ?? dh;
+                    }
+                }
+
+                if (isFiniteNumber(minB)) {
+                    if (isFiniteNumber(lowVal)) lowVal = Math.max(minB, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.max(minB, highVal);
+                }
+                if (isFiniteNumber(maxB)) {
+                    if (isFiniteNumber(lowVal)) lowVal = Math.min(maxB, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.min(maxB, highVal);
+                }
+                if (isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
+                    const mid = (lowVal + highVal) / 2;
+                    lowVal = mid;
+                    highVal = mid;
+                }
+
+                if (isFiniteNumber(lowVal)) {
+                    lowSlider.value = String(lowVal);
+                    lowField.value = String(lowVal);
+                }
+                if (isFiniteNumber(highVal)) {
+                    highSlider.value = String(highVal);
+                    highField.value = String(highVal);
+                }
+                updateSliderLabels(specCell, parseNum(lowField.value), parseNum(highField.value));
+            }
+
+            function syncFromSliders(changed) {
+                applyBoundsToSliders();
+                let lowVal = parseNum(lowSlider.value);
+                let highVal = parseNum(highSlider.value);
+                const [minB, maxB] = getBounds();
+                lowVal = clamp(lowVal, minB, maxB);
+                highVal = clamp(highVal, minB, maxB);
+                if (changed === 'low' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
+                    highVal = lowVal;
+                    highSlider.value = String(highVal);
+                }
+                if (changed === 'high' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && highVal < lowVal) {
+                    lowVal = highVal;
+                    lowSlider.value = String(lowVal);
+                }
+                lowField.value = String(lowVal);
+                highField.value = String(highVal);
+                updateSliderLabels(specCell, lowVal, highVal);
+            }
+
+            function syncFromFields(changed) {
+                applyBoundsToSliders();
+                let lowVal = parseNum(lowField.value);
+                let highVal = parseNum(highField.value);
+                const [minB, maxB] = getBounds();
+                if (isFiniteNumber(lowVal)) lowVal = clamp(lowVal, minB, maxB);
+                if (isFiniteNumber(highVal)) highVal = clamp(highVal, minB, maxB);
+                if (changed === 'low' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
+                    highVal = lowVal;
+                    highField.value = String(highVal);
+                }
+                if (changed === 'high' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && highVal < lowVal) {
+                    lowVal = highVal;
+                    lowField.value = String(lowVal);
+                }
+                if (isFiniteNumber(lowVal)) lowSlider.value = String(lowVal);
+                if (isFiniteNumber(highVal)) highSlider.value = String(highVal);
+                updateSliderLabels(specCell, lowVal, highVal);
+            }
+
+            // Event bindings
+            lowSlider.addEventListener('input', () => syncFromSliders('low'));
+            highSlider.addEventListener('input', () => syncFromSliders('high'));
+            lowField.addEventListener('input', () => syncFromFields('low'));
+            highField.addEventListener('input', () => syncFromFields('high'));
+            minField?.addEventListener('input', () => setSlidersFromFieldsOrDefaults());
+            maxField?.addEventListener('input', () => setSlidersFromFieldsOrDefaults());
+            if (dist === 'normal') {
+                meanField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+                sdField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+                sigmaField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+            } else if (dist === 'lognormal') {
+                muField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+                sigmaField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+                sdField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                });
+            }
+
+            // Initial sync
+            setSlidersFromFieldsOrDefaults();
+        }
+
         function addRow(paramName, distSpec) {
             const tbody = document.getElementById('distBody');
             const tr = document.createElement('tr');
@@ -239,8 +476,10 @@
             tr.querySelector('.dist-select').addEventListener('change', (e) => {
                 const d = e.target.value;
                 tr.querySelector('.spec-cell').innerHTML = renderSpecInputs(d, {});
+                bindRowInteractions(tr);
             });
             tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+            bindRowInteractions(tr);
         }
 
         function renderConfig(cfg) {
@@ -350,6 +589,7 @@
             const hasAny = (name) => artifacts.includes(name);
             const ts = Date.now();
             const base = (name) => `/api/monte-carlo/artifact/${jobId}/${encodeURIComponent(name)}?t=${ts}`;
+            const dlAll = () => `/api/monte-carlo/download/${jobId}?t=${ts}`;
 
             const wrap = document.getElementById('analysisWrap');
             const empty = document.getElementById('analysisEmpty');
@@ -380,6 +620,36 @@
                 pmWrap.style.display = '';
             } else {
                 pmWrap.style.display = 'none';
+            }
+
+            // Wire up download-all
+            const btnZip = document.getElementById('btnDownloadZip');
+            if (btnZip) {
+                btnZip.onclick = () => { window.location.href = dlAll(); };
+            }
+
+            // Populate individual downloads menu with common files and detected artifacts
+            const menu = document.getElementById('downloadMenu');
+            if (menu) {
+                const items = [];
+                const addItem = (label, fname) => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.className = 'dropdown-item';
+                    a.href = base(fname);
+                    a.download = fname;
+                    a.textContent = label;
+                    li.appendChild(a);
+                    items.push(li);
+                };
+                // Known key files
+                ['samples.jsonl', 'rollouts.jsonl', 'metadata.json', 'model_config_snapshot.yaml', 'model_config_snapshot.json']
+                    .forEach(fname => addItem(fname, fname));
+                // Detected artifacts
+                artifacts.forEach(fname => addItem(fname, fname));
+                // Clear and append
+                menu.innerHTML = '';
+                items.forEach(li => menu.appendChild(li));
             }
         }
 
