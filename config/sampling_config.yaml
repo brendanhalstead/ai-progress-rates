@@ -17,7 +17,7 @@ initial_progress: 0.0
 time_range: [2012.0, 2040.0]
 
 num_rollouts: 5000
-input_data: /home/bhalstead/ai-safety/timelines-slop/input_data.csv
+input_data: input_data.csv
 
 parameters:
   # Elasticities and weights
