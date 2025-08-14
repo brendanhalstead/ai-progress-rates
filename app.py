@@ -1758,6 +1758,18 @@ def create_default_parameters():
     """Create default model parameters"""
     return Parameters()
 
+def load_time_series_from_csv_path(csv_path):
+    """Load time series data from a given CSV file path"""
+    with open(csv_path, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        data = list(reader)
+    time = np.array([float(row['time']) for row in data])
+    L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
+    L_AI = np.array([float(row['L_AI']) for row in data])
+    experiment_compute = np.array([float(row['experiment_compute']) for row in data])
+    training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
+    return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+
 def time_series_to_dict(data: TimeSeriesData):
     """Convert TimeSeriesData to dictionary for JSON serialization"""
     return {
@@ -2178,6 +2190,48 @@ def upload_data():
         
     except Exception as e:
         logger.error(f"Error uploading data: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/select-data', methods=['POST'])
+def select_data():
+    """Select a built-in dataset by actor and update session time series"""
+    try:
+        data = request.json or {}
+        dataset = data.get('dataset', 'default')
+
+        import os
+        base_dir = os.path.dirname(__file__)
+
+        dataset_to_file = {
+            'default': 'input_data.csv',
+            'russia': 'input_data_russia.csv',
+            'us_black_site': 'input_data_us_black_site.csv',
+            'cn_black_site': 'input_data_cn_black_site.csv'
+        }
+
+        if dataset not in dataset_to_file:
+            return jsonify({'success': False, 'error': f"Unknown dataset: {dataset}"}), 400
+
+        csv_filename = dataset_to_file[dataset]
+        csv_path = os.path.join(base_dir, csv_filename)
+
+        if not os.path.exists(csv_path):
+            return jsonify({'success': False, 'error': f"Dataset file not found: {csv_filename}"}), 400
+
+        time_series = load_time_series_from_csv_path(csv_path)
+        session_data['time_series'] = time_series
+
+        time_array = time_series.time
+        return jsonify({
+            'success': True,
+            'data_summary': {
+                'time_range': [float(time_array.min()), float(time_array.max())],
+                'data_points': len(time_array),
+                'preview': time_series_to_dict(time_series)
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error selecting dataset: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/estimate-parameters', methods=['POST'])

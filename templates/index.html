@@ -338,6 +338,17 @@
                         <div class="tab-pane fade" id="data-panel">
                             <h5>Time Series Data</h5>
                             
+                             <div class="mb-3">
+                                 <label class="form-label">Select Input Time Series</label>
+                                 <select class="form-select" id="datasetSelect" onchange="selectDataset()">
+                                     <option value="default">OpenBrain, no pause</option>
+                                     <option value="russia">Russia</option>
+                                     <option value="us_black_site">US Black Site</option>
+                                     <option value="cn_black_site">China Black Site</option>
+                                 </select>
+                                 <div class="form-text">Choose from preloaded time series for different actors.</div>
+                             </div>
+                             
                             <div class="mb-3">
                                 <label class="form-label">Upload Custom CSV Data</label>
                                 <input type="file" class="form-control" id="csvFile" accept=".csv" onchange="uploadData()">
@@ -1416,6 +1427,44 @@
                 }
             });
         }
+         
+         function selectDataset() {
+             const dataset = $('#datasetSelect').val();
+             if (!dataset) return;
+             
+             showLoading(true);
+             
+             $.ajax({
+                 url: '/api/select-data',
+                 method: 'POST',
+                 contentType: 'application/json',
+                 data: JSON.stringify({ dataset }),
+                 success: function(response) {
+                     if (response.success) {
+                         $('#dataPreview').show();
+                         $('#dataSummary').html(
+                             `<div>Time range: ${response.data_summary.time_range[0]} - ${response.data_summary.time_range[1]}</div>` +
+                             `<div>Data points: ${response.data_summary.data_points}</div>`
+                         );
+                         
+                         // Update time range inputs
+                         $('#start_year').val(Math.floor(response.data_summary.time_range[0]));
+                         $('#end_year').val(Math.ceil(response.data_summary.time_range[1]));
+                         
+                         computeModel();
+                     } else {
+                         showError(response.error || 'Failed to select dataset');
+                     }
+                 },
+                 error: function(xhr) {
+                     const error = xhr.responseJSON ? xhr.responseJSON.error : 'Failed to select dataset';
+                     showError(error);
+                 },
+                 complete: function() {
+                     showLoading(false);
+                 }
+             });
+         }
         
         function estimateParameters() {
             const anchors = collectConstraints();
