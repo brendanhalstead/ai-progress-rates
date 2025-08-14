@@ -90,15 +90,12 @@ PARAMETER_BOUNDS = {
     'alpha': (0.05, 0.95),
     'software_scale': (0.1, 10),
     'automation_fraction_at_superhuman_coder': (0.1, 1.0),
-    'progress_at_half_sc_automation': (1.0, 500),
-    'automation_slope': (0.1, 10.0),
     'swe_multiplier_at_anchor_time': (1.0, 10.0),
     'cognitive_output_normalization': (0.00001, 10),
     'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
     # AI Research Taste parameter bounds
     'ai_research_taste_at_superhuman_coder': (0.1, 5),
     'ai_research_taste_at_superhuman_coder_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
-    'progress_at_half_ai_research_taste': (1.0, 500),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
     'sc_time_horizon_minutes': (1000, 100000000000),
@@ -117,9 +114,7 @@ PARAMETER_BOUNDS = {
 PARAM_VALIDATION_THRESHOLDS = {
     'automation_fraction_superhuman_coder_min': 0.05,
     'automation_fraction_superhuman_coder_max': 1,
-    'progress_at_half_automation_min': 0.0, # should be > 0
-    'automation_slope_min': 0.0, # should be > 0
-    'automation_slope_max': 20.0,
+    # removed legacy automation sigmoid thresholds
     'rho_extreme_abs': 0.8,
     'rho_product_max': 0.5,
     'cognitive_output_normalization_max': 10
@@ -163,15 +158,12 @@ DEFAULT_PARAMETERS = {
     'alpha': 0.69,
     'software_scale': 2.25,
     'automation_fraction_at_superhuman_coder': 1.0,
-    'progress_at_half_sc_automation': 20.0,
-    'automation_slope': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
     'cognitive_output_normalization': 0.3,
     'zeta': 0.56,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
-    'progress_at_half_ai_research_taste': 30.0,
     'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,

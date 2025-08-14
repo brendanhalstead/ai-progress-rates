@@ -70,27 +70,13 @@ parameters:
     min: 0.1
     max: 1.0
 
-  # Automation sigmoid (SWE tasks automated)
+  # Automation
   automation_fraction_at_superhuman_coder:
     dist: beta
     alpha: 3.0
     beta: 1.5
     min: 0.1
     max: 1.0
-  progress_at_half_sc_automation:
-    dist: lognormal
-    mu: 3.40  # ~exp(3.40) ≈ 30
-    sigma: 0.8
-    min: 1.0
-    max: 500.0
-    clip_to_bounds: true
-  automation_slope:
-    dist: lognormal
-    mu: 0.0   # ~1.0
-    sigma: 0.5
-    min: 0.1
-    max: 10.0
-    clip_to_bounds: true
   swe_multiplier_at_anchor_time:
     dist: normal
     mean: 1.05
@@ -106,13 +92,6 @@ parameters:
     sd: 3.0
     min: -10.0
     max: 23.0
-    clip_to_bounds: true
-  progress_at_half_ai_research_taste:
-    dist: lognormal
-    mu: 3.40  # ~30
-    sigma: 0.8
-    min: 1.0
-    max: 500.0
     clip_to_bounds: true
   ai_research_taste_slope:
     dist: lognormal

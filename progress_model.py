@@ -255,17 +255,14 @@ class Parameters:
     software_scale: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_scale'])
     zeta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['zeta'])
     
-    # Automation sigmoid parameters
+    # Automation parameters
     automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
-    progress_at_half_sc_automation: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation'])
-    automation_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_slope'])
     automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
     swe_multiplier_at_anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_anchor_time'])
     # AI Research Taste sigmoid parameters
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
     ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
-    progress_at_half_ai_research_taste: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste'])
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
@@ -332,18 +329,7 @@ class Parameters:
         else:
             self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
-        if not np.isfinite(self.progress_at_half_sc_automation) or self.progress_at_half_sc_automation <= 0:
-            logger.warning(f"Invalid progress_at_half_sc_automation: {self.progress_at_half_sc_automation}, setting to {cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation']}")
-            self.progress_at_half_sc_automation = cfg.DEFAULT_PARAMETERS['progress_at_half_sc_automation']
-        else:
-            self.progress_at_half_sc_automation = max(cfg.PARAM_CLIP_MIN, self.progress_at_half_sc_automation)
-        
-        if not np.isfinite(self.automation_slope):
-            logger.warning(f"Non-finite automation_slope: {self.automation_slope}, setting to 1.0")
-            self.automation_slope = 1.0
-        else:
-            # Clamp slope to reasonable range to prevent numerical instability
-            self.automation_slope = np.clip(self.automation_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
+        # Legacy automation sigmoid parameters removed
         
         # Sanitize AI research taste parameters
         # If SD-specification is provided, convert to raw taste via TasteDistribution
@@ -361,11 +347,7 @@ class Parameters:
         else:
             self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, cfg.AI_RESEARCH_TASTE_MAX)
         
-        if not np.isfinite(self.progress_at_half_ai_research_taste) or self.progress_at_half_ai_research_taste <= 0:
-            logger.warning(f"Invalid progress_at_half_ai_research_taste: {self.progress_at_half_ai_research_taste}, setting to {cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste']}")
-            self.progress_at_half_ai_research_taste = cfg.DEFAULT_PARAMETERS['progress_at_half_ai_research_taste']
-        else:
-            self.progress_at_half_ai_research_taste = max(cfg.PARAM_CLIP_MIN, self.progress_at_half_ai_research_taste)
+        # Legacy sigmoid midpoint for AI research taste removed
         
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
@@ -1164,7 +1146,7 @@ def compute_ai_research_taste(cumulative_progress: float, params: Parameters) ->
     if ui_type == "SDs per effective OOM" or ui_type == "SDs per progress-year":
         return _compute_ai_research_taste_sd_per_progress(cumulative_progress, params)
     if params.taste_schedule_type == "sigmoid":
-        return _compute_ai_research_taste_sigmoid(cumulative_progress, params)
+        return _compute_ai_research_taste_exponential(cumulative_progress, params)
     elif params.taste_schedule_type == "exponential":
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
     elif params.taste_schedule_type == "sd_per_progress":
@@ -1180,28 +1162,23 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
     """
     # Extract sigmoid parameters
     L = params.ai_research_taste_at_superhuman_coder  # Upper asymptote
-    x0 = params.progress_at_half_ai_research_taste  # Midpoint (where taste = L/2)
+    # Midpoint parameter removed with legacy sigmoid
+    x0 = None
     k = params.ai_research_taste_slope  # Slope parameter
     
-    # Calculate sigmoid: f(x) = L / (1 + e^(-k*(x-x0)))
+    # Legacy sigmoid path deprecated; approximate with a smooth rise capped at L
     try:
-        exponent = -k * (cumulative_progress - x0)
-        
-        # Handle extreme exponents to prevent overflow/underflow
-        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:  # e^100 is very large, sigmoid ≈ 0
+        exponent = -k * cumulative_progress
+        if exponent > cfg.SIGMOID_EXPONENT_CLAMP:
             ai_research_taste = 0.0
-        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:  # e^(-100) is very small, sigmoid ≈ L
+        elif exponent < -cfg.SIGMOID_EXPONENT_CLAMP:
             ai_research_taste = L
         else:
-            ai_research_taste = L / (1 + np.exp(exponent))
-            
+            ai_research_taste = L * (1 - np.exp(exponent))
+            ai_research_taste = np.clip(ai_research_taste, 0.0, L)
     except (OverflowError, ValueError) as e:
-        logger.warning(f"Numerical error in AI research taste sigmoid calculation: {e}")
-        # Fallback: linear interpolation between 0 and L
-        if cumulative_progress <= x0:
-            ai_research_taste = L * 0.5 * (cumulative_progress / x0)
-        else:
-            ai_research_taste = L * (0.5 + 0.5 * (cumulative_progress - x0) / x0)
+        logger.warning(f"Numerical error in legacy taste fallback: {e}")
+        ai_research_taste = float(np.clip(L * cumulative_progress, 0.0, L))
     
     return ai_research_taste
 
@@ -1792,17 +1769,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                     logger.warning(f"automation_fraction_at_superhuman_coder should be in reasonable range ({cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_min']}, {cfg.PARAM_VALIDATION_THRESHOLDS['automation_fraction_superhuman_coder_max']})")
                     return False
             
-            # Check that progress at half automation is positive
-            if 'progress_at_half_sc_automation' in params_dict:
-                if params_dict['progress_at_half_sc_automation'] <= cfg.PARAM_VALIDATION_THRESHOLDS['progress_at_half_automation_min']:
-                    logger.warning("progress_at_half_sc_automation must be positive")
-                    return False
-            
-            # Check automation slope is reasonable
-            if 'automation_slope' in params_dict:
-                if params_dict['automation_slope'] <= cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_min'] or params_dict['automation_slope'] > cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_max']:
-                    logger.warning(f"automation_slope should be in reasonable range ({cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_min']}, {cfg.PARAM_VALIDATION_THRESHOLDS['automation_slope_max']})")
-                    return False
+            # Legacy automation sigmoid checks removed
             
             # Check for extreme elasticity combinations that cause numerical instability
             if 'rho_cognitive' in params_dict and 'rho_progress' in params_dict:

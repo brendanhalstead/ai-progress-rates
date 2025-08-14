@@ -1788,15 +1788,12 @@ def params_to_dict(params: Parameters):
         'alpha': params.alpha,
         'software_scale': params.software_scale,
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
-        'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
-        'automation_slope': params.automation_slope,
 
         'cognitive_output_normalization': params.cognitive_output_normalization,
         'zeta': params.zeta,
-        'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
-        'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
-        'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
-        'ai_research_taste_slope': params.ai_research_taste_slope,
+            'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
+            'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
+            'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
         'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
@@ -2041,16 +2038,7 @@ def get_parameter_config():
                     'description': 'Automation fraction when AI reaches superhuman coding ability',
                     'units': 'fraction'
                 },
-                'progress_at_half_sc_automation': {
-                    'name': 'Half-Max Progress',
-                    'description': 'Progress level at 50% of max automation',
-                    'units': 'dimensionless'
-                },
-                'automation_slope': {
-                    'name': 'Automation Slope',  
-                    'description': 'Steepness of automation curve',
-                    'units': 'dimensionless'
-                },
+                
                 'swe_multiplier_at_anchor_time': {
                     'name': 'SWE Multiplier at Anchor Time',
                     'description': 'Software engineering productivity multiplier at the anchor time',
@@ -2077,11 +2065,7 @@ def get_parameter_config():
                     'description': 'AI research taste at superhuman coder specified in human-range standard deviations',
                     'units': 'SD'
                 },
-                'progress_at_half_ai_research_taste': {
-                    'name': 'Half-Max AI Research Taste Progress',
-                    'description': 'Progress level at 50% of max AI research taste (sigmoid mode)',
-                    'units': 'dimensionless'
-                },
+                
                 'ai_research_taste_slope': {
                     'name': 'AI Research Taste Slope',
                     'description': 'Steepness of AI research taste curve',
@@ -2762,13 +2746,9 @@ def get_default_data():
             'alpha': params.alpha,
             'software_scale': params.software_scale,
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
-            'progress_at_half_sc_automation': params.progress_at_half_sc_automation,
-            'automation_slope': params.automation_slope,
-    
             'cognitive_output_normalization': params.cognitive_output_normalization,
             'zeta': params.zeta,
             'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
-            'progress_at_half_ai_research_taste': params.progress_at_half_ai_research_taste,
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
             'progress_at_sc': params.progress_at_sc,
