@@ -1501,7 +1501,7 @@ def update_axes_for_tab(fig: go.Figure, tab_config: TabConfig, data: Dict[str, A
                     span = max(0.0, tmax - tmin)
                     # Use more frequent ticks for Time Horizon Lengths graph
                     if plot_config.title == "Time Horizon Lengths":
-                        target_ticks = 24.0  # More frequent ticks for time horizon plot
+                        target_ticks = 20.0  # More frequent ticks for time horizon plot
                     else:
                         target_ticks = 6.0  # Default for other plots
                     dtick_years = max(1, int(round(span / target_ticks)))
