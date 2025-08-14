@@ -159,18 +159,22 @@
             }
             if (dist === 'normal') {
                 return `<div class="row g-1">
-                    <div class="col-4">${numberField('mean','mean', s.mean ?? '')}</div>
-                    <div class="col-4">${numberField('sd','sd', s.sd ?? s.sigma ?? '')}</div>
-                    <div class="col-2">${numberField('min','min', s.min ?? '')}</div>
-                    <div class="col-2">${numberField('max','max', s.max ?? '')}</div>
+                    <div class="col-3">${numberField('mean','mean', s.mean ?? '')}</div>
+                    <div class="col-3">${numberField('sd','sd', s.sd ?? s.sigma ?? '')}</div>
+                    <div class="col-3">${numberField('ci80_low','CI80 low (10%)', s.ci80_low ?? '')}</div>
+                    <div class="col-3">${numberField('ci80_high','CI80 high (90%)', s.ci80_high ?? '')}</div>
+                    <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
                 </div>`;
             }
             if (dist === 'lognormal') {
                 return `<div class="row g-1">
-                    <div class="col-4">${numberField('mu','mu', s.mu ?? '')}</div>
-                    <div class="col-4">${numberField('sigma','sigma', s.sigma ?? '')}</div>
-                    <div class="col-2">${numberField('min','min', s.min ?? '')}</div>
-                    <div class="col-2">${numberField('max','max', s.max ?? '')}</div>
+                    <div class="col-3">${numberField('mu','mu (log)', s.mu ?? '')}</div>
+                    <div class="col-3">${numberField('sigma','sigma (log)', s.sigma ?? '')}</div>
+                    <div class="col-3">${numberField('ci80_low','CI80 low', s.ci80_low ?? '')}</div>
+                    <div class="col-3">${numberField('ci80_high','CI80 high', s.ci80_high ?? '')}</div>
+                    <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
                 </div>`;
             }
             if (dist === 'beta') {

@@ -183,17 +183,50 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> An
         return rng.uniform(a, b)
 
     if kind == "normal":
-        mu = float(dist_spec["mean"])  # real line
-        sigma = float(dist_spec["sd"]) if "sd" in dist_spec else float(dist_spec.get("sigma", 1.0))
+        # Support parameterization by mean/sd (or sigma) OR by 80% CI (q10,q90)
+        # If 80% CI is provided, it takes precedence
+        if "ci80_low" in dist_spec and "ci80_high" in dist_spec:
+            q10 = float(dist_spec["ci80_low"])  # 10th percentile
+            q90 = float(dist_spec["ci80_high"]) # 90th percentile
+            if not np.isfinite(q10) or not np.isfinite(q90):
+                raise ValueError("ci80_low/ci80_high for normal must be finite numbers")
+            # Ensure ordering
+            if q10 > q90:
+                q10, q90 = q90, q10
+            # z-scores for 10% and 90% quantiles (symmetric)
+            z = 1.2815515655446004
+            mu = 0.5 * (q10 + q90)
+            sigma = (q90 - q10) / (2.0 * z)
+        else:
+            mu = float(dist_spec["mean"])  # real line
+            sigma = float(dist_spec["sd"]) if "sd" in dist_spec else float(dist_spec.get("sigma", 1.0))
+
         x = rng.normal(mu, sigma)
         if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
             x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
         return x
 
     if kind == "lognormal":
-        # parameterization using mu, sigma in log-space
-        mu = float(dist_spec["mu"])  # log-space mean
-        sigma = float(dist_spec["sigma"])  # log-space sd
+        # Support parameterization by mu/sigma in log-space OR by 80% CI in original space
+        # If 80% CI is provided, it takes precedence
+        if "ci80_low" in dist_spec and "ci80_high" in dist_spec:
+            q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units
+            q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units
+            if not np.isfinite(q10) or not np.isfinite(q90) or q10 <= 0 or q90 <= 0:
+                raise ValueError("ci80_low/ci80_high for lognormal must be positive finite numbers")
+            if q10 > q90:
+                q10, q90 = q90, q10
+            # Convert to log-space and solve for mu, sigma using the symmetric quantiles
+            z = 1.2815515655446004
+            ln_q10 = float(np.log(q10))
+            ln_q90 = float(np.log(q90))
+            mu = 0.5 * (ln_q10 + ln_q90)
+            sigma = (ln_q90 - ln_q10) / (2.0 * z)
+        else:
+            # parameterization using mu, sigma in log-space
+            mu = float(dist_spec["mu"])  # log-space mean
+            sigma = float(dist_spec["sigma"])  # log-space sd
+
         x = rng.lognormal(mean=mu, sigma=sigma)
         if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
             x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))

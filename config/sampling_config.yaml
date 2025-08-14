@@ -25,6 +25,9 @@ parameters:
     dist: normal
     mean: -2.0
     sd: 0.6
+    # Alternatively, specify 80% CI via ci80_low/ci80_high instead of mean/sd
+    # ci80_low: -2.8
+    # ci80_high: -1.2
     min: -10.0
     max: 0.0
     clip_to_bounds: true
@@ -47,6 +50,9 @@ parameters:
     dist: lognormal
     mu: 0.80   # ~exp(0.80) ≈ 2.2
     sigma: 0.35
+    # Alternatively, specify 80% CI in original units
+    # ci80_low: 1.0
+    # ci80_high: 5.0
     min: 0.1
     max: 10.0
     clip_to_bounds: true
