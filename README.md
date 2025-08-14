@@ -1,9 +1,9 @@
 
 
 ### How to generate timelines distributions
-1. Specify parameter distributions and sampling settings in `config/sampling\_config.yaml`.
+1. Specify parameter distributions and sampling settings in `config/sampling_config.yaml`.
 2. Install the requirements in `requirements.txt`
-3. Run `scripts/run\_all.py`. 
+3. Run `scripts/run_all.py`. 
 4. Check `outputs/timestamp` for plots.
 
 ### Relevant files
