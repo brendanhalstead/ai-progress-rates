@@ -16,26 +16,26 @@ initial_progress: 0.0
 # If omitted on CLI, this is used; otherwise CLI --time-range overrides
 time_range: [2012.0, 2040.0]
 
-num_rollouts: 5000
-input_data: /home/bhalstead/ai-safety/timelines-slop/input_data.csv
+num_rollouts: 5
+input_data: input_data.csv
 
 parameters:
   # Elasticities and weights
-  rho_cognitive:
+  rho_coding_labor:
     dist: normal
     mean: -2.0
     sd: 0.6
     min: -10.0
     max: 0.0
     clip_to_bounds: true
-  rho_progress:
+  rho_experiment_capacity:
     dist: normal
     mean: -0.2
     sd: 0.25
     min: -1.0
     max: 0
     clip_to_bounds: true
-  alpha:
+  alpha_experiment_capacity:
     dist: beta
     alpha: 2.0
     beta: 2.0
@@ -43,21 +43,27 @@ parameters:
     max: 0.95
 
   # Software scale / normalization
-  software_scale:
+  r_software:
     dist: lognormal
     mu: 0.80   # ~exp(0.80) ≈ 2.2
     sigma: 0.35
     min: 0.1
     max: 10.0
     clip_to_bounds: true
-  cognitive_output_normalization:
+  coding_labor_normalization:
     dist: lognormal
     mu: -1.20  # ~exp(-1.20) ≈ 0.30
     sigma: 0.5
     min: 0.00001
     max: 10.0
     clip_to_bounds: true
-  zeta:
+  coding_labor_exponent:
+    dist: beta
+    alpha: 2.0
+    beta: 5.0
+    min: 0.0
+    max: 2.0
+  experiment_compute_exponent:
     dist: beta
     alpha: 2.0
     beta: 2.0
@@ -71,21 +77,7 @@ parameters:
     beta: 1.5
     min: 0.1
     max: 1.0
-  progress_at_half_sc_automation:
-    dist: lognormal
-    mu: 3.40  # ~exp(3.40) ≈ 30
-    sigma: 0.8
-    min: 1.0
-    max: 500.0
-    clip_to_bounds: true
-  automation_slope:
-    dist: lognormal
-    mu: 0.0   # ~1.0
-    sigma: 0.5
-    min: 0.1
-    max: 10.0
-    clip_to_bounds: true
-  swe_multiplier_at_anchor_time:
+  swe_multiplier_at_present_day:
     dist: normal
     mean: 1.05
     sd: 0.2
@@ -101,14 +93,7 @@ parameters:
     min: -10.0
     max: 23.0
     clip_to_bounds: true
-  progress_at_half_ai_research_taste:
-    dist: lognormal
-    mu: 3.40  # ~30
-    sigma: 0.8
-    min: 1.0
-    max: 500.0
-    clip_to_bounds: true
-  ai_research_taste_slope:
+  ai_research_taste_sds_per_oom:
     dist: lognormal
     mu: 0.69  # ~2.0
     sigma: 0.5
@@ -134,21 +119,21 @@ parameters:
     p: [0.25, 0.75]
 
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
-  anchor_time:
+  present_day:
     dist: normal
     mean: 2025.25
     sd: 0
     min: 2025.0
     max: 2026.0
     clip_to_bounds: true
-  anchor_horizon:
+  present_horizon:
     dist: normal
     mean: 15.0
     sd: 0
     min: 0.01
     max: 100.0
     clip_to_bounds: true
-  anchor_doubling_time:
+  present_doubling_time:
     dist: lognormal
     mu: -0.776  # ~0.46
     sigma: 0.3
@@ -171,11 +156,4 @@ parameters:
     min: 1.0
     max: 20.0
     clip_to_bounds: true
-
-  # CES lambda transformation
-  lambda:
-    dist: beta
-    alpha: 2.0
-    beta: 5.0
-    min: 0.0
-    max: 2.0
+  

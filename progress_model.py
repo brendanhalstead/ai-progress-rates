@@ -3029,7 +3029,7 @@ class ProgressModel:
                 # Compute effective compute as baseline_annual_compute_multiplier^progress
                 effective_compute_val = 0.0  # Default fallback
                 try:
-                    effective_compute_val = self.params.baseline_annual_compute_multiplier ** p
+                    effective_compute_val = 10 ** p
                     if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
                         effective_compute_val = 0.0
                 except Exception as compute_e:
