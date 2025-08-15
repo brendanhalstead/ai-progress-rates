@@ -156,7 +156,7 @@ DEFAULT_PARAMETERS = {
     'rho_coding_labor': -2,
     'rho_experiment_capacity': -0.137,
     'alpha_experiment_capacity': 0.70,
-    'r_software': 2.25,
+    'r_software': 2.40,
     'automation_fraction_at_superhuman_coder': 1.0,
     'swe_multiplier_at_present_day': 1.05,
     'coding_labor_normalization': 1,
