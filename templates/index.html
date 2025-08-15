@@ -120,7 +120,7 @@
                                             </div>
                                             <label class="param-label">Anchor Horizon: <span id="present_horizon_val">Loading...</span> mins</label>
                                             <input type="range" class="range-input form-range" id="present_horizon" step="0.01" disabled>
-                                            <small class="text-muted">Time horizon length at anchor time</small>
+                                            <small class="text-muted">Time horizon length at present day</small>
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
@@ -129,7 +129,7 @@
                                             </div>
                                             <label class="param-label">Anchor Doubling Time: <span id="present_doubling_time_val">Loading...</span> months</label>
                                             <input type="range" class="range-input form-range" id="present_doubling_time" step="0.01" disabled>
-                                            <small class="text-muted">Months required to double time horizon from anchor value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at anchor time.</small>
+                                            <small class="text-muted">Months required to double time horizon from present value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at present day.</small>
                                         </div>
                                         <div class="mb-2" id="doubling_decay_rate_group">
                                             <div class="form-check form-switch">
@@ -156,7 +156,7 @@
                                     <div class="mb-3">
                                         <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_present_day_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="swe_multiplier_at_present_day" step="0.01">
-                                        <small class="text-muted" id="swe_multiplier_present_day_text">Coding labor multiplier at the anchor time</small>
+                                        <small class="text-muted" id="swe_multiplier_present_day_text">Coding labor multiplier at present day</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
@@ -712,7 +712,7 @@
             if (anchorTimeSlider && anchorTimeText) {
                 const anchorTimeValue = parseFloat(anchorTimeSlider.value);
                 const formattedDate = formatDecimalYearToDate(anchorTimeValue);
-                anchorTimeText.textContent = `Coding labor multiplier at the anchor time (${formattedDate})`;
+                anchorTimeText.textContent = `Coding labor multiplier at present day (${formattedDate})`;
             }
         }
 
@@ -754,7 +754,7 @@
                 if (selected === 'SDs per effective OOM') {
                     slopeInfoEl.textContent = 'Slope: SD per effective OOM';
                 } else if (selected === 'SDs per progress-year') {
-                    slopeInfoEl.textContent = 'Slope: SD per anchor-progress-year';
+                    slopeInfoEl.textContent = 'Slope: SD per present-progress-year';
                 }
             }
         }
@@ -2142,7 +2142,7 @@
                 if (slopeInfoEl) {
                     const slope = summary.ai_research_taste_slope_per_anchor_progress_year;
                     if (slope !== undefined && slope !== null && isFinite(slope)) {
-                        slopeInfoEl.textContent = `Slope at anchor: ${fmt(slope, 2)} SD/anchor-progress-year`;
+                        slopeInfoEl.textContent = `Slope at present: ${fmt(slope, 2)} SD/anchor-progress-year`;
                     } else {
                         slopeInfoEl.textContent = 'Steepness of research taste curve';
                     }
