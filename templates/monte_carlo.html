@@ -19,7 +19,38 @@
             </div>
         </div>
 
+        <!-- Live plots row placed above parameter settings -->
         <div class="row g-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live SC-time Histogram</span>
+                        <span id="liveHistStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveHistWrap" style="display:none;">
+                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live SC-time histogram" />
+                        </div>
+                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating SC-time histogram while rollouts are running.</div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live Horizon Trajectories</span>
+                        <span id="liveTrajStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveTrajWrap" style="display:none;">
+                            <img id="imgLiveTraj" class="img-fluid rounded border" alt="Live horizon trajectories" />
+                        </div>
+                        <div id="liveTrajEmpty" class="text-muted small">Start a job to see a live-updating horizon trajectories plot while rollouts are running.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
             <div class="col-lg-5">
                 <div class="card">
                     <div class="card-header d-flex align-items-center justify-content-between">
@@ -72,61 +103,6 @@
                         <pre id="jobLog" class="mt-2" style="max-height: 220px; overflow: auto; background: var(--surface-2); padding: 8px;"></pre>
                     </div>
                 </div>
-            </div>
-
-            <div class="col-lg-7">
-                <div class="card h-100">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                        <span>Parameter Distributions</span>
-                        <div>
-                            <button id="addParamBtn" class="btn btn-sm btn-outline-success">Add Parameter</button>
-                        </div>
-                    </div>
-                    <div class="card-body" style="max-height: 70vh; overflow: auto;">
-                        <div class="text-muted small mb-2">
-                            Only parameters listed below are sampled. Any parameter not listed is held fixed at its default value from the model (as defined in model_config.py) for all rollouts. Clicking the ✕ on a row removes that parameter from sampling, reverting it to its default (no variation). If omitted, categorical parameters fall back to their defaults (horizon extrapolation type and taste schedule type).
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle" id="distTable">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 220px;">Parameter</th>
-                                        <th style="width: 120px;">Distribution</th>
-                                        <th>Spec</th>
-                                        <th style="width: 60px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="distBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mt-3">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                        <span>Live SC-time Histogram</span>
-                        <span id="liveHistStatus" class="small text-muted"></span>
-                    </div>
-                    <div class="card-body">
-                        <div id="liveHistWrap" style="display:none;">
-                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live SC-time histogram" />
-                        </div>
-                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating SC-time histogram while rollouts are running.</div>
-                    </div>
-                </div>
-
-                <div class="card mt-3">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                        <span>Live Horizon Trajectories</span>
-                        <span id="liveTrajStatus" class="small text-muted"></span>
-                    </div>
-                    <div class="card-body">
-                        <div id="liveTrajWrap" style="display:none;">
-                            <img id="imgLiveTraj" class="img-fluid rounded border" alt="Live horizon trajectories" />
-                        </div>
-                        <div id="liveTrajEmpty" class="text-muted small">Start a job to see a live-updating horizon trajectories plot while rollouts are running.</div>
-                    </div>
-                </div>
 
                 <div class="card mt-3">
                     <div class="card-header d-flex align-items-center justify-content-between">
@@ -163,15 +139,47 @@
                     </div>
                 </div>
             </div>
+
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Parameter Distributions</span>
+                        <div>
+                            <button id="addParamBtn" class="btn btn-sm btn-outline-success">Add Parameter</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 70vh; overflow: auto;">
+                        <div class="text-muted small mb-2">
+                            Only parameters listed below are sampled. Any parameter not listed is held fixed at its default value from the model (as defined in model_config.py) for all rollouts. Clicking the ✕ on a row removes that parameter from sampling, reverting it to its default (no variation). If omitted, categorical parameters fall back to their defaults (horizon extrapolation type and taste schedule type).
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle" id="distTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 220px;">Parameter</th>
+                                        <th style="width: 120px;">Distribution</th>
+                                        <th>Spec</th>
+                                        <th style="width: 60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="distBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
     <script>
         let currentConfig = null;
         let jobId = null;
+        let sessionJobIds = [];
         let pollTimer = null;
         let liveHistTimer = null;
         let liveTrajTimer = null;
+        let cancelOnUnload = false;
 
         function field(name, placeholder = '', value = '') {
             return `<input type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
@@ -577,6 +585,8 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error || 'Failed to start job');
                 jobId = data.job_id;
+                cancelOnUnload = true;
+                sessionJobIds.push(jobId);
                 document.getElementById('jobStatus').textContent = `Job ${jobId} started...`;
                 pollJob();
                 startLiveHist();
@@ -608,6 +618,7 @@
                         document.getElementById('runBtn').disabled = false;
                         stopLiveHist();
                         stopLiveTraj();
+                        cancelOnUnload = false;
                         // Attempt to show artifacts if the job succeeded
                         if (status === 'succeeded') {
                             renderArtifacts(j);
@@ -773,6 +784,26 @@
 
         // Initial load
         loadDefaultConfig('generated');
+
+        // Cancel job and delete files when user exits the page
+        function sendCancelBeacon() {
+            if (!cancelOnUnload || sessionJobIds.length === 0) return;
+            const url = `/api/monte-carlo/cleanup`;
+            const blob = new Blob([JSON.stringify({ reason: 'unload', job_ids: sessionJobIds })], { type: 'application/json' });
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(url, blob);
+            } else {
+                // Fallback synchronous request
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, false);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                try { xhr.send(blob); } catch (e) {}
+            }
+        }
+        window.addEventListener('beforeunload', sendCancelBeacon);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') sendCancelBeacon();
+        });
     </script>
 </body>
 </html>

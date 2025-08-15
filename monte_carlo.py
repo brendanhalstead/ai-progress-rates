@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 import zipfile
 from typing import Any, Dict, List, Optional, Tuple
+import shutil
+import signal
 
 from flask import Blueprint, jsonify, render_template, request, send_file, abort
 
@@ -169,16 +171,21 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
         text=True,
         bufsize=1,
         universal_newlines=True,
+        start_new_session=True,  # make child the leader of a new process group for safe cancellation
     )
 
     job_info: Dict[str, Any] = {
         "job_id": job_id,
         "pid": proc.pid,
+        "pgrp": proc.pid,  # process group id (same as pid when start_new_session=True)
         "status": "running",
         "created_at": time.time(),
         "updated_at": time.time(),
         "log_path": str(log_path),
+        "tmp_dir": str(tmp_dir),
         "output_dir": None,
+        "output_dir_confirmed": False,
+        "outputs_before": [str(p) for p in before_dirs],
         "cmd": cmd,
     }
     with _jobs_lock:
@@ -266,10 +273,14 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                     if ji is not None:
                         ji["updated_at"] = time.time()
                         ji["exit_code"] = proc.returncode
-                        ji["output_dir"] = str(out_dir) if out_dir else None
+                        if out_dir is not None:
+                            ji["output_dir"] = str(out_dir)
+                            ji["output_dir_confirmed"] = True
                         if artifacts:
                             ji["artifacts"] = artifacts
-                        ji["status"] = "succeeded" if proc.returncode == 0 else "failed"
+                        # Don't override explicit cancellation status
+                        if ji.get("status") != "cancelled":
+                            ji["status"] = "succeeded" if proc.returncode == 0 else "failed"
 
     t = threading.Thread(target=_reader_thread, daemon=True)
     t.start()
@@ -450,6 +461,124 @@ def download_run_zip(job_id: str):
 
     # Stream the zip file
     return send_file(str(zip_path), as_attachment=True, download_name=zip_name)
+
+
+@mc_bp.route("/api/monte-carlo/cancel/<job_id>", methods=["POST"]) 
+def cancel_job(job_id: str):
+    """Cancel a running job and delete its files (tmp and output dirs)."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+
+    pid = int(job.get("pid") or 0)
+    pgrp = int(job.get("pgrp") or pid or 0)
+    # Attempt to terminate the process group first
+    try:
+        if pgrp:
+            os.killpg(pgrp, signal.SIGTERM)  # type: ignore[arg-type]
+        elif pid:
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        pass
+
+    # Best-effort hard kill after a short grace period
+    try:
+        time.sleep(0.5)
+        if pgrp:
+            os.killpg(pgrp, signal.SIGKILL)  # type: ignore[arg-type]
+        elif pid:
+            os.kill(pid, signal.SIGKILL)
+    except Exception:
+        pass
+
+    # Update job status
+    with _jobs_lock:
+        ji = _jobs.get(job_id)
+        if ji is not None:
+            ji["status"] = "cancelled"
+            ji["updated_at"] = time.time()
+            ji["exit_code"] = -signal.SIGTERM
+
+    # Delete files/directories associated with the job
+    tmp_dir = Path(job.get("tmp_dir") or (OUTPUTS_DIR / "tmp" / job_id))
+    out_dir = Path(job.get("output_dir") or "") if job.get("output_dir") else None
+    try:
+        if out_dir and out_dir.exists():
+            shutil.rmtree(out_dir, ignore_errors=True)
+    except Exception:
+        pass
+    try:
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+    return jsonify({"success": True, "cancelled": True})
+
+
+@mc_bp.route("/api/monte-carlo/cleanup", methods=["POST"])
+def cleanup_jobs():
+    """Bulk cleanup: cancel running jobs and delete their files for provided job_ids.
+
+    Body: { "job_ids": ["abc123", ...] }
+    """
+    try:
+        payload = request.json or {}
+        job_ids = payload.get("job_ids", [])
+        if not isinstance(job_ids, list):
+            return jsonify({"success": False, "error": "job_ids must be a list"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    results: List[Dict[str, Any]] = []
+    for jid in job_ids:
+        with _jobs_lock:
+            job = _jobs.get(jid)
+        if job is None:
+            results.append({"job_id": jid, "found": False})
+            continue
+        status = job.get("status")
+        pid = int(job.get("pid") or 0)
+        pgrp = int(job.get("pgrp") or pid or 0)
+        # If running, terminate
+        if status == "running":
+            try:
+                if pgrp:
+                    os.killpg(pgrp, signal.SIGTERM)  # type: ignore[arg-type]
+                elif pid:
+                    os.kill(pid, signal.SIGTERM)
+            except Exception:
+                pass
+            try:
+                time.sleep(0.2)
+                if pgrp:
+                    os.killpg(pgrp, signal.SIGKILL)  # type: ignore[arg-type]
+                elif pid:
+                    os.kill(pid, signal.SIGKILL)
+            except Exception:
+                pass
+        # Delete files
+        tmp_dir = Path(job.get("tmp_dir") or (OUTPUTS_DIR / "tmp" / jid))
+        out_dir = Path(job.get("output_dir") or "") if job.get("output_dir") else None
+        try:
+            if out_dir and out_dir.exists():
+                shutil.rmtree(out_dir, ignore_errors=True)
+        except Exception:
+            pass
+        try:
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+        # Remove from registry
+        with _jobs_lock:
+            _jobs.pop(jid, None)
+
+        results.append({"job_id": jid, "found": True, "deleted": True})
+
+    return jsonify({"success": True, "results": results})
 
 
 @mc_bp.route("/api/monte-carlo/live-sc-hist/<job_id>.png", methods=["GET"])
