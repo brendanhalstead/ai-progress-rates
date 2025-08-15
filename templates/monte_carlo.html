@@ -127,6 +127,10 @@
                                 <label class="form-label small">SC-time Distribution</label>
                                 <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
                             </div>
+                            <div class="col-12">
+                                <label class="form-label small">Horizon Trajectories</label>
+                                <img id="imgHorizonTraj" class="img-fluid rounded border" alt="Horizon trajectories" />
+                            </div>
                             <div class="col-md-6">
                                 <label class="form-label small">Sensitivity: Spearman (top)</label>
                                 <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
@@ -724,6 +728,7 @@
 
             // Toggle and set image sources based on available artifacts
             const scWrap = document.getElementById('imgScHist').closest('.col-12');
+            const htWrap = document.getElementById('imgHorizonTraj').closest('.col-12');
             const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
             const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
 
@@ -732,6 +737,12 @@
                 scWrap.style.display = '';
             } else {
                 scWrap.style.display = 'none';
+            }
+            if (hasAny('horizon_trajectories.png')) {
+                document.getElementById('imgHorizonTraj').src = base('horizon_trajectories.png');
+                htWrap.style.display = '';
+            } else {
+                htWrap.style.display = 'none';
             }
             if (hasAny('sensitivity_spearman_top.png')) {
                 document.getElementById('imgSensSpearman').src = base('sensitivity_spearman_top.png');
