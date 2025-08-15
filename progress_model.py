@@ -249,16 +249,16 @@ class Parameters:
     human_only: bool = field(default_factory=lambda: False)
     
     # Production function parameters
-    rho_cognitive: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_cognitive'])
-    rho_progress: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_progress'])
-    alpha: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha'])
-    software_scale: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_scale'])
-    zeta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['zeta'])
+    rho_coding_labor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_coding_labor'])
+    rho_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_experiment_capacity'])
+    alpha_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha_experiment_capacity'])
+    r_software: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['r_software'])
+    experiment_compute_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['experiment_compute_exponent'])
     
     # Automation parameters
     automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
     automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
-    swe_multiplier_at_anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_anchor_time'])
+    swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
@@ -270,13 +270,13 @@ class Parameters:
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Manual horizon fitting parameters
-    anchor_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_time'])
-    anchor_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_horizon'])
-    anchor_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['anchor_doubling_time'])
+    present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_day'])
+    present_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_horizon'])
+    present_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_doubling_time'])
     doubling_decay_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_decay_rate'])
     
     # Normalization
-    cognitive_output_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['cognitive_output_normalization'])
+    coding_labor_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_normalization'])
     
     # Baseline Annual Compute Multiplier
     baseline_annual_compute_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['baseline_annual_compute_multiplier'])
@@ -287,40 +287,40 @@ class Parameters:
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
         # Sanitize elasticity parameters
-        if not np.isfinite(self.rho_cognitive):
-            logger.warning(f"Non-finite rho_cognitive: {self.rho_cognitive}, setting to 0")
-            self.rho_cognitive = 0.0
+        if not np.isfinite(self.rho_coding_labor):
+            logger.warning(f"Non-finite rho_coding_labor: {self.rho_coding_labor}, setting to 0")
+            self.rho_coding_labor = 0.0
         else:
             # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
             # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_cognitive = np.clip(self.rho_cognitive, cfg.RHO_CLIP_MIN, 1.0)
+            self.rho_coding_labor = np.clip(self.rho_coding_labor, cfg.RHO_CLIP_MIN, 1.0)
         
-        if not np.isfinite(self.rho_progress):
-            logger.warning(f"Non-finite rho_progress: {self.rho_progress}, setting to 0")
-            self.rho_progress = 0.0
+        if not np.isfinite(self.rho_experiment_capacity):
+            logger.warning(f"Non-finite rho_experiment_capacity: {self.rho_experiment_capacity}, setting to 0")
+            self.rho_experiment_capacity = 0.0
         else:
             # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
             # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_progress = np.clip(self.rho_progress, cfg.RHO_CLIP_MIN, 1.0)
+            self.rho_experiment_capacity = np.clip(self.rho_experiment_capacity, cfg.RHO_CLIP_MIN, 1.0)
         
         # Sanitize weights
-        if not np.isfinite(self.alpha):
-            logger.warning(f"Non-finite alpha: {self.alpha}, setting to 0.5")
-            self.alpha = 0.5
+        if not np.isfinite(self.alpha_experiment_capacity):
+            logger.warning(f"Non-finite alpha_experiment_capacity: {self.alpha_experiment_capacity}, setting to 0.5")
+            self.alpha_experiment_capacity = 0.5
         else:
-            self.alpha = np.clip(self.alpha, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
+            self.alpha_experiment_capacity = np.clip(self.alpha_experiment_capacity, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
         
-        if not np.isfinite(self.software_scale):
-            logger.warning(f"Non-finite software_scale: {self.software_scale}, setting to 1.0")
-            self.software_scale = 1.0
+        if not np.isfinite(self.r_software):
+            logger.warning(f"Non-finite r_software: {self.r_software}, setting to 1.0")
+            self.r_software = 1.0
         else:
-            self.software_scale = np.clip(self.software_scale, 0.1, 10.0)
+            self.r_software = np.clip(self.r_software, 0.1, 10.0)
         
-        if not np.isfinite(self.zeta):
-            logger.warning(f"Non-finite zeta: {self.zeta}, setting to {cfg.DEFAULT_PARAMETERS['zeta']}")
-            self.zeta = cfg.DEFAULT_PARAMETERS['zeta']
+        if not np.isfinite(self.experiment_compute_exponent):
+            logger.warning(f"Non-finite experiment_compute_exponent: {self.experiment_compute_exponent}, setting to {cfg.DEFAULT_PARAMETERS['experiment_compute_exponent']}")
+            self.experiment_compute_exponent = cfg.DEFAULT_PARAMETERS['experiment_compute_exponent']
         else:
-            self.zeta = np.clip(self.zeta, cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
+            self.experiment_compute_exponent = np.clip(self.experiment_compute_exponent, cfg.experiment_compute_exponent_CLIP_MIN, cfg.experiment_compute_exponent_CLIP_MAX)
         
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
@@ -370,27 +370,27 @@ class Parameters:
             self.horizon_extrapolation_type = cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE
         
         # Sanitize manual horizon fitting parameters
-        if not np.isfinite(self.anchor_time):
-            logger.warning(f"Non-finite anchor_time: {self.anchor_time}, setting to default")
-            self.anchor_time = cfg.DEFAULT_ANCHOR_TIME
+        if not np.isfinite(self.present_day):
+            logger.warning(f"Non-finite present_day: {self.present_day}, setting to default")
+            self.present_day = cfg.DEFAULT_present_day
         else:
             # Clamp to reasonable time range
-            self.anchor_time = np.clip(self.anchor_time, 2020.0, 2030.0)
+            self.present_day = np.clip(self.present_day, 2020.0, 2030.0)
         
         # Validate optional parameters - if provided, ensure they're finite and positive
-        if self.anchor_horizon is not None:
-            if not np.isfinite(self.anchor_horizon) or self.anchor_horizon <= 0:
-                logger.warning(f"Invalid anchor_horizon: {self.anchor_horizon}, setting to None for optimization")
-                self.anchor_horizon = None
+        if self.present_horizon is not None:
+            if not np.isfinite(self.present_horizon) or self.present_horizon <= 0:
+                logger.warning(f"Invalid present_horizon: {self.present_horizon}, setting to None for optimization")
+                self.present_horizon = None
             else:
-                self.anchor_horizon = np.clip(self.anchor_horizon, 0.01, 10000.0)
+                self.present_horizon = np.clip(self.present_horizon, 0.01, 10000.0)
         
-        if self.anchor_doubling_time is not None:
-            if not np.isfinite(self.anchor_doubling_time) or self.anchor_doubling_time <= 0:
-                logger.warning(f"Invalid anchor_doubling_time: {self.anchor_doubling_time}, setting to None for optimization")
-                self.anchor_doubling_time = None
+        if self.present_doubling_time is not None:
+            if not np.isfinite(self.present_doubling_time) or self.present_doubling_time <= 0:
+                logger.warning(f"Invalid present_doubling_time: {self.present_doubling_time}, setting to None for optimization")
+                self.present_doubling_time = None
             else:
-                self.anchor_doubling_time = np.clip(self.anchor_doubling_time, 0.01, 100.0)
+                self.present_doubling_time = np.clip(self.present_doubling_time, 0.01, 100.0)
         
         if self.doubling_decay_rate is not None:
             if not np.isfinite(self.doubling_decay_rate) or self.doubling_decay_rate <= 0:
@@ -400,11 +400,11 @@ class Parameters:
                 self.doubling_decay_rate = np.clip(self.doubling_decay_rate, 0.001, 1.0)
 
         # Sanitize normalization parameters
-        if not np.isfinite(self.cognitive_output_normalization) or self.cognitive_output_normalization <= 0:
-            logger.warning(f"Invalid cognitive_output_normalization: {self.cognitive_output_normalization}, setting to 1.0")
-            self.cognitive_output_normalization = 1.0
+        if not np.isfinite(self.coding_labor_normalization) or self.coding_labor_normalization <= 0:
+            logger.warning(f"Invalid coding_labor_normalization: {self.coding_labor_normalization}, setting to 1.0")
+            self.coding_labor_normalization = 1.0
         else:
-            self.cognitive_output_normalization = max(cfg.NORMALIZATION_MIN, self.cognitive_output_normalization)
+            self.coding_labor_normalization = max(cfg.NORMALIZATION_MIN, self.coding_labor_normalization)
         
         # Validate baseline annual compute multiplier
         if not np.isfinite(self.baseline_annual_compute_multiplier) or self.baseline_annual_compute_multiplier <= 0:
@@ -598,7 +598,7 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     return result_with_lambda * cognitive_normalization
 
 
-def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha: float, rho: float, zeta: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
+def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
@@ -606,19 +606,19 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
     Args:
         experiment_compute: Experiment compute budget
         cognitive_output: Output from cognitive work
-        alpha: Weight on experiment compute [0,1]
+        alpha_experiment_capacity: Weight on experiment compute [0,1]
         rho: Standard substitution parameter in (-inf, 1].
              rho -> 1: perfect substitutes
              rho -> 0: Cobb-Douglas
              rho -> -inf: perfect complements
-        zeta: Discounting factor for experiment compute (see cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
+        experiment_compute_exponent: Discounting factor for experiment compute (see cfg.experiment_compute_exponent_CLIP_MIN, cfg.experiment_compute_exponent_CLIP_MAX)
         aggregate_research_taste: Multiplier for research effectiveness (default 1.0)
     
     Returns:
         Research stock growth rate RS'(t)
     """
     # Input validation
-    if not all(np.isfinite([experiment_compute, cognitive_output, alpha, rho, zeta, aggregate_research_taste])):
+    if not all(np.isfinite([experiment_compute, cognitive_output, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
         logger.warning("Non-finite inputs to compute_research_stock_rate")
         return 0.0
     
@@ -630,18 +630,18 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
         logger.warning(f"Negative aggregate_research_taste: {aggregate_research_taste}, setting to {cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK}")
         aggregate_research_taste = cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK
     
-    if zeta < cfg.ZETA_CLIP_MIN or zeta > cfg.ZETA_CLIP_MAX:
-        logger.warning(f"Invalid zeta value {zeta}, clamping to [{cfg.ZETA_CLIP_MIN}, {cfg.ZETA_CLIP_MAX}]")
-        zeta = np.clip(zeta, cfg.ZETA_CLIP_MIN, cfg.ZETA_CLIP_MAX)
+    if experiment_compute_exponent < cfg.experiment_compute_exponent_CLIP_MIN or experiment_compute_exponent > cfg.experiment_compute_exponent_CLIP_MAX:
+        logger.warning(f"Invalid experiment_compute_exponent value {experiment_compute_exponent}, clamping to [{cfg.experiment_compute_exponent_CLIP_MIN}, {cfg.experiment_compute_exponent_CLIP_MAX}]")
+        experiment_compute_exponent = np.clip(experiment_compute_exponent, cfg.experiment_compute_exponent_CLIP_MIN, cfg.experiment_compute_exponent_CLIP_MAX)
     
-    # Clamp alpha to valid range
-    alpha = np.clip(alpha, 0.0, 1.0)
+    # Clamp alpha_experiment_capacity to valid range
+    alpha_experiment_capacity = np.clip(alpha_experiment_capacity, 0.0, 1.0)
     
     # Apply discounting factor to experiment compute
-    discounted_experiment_compute = np.power(experiment_compute, zeta)
+    discounted_experiment_compute = np.power(experiment_compute, experiment_compute_exponent)
     
     # Use the generic CES function for computation
-    rate = _ces_function(discounted_experiment_compute, cognitive_output, alpha, rho)
+    rate = _ces_function(discounted_experiment_compute, cognitive_output, alpha_experiment_capacity, rho)
     
     # Cap extremely large rates to prevent numerical issues
     if rate > cfg.MAX_RESEARCH_STOCK_RATE:
@@ -661,7 +661,7 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
 
 def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
                                  initial_research_stock: float, initial_research_stock_rate: float,
-                                 software_scale: float) -> float:
+                                 r_software: float) -> float:
     """
     Compute software progress rate using research stock formulation:
     S(t) = RS'(t) / RS(t) * s
@@ -669,13 +669,13 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
     Args:
         research_stock: Current research stock RS(t)
         research_stock_rate: Current research stock rate RS'(t)
-        software_scale: Software progress share parameter s [0.1,10]
+        r_software: Software progress share parameter s [0.1,10]
     
     Returns:
         Software progress rate multiplied by s
     """
     # Input validation
-    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate, software_scale])):
+    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate, r_software])):
         logger.warning("Non-finite inputs to compute_software_progress_rate")
         return 0.0
     
@@ -687,8 +687,8 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
         logger.warning("Non-positive initial research stock rate")
         return 0.0
     
-    if software_scale < 0.1 or software_scale > 10:
-        logger.warning(f"Invalid software_scale: {software_scale}, must be in [0.1,10]")
+    if r_software < 0.1 or r_software > 10:
+        logger.warning(f"Invalid r_software: {r_software}, must be in [0.1,10]")
         return 0.0
     
     # Compute software progress rate using research stock ratio formula
@@ -706,7 +706,7 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
             logger.warning(f"Invalid software progress rate: {software_progress_rate}")
             return 0.0
         # Apply software progress share multiplier: s
-        final_rate = software_progress_rate * software_scale
+        final_rate = software_progress_rate * r_software
         rate_at_base_for_software_lom = final_rate * 1.0 / np.log(cfg.BASE_FOR_SOFTWARE_LOM)
         
         if not np.isfinite(final_rate) or final_rate < 0:
@@ -782,7 +782,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
+            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: cognitive_output_0: {cognitive_output_0}")
             initial_aggregate_research_taste = 1.0
         else:
@@ -791,14 +791,14 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
             cognitive_output_0 = compute_cognitive_output(
                 initial_automation, L_AI_0, L_HUMAN_0, 
-                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
+                params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization
             )
             logger.info(f"ACTUAL::: cognitive_output_0: {cognitive_output_0}")
         
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
             experiment_compute_0, cognitive_output_0, 
-            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
+            params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
         
         # Calculate RS'(dt) for numerical differentiation
@@ -809,17 +809,17 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
+            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: cognitive_output_dt: {cognitive_output_dt}")
         else:
             cognitive_output_dt = compute_cognitive_output(
                 initial_automation, L_AI_dt, L_HUMAN_dt,
-                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
+                params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization
             )
         
         rs_rate_dt = compute_research_stock_rate(
             experiment_compute_dt, cognitive_output_dt,
-            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
+            params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
         # logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
         
@@ -896,20 +896,20 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
-        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste)
+        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True)
+        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
         initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
         initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
         cognitive_output = compute_cognitive_output(
             initial_automation, L_AI, L_HUMAN, 
-            params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
+            params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization
         )
     
         research_stock_rate = compute_research_stock_rate(
             experiment_compute, cognitive_output, 
-            params.alpha, params.rho_progress, params.zeta, initial_aggregate_research_taste
+            params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
     
     # Validate and fallback for research stock rate
@@ -959,8 +959,8 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      (swe_multiplier)**params.lambda_param * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization)
-    where p = params.rho_cognitive.
+      (swe_multiplier)**params.lambda_param * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization)
+    where p = params.rho_coding_labor.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
     """
@@ -974,7 +974,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier**params.lambda_param * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)
+    target_output = swe_multiplier**params.lambda_param * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
@@ -982,7 +982,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         try:
             actual_output = compute_cognitive_output(
                 A_candidate, L_AI, L_HUMAN, 
-                params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
+                params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization
             )
             return actual_output - target_output
         except Exception as e:
@@ -1438,7 +1438,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization, human_only=True)  
+            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -1452,7 +1452,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             
             # Compute cognitive output with validation
             cognitive_output = compute_cognitive_output(
-                automation_fraction, L_AI, L_HUMAN, params.rho_cognitive, params.lambda_param, params.cognitive_output_normalization
+                automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.lambda_param, params.coding_labor_normalization
             )
         
         if not np.isfinite(cognitive_output) or cognitive_output < 0:
@@ -1461,7 +1461,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         
         # Compute research stock rate (dRS/dt) with validation
         research_stock_rate = compute_research_stock_rate(
-            experiment_compute, cognitive_output, params.alpha, params.rho_progress, params.zeta, aggregate_research_taste
+            experiment_compute, cognitive_output, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, aggregate_research_taste
         )
         
         if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
@@ -1477,7 +1477,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             software_progress_rate = compute_software_progress_rate(
                 research_stock, research_stock_rate, 
                 initial_research_stock, initial_research_stock_rate,
-                params.software_scale
+                params.r_software
             )
         
         if not np.isfinite(software_progress_rate) or software_progress_rate < 0:
@@ -1772,15 +1772,15 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
             # Legacy automation sigmoid checks removed
             
             # Check for extreme elasticity combinations that cause numerical instability
-            if 'rho_cognitive' in params_dict and 'rho_progress' in params_dict:
-                if abs(params_dict['rho_cognitive']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs'] and abs(params_dict['rho_progress']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs']:
-                    if params_dict['rho_cognitive'] * params_dict['rho_progress'] > cfg.PARAM_VALIDATION_THRESHOLDS['rho_product_max']:
+            if 'rho_coding_labor' in params_dict and 'rho_experiment_capacity' in params_dict:
+                if abs(params_dict['rho_coding_labor']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs'] and abs(params_dict['rho_experiment_capacity']) > cfg.PARAM_VALIDATION_THRESHOLDS['rho_extreme_abs']:
+                    if params_dict['rho_coding_labor'] * params_dict['rho_experiment_capacity'] > cfg.PARAM_VALIDATION_THRESHOLDS['rho_product_max']:
                         logger.warning("Extreme elasticity combination may cause numerical instability")
                         return False
             
             # Check normalization values are reasonable
-            if 'cognitive_output_normalization' in params_dict:
-                if params_dict['cognitive_output_normalization'] > cfg.PARAM_VALIDATION_THRESHOLDS['cognitive_output_normalization_max']:
+            if 'coding_labor_normalization' in params_dict:
+                if params_dict['coding_labor_normalization'] > cfg.PARAM_VALIDATION_THRESHOLDS['coding_labor_normalization_max']:
                     logger.warning("Cognitive output normalization too large, may cause instability")
                     return False
             
@@ -1852,7 +1852,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
     
     logger.info(f"Parameters being optimized: {param_names}")
     logger.info(f"Fixed parameters: {fixed_params}")
-    logger.info(f"Initial cognitive_output_normalization: {initial_params.cognitive_output_normalization}")
+    logger.info(f"Initial coding_labor_normalization: {initial_params.coding_labor_normalization}")
     logger.info(f"Using {len(anchor_constraints)} feasible constraints")
     
     def objective(x):
@@ -1893,10 +1893,10 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
             # Add regularization to prevent extreme parameter values
             regularization = 0.0
             for i, (name, value) in enumerate(zip(param_names, x)):
-                if name in ['rho_cognitive', 'rho_progress']:
+                if name in ['rho_coding_labor', 'rho_experiment_capacity']:
                     # Penalize extreme elasticity values more strongly
                     regularization += cfg.OBJECTIVE_FUNCTION_CONFIG['elasticity_regularization_weight'] * (value ** 4)  # Quartic penalty for elasticities
-                elif name in ['alpha', 'software_scale']:
+                elif name in ['alpha_experiment_capacity', 'r_software']:
                     # Penalize values near boundaries (0 or 1)
                     distance_from_center = abs(value - 0.5)
                     if distance_from_center > cfg.OBJECTIVE_FUNCTION_CONFIG['boundary_avoidance_threshold']:  # Tighter boundary avoidance
@@ -1961,7 +1961,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                     if constraint.target_value > cfg.STRATEGIC_STARTING_POINTS_CONFIG['high_progress_rate_threshold']:  # High progress rate desired
                         # Favor less negative elasticities
                         for j, name in enumerate(param_names):
-                            if name in ['rho_cognitive', 'rho_progress']:
+                            if name in ['rho_coding_labor', 'rho_experiment_capacity']:
                                 min_bound, max_bound = opt_bounds[j]
                                 constraint_point[j] = max_bound * cfg.STRATEGIC_STARTING_POINTS_CONFIG['rho_adjustment_factor']  # Near positive end
                 elif constraint.target_variable == 'automation_fraction':
@@ -1982,7 +1982,7 @@ def estimate_parameters(anchor_constraints: List[AnchorConstraint], time_series_
                 val = x0[j]
                 min_bound, max_bound = bound
                 # Smaller perturbations for critical parameters
-                if param_name in ['rho_cognitive', 'rho_progress']:
+                if param_name in ['rho_coding_labor', 'rho_experiment_capacity']:
                     perturbation_factor = cfg.STRATEGIC_STARTING_POINTS_CONFIG['critical_param_perturbation_factor']  # 10% of range
                 else:
                     perturbation_factor = cfg.STRATEGIC_STARTING_POINTS_CONFIG['other_param_perturbation_factor']  # 20% of range
@@ -2174,7 +2174,7 @@ class ProgressModel:
             human_only_times: Time array from human-only trajectory computation
             human_only_progress: Progress array from human-only trajectory computation
             anchor_progress_rate: Progress rate at anchor time (progress units per time unit),
-                                 used to convert anchor_doubling_time from time units to progress units
+                                 used to convert present_doubling_time from time units to progress units
             
         Returns:
             Function that maps progress to horizon length
@@ -2288,35 +2288,35 @@ class ProgressModel:
         try:
             if self.params.horizon_extrapolation_type == "exponential":
                 # Check if manual parameters are provided
-                if self.params.anchor_horizon is not None:
+                if self.params.present_horizon is not None:
                     # Use manual fitting with anchor point
-                    # Get progress at anchor_time
-                    anchor_progress = np.interp(self.params.anchor_time, human_only_times, human_only_progress)
+                    # Get progress at present_day
+                    anchor_progress = np.interp(self.params.present_day, human_only_times, human_only_progress)
                     
-                    # If anchor_doubling_time is provided, use it to calculate slope
-                    if self.params.anchor_doubling_time is not None:
-                        # Convert anchor_doubling_time from time units to progress units
+                    # If present_doubling_time is provided, use it to calculate slope
+                    if self.params.present_doubling_time is not None:
+                        # Convert present_doubling_time from time units to progress units
                         # doubling_time_in_progress_units = doubling_time_in_time_units * progress_rate
-                        doubling_time_in_progress_units = self.params.anchor_doubling_time * anchor_progress_rate
+                        doubling_time_in_progress_units = self.params.present_doubling_time * anchor_progress_rate
                         # slope = log(2) / doubling_time (in progress units)
                         slope = np.log(2) / doubling_time_in_progress_units
                     else:
                         # Optimize slope using data, but fix intercept using anchor point
                         def fit_slope_only(slope_val):
-                            intercept_val = np.log(self.params.anchor_horizon) - slope_val * anchor_progress
+                            intercept_val = np.log(self.params.present_horizon) - slope_val * anchor_progress
                             predicted = linear_func(progress_values, slope_val, intercept_val)
                             return np.sum((log_horizon_values - predicted)**2)
                         
                         result = optimize.minimize_scalar(fit_slope_only, bounds=(-10, 10), method='bounded')
                         slope = result.x
                     
-                    # Calculate intercept from anchor point: log(anchor_horizon) = slope * anchor_progress + intercept
-                    intercept = np.log(self.params.anchor_horizon) - slope * anchor_progress
+                    # Calculate intercept from anchor point: log(present_horizon) = slope * anchor_progress + intercept
+                    intercept = np.log(self.params.present_horizon) - slope * anchor_progress
                     
                     logger.info(f"Manual exponential horizon trajectory: log(horizon) = {slope:.6f} * progress + {intercept:.6f}")
-                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}, horizon={self.params.anchor_horizon:.4f}")
-                    if self.params.anchor_doubling_time is not None:
-                        logger.info(f"Anchor doubling time (time units): {self.params.anchor_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
+                    logger.info(f"Using anchor point: time={self.params.present_day}, progress={anchor_progress:.4f}, horizon={self.params.present_horizon:.4f}")
+                    if self.params.present_doubling_time is not None:
+                        logger.info(f"Anchor doubling time (time units): {self.params.present_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
                 else:
                     # Use automatic curve fitting
                     popt, pcov = optimize.curve_fit(linear_func, progress_values, log_horizon_values)
@@ -2343,30 +2343,30 @@ class ProgressModel:
                         self.params.progress_at_sc = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
-                # Determine approach based on whether anchor_doubling_time is specified
-                # If anchor_doubling_time is specified, we MUST use the shifted function approach
-                # to ensure the doubling time at the anchor point equals anchor_doubling_time
-                if self.params.anchor_doubling_time is not None or self.params.anchor_horizon is not None:
+                # Determine approach based on whether present_doubling_time is specified
+                # If present_doubling_time is specified, we MUST use the shifted function approach
+                # to ensure the doubling time at the anchor point equals present_doubling_time
+                if self.params.present_doubling_time is not None or self.params.present_horizon is not None:
                     # Use shifted function approach
                     self._horizon_uses_shifted_form = True
-                    # Get progress at anchor_time
-                    anchor_progress = np.interp(self.params.anchor_time, human_only_times, human_only_progress)
+                    # Get progress at present_day
+                    anchor_progress = np.interp(self.params.present_day, human_only_times, human_only_progress)
                     
                     # Determine what parameters we have and what we need to optimize
                     params_to_optimize = []
                     fixed_params = {}
                     
-                    # Handle H_0 (anchor_horizon)
-                    if self.params.anchor_horizon is not None:
-                        fixed_params['H_0'] = self.params.anchor_horizon
+                    # Handle H_0 (present_horizon)
+                    if self.params.present_horizon is not None:
+                        fixed_params['H_0'] = self.params.present_horizon
                     else:
                         params_to_optimize.append('H_0')
                     
-                    # Handle T_0 (anchor_doubling_time)
-                    if self.params.anchor_doubling_time is not None:
-                        # Convert anchor_doubling_time from time units to progress units
+                    # Handle T_0 (present_doubling_time)
+                    if self.params.present_doubling_time is not None:
+                        # Convert present_doubling_time from time units to progress units
                         # doubling_time_in_progress_units = doubling_time_in_time_units * progress_rate
-                        doubling_time_in_progress_units = self.params.anchor_doubling_time * anchor_progress_rate
+                        doubling_time_in_progress_units = self.params.present_doubling_time * anchor_progress_rate
                         fixed_params['T_0'] = doubling_time_in_progress_units
                     else:
                         params_to_optimize.append('T_0')
@@ -2379,7 +2379,7 @@ class ProgressModel:
                     
                     if len(params_to_optimize) == 0:
                         # All parameters specified (Case 8)
-                        H_0 = self.params.anchor_horizon
+                        H_0 = self.params.present_horizon
                         T_0 = doubling_time_in_progress_units
                         A_0 = self.params.doubling_decay_rate
                         logger.info(f"Manual decaying doubling time: All parameters specified")
@@ -2511,11 +2511,11 @@ class ProgressModel:
                         logger.info(f"Optimized parameters: {', '.join([f'{name}={param_dict[name]:.6f}' for name in params_to_optimize])}")
                     
                     logger.info(f"Manual decaying doubling time horizon trajectory: H_0={H_0:.6f}, A_0={A_0:.6f}, T_0={T_0:.6f}")
-                    logger.info(f"Using anchor point: time={self.params.anchor_time}, progress={anchor_progress:.4f}")
-                    if self.params.anchor_horizon is not None:
-                        logger.info(f"Anchor horizon: {self.params.anchor_horizon:.4f}")
-                    if self.params.anchor_doubling_time is not None:
-                        logger.info(f"Anchor doubling time (time units): {self.params.anchor_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
+                    logger.info(f"Using anchor point: time={self.params.present_day}, progress={anchor_progress:.4f}")
+                    if self.params.present_horizon is not None:
+                        logger.info(f"Anchor horizon: {self.params.present_horizon:.4f}")
+                    if self.params.present_doubling_time is not None:
+                        logger.info(f"Anchor doubling time (time units): {self.params.present_doubling_time:.4f}, converted to progress units: {doubling_time_in_progress_units:.4f} (using progress rate: {anchor_progress_rate:.4f})")
                     
                     # Store anchor_progress for use in horizon_trajectory function
                     anchor_progress_for_trajectory = anchor_progress
@@ -2665,7 +2665,7 @@ class ProgressModel:
         """
         Update the horizon trajectory function with a new anchor progress value.
         This fixes the Case 2 issue where the fitted anchor progress differs from 
-        the actual integrated progress at anchor_time.
+        the actual integrated progress at present_day.
         """
         if not hasattr(self, '_horizon_params') or not self._horizon_params:
             logger.warning("Cannot update horizon trajectory: no stored parameters")
@@ -2755,19 +2755,19 @@ class ProgressModel:
             progress_rates.append(rates[0])
             research_stock_rates.append(rates[1])
         
-        # Anchor stats at params.anchor_time
-        anchor_time = human_only_params.anchor_time
-        anchor_progress = np.interp(anchor_time, times, progress_values)
-        anchor_progress_rate = np.interp(anchor_time, times, progress_rates)
+        # Anchor stats at params.present_day
+        present_day = human_only_params.present_day
+        anchor_progress = np.interp(present_day, times, progress_values)
+        anchor_progress_rate = np.interp(present_day, times, progress_rates)
         # Interpolate human and AI labor at anchor time using log-space when positive
         if np.all(self.data.L_HUMAN > 0):
-            anchor_human_labor = _log_interp(anchor_time, self.data.time, self.data.L_HUMAN)
+            anchor_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
         else:
-            anchor_human_labor = np.interp(anchor_time, self.data.time, self.data.L_HUMAN)
+            anchor_human_labor = np.interp(present_day, self.data.time, self.data.L_HUMAN)
         if np.all(self.data.L_AI > 0):
-            anchor_ai_labor = _log_interp(anchor_time, self.data.time, self.data.L_AI)
+            anchor_ai_labor = _log_interp(present_day, self.data.time, self.data.L_AI)
         else:
-            anchor_ai_labor = np.interp(anchor_time, self.data.time, self.data.L_AI)
+            anchor_ai_labor = np.interp(present_day, self.data.time, self.data.L_AI)
         
         self.human_only_results = {
             'times': times,
@@ -2816,14 +2816,14 @@ class ProgressModel:
             self.horizon_trajectory = None
 
         # compute automation fraction at anchor time
-        anchor_time = self.params.anchor_time
+        present_day = self.params.present_day
         anchor_progress = self.human_only_results['anchor_stats']['progress']
         anchor_human_labor = self.human_only_results['anchor_stats']['human_labor']
         anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
         # compute automation fraction at anchor time
-        anchor_aut_frac = aut_frac_from_swe_multiplier(self.params.swe_multiplier_at_anchor_time, anchor_human_labor, anchor_ai_labor, self.params)
+        anchor_aut_frac = aut_frac_from_swe_multiplier(self.params.swe_multiplier_at_present_day, anchor_human_labor, anchor_ai_labor, self.params)
         # anchor_aut_frac = 0.01
-        logger.info(f"calculated anchor automation fraction: {anchor_aut_frac} from swe_multiplier_at_anchor_time: {self.params.swe_multiplier_at_anchor_time} and anchor_time: {anchor_time}")
+        logger.info(f"calculated anchor automation fraction: {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             anchor_progress: anchor_aut_frac,
             self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
@@ -2833,13 +2833,13 @@ class ProgressModel:
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
-        # This ensures that the horizon at anchor_time matches the specified anchor_horizon value
+        # This ensures that the horizon at present_day matches the specified present_horizon value
         if (self.horizon_trajectory is not None and 
             hasattr(self, '_horizon_uses_shifted_form') and self._horizon_uses_shifted_form and
-            self.params.anchor_horizon is not None):
+            self.params.present_horizon is not None):
             
-            # Recompute the actual progress at anchor_time from the integrated trajectory
-            actual_anchor_progress = np.interp(self.params.anchor_time, times, progress_values)
+            # Recompute the actual progress at present_day from the integrated trajectory
+            actual_anchor_progress = np.interp(self.params.present_day, times, progress_values)
             
             # Update the horizon trajectory function with the corrected anchor progress
             logger.info(f"Updating anchor progress from fitted value ({anchor_progress:.6f}) to actual integrated value: {actual_anchor_progress:.6f}")
@@ -2912,13 +2912,13 @@ class ProgressModel:
                 training_compute_growth_rate = _log_interp(t, self.data.time, self.data.training_compute_growth_rate)
                 
                 # Compute discounted experiment compute
-                discounted_exp_compute_val = experiment_compute ** self.params.zeta
+                discounted_exp_compute_val = experiment_compute ** self.params.experiment_compute_exponent
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute cognitive output
                 cognitive_output = compute_cognitive_output(
                     automation_fraction, L_AI, L_HUMAN, 
-                    self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization
+                    self.params.rho_coding_labor, self.params.lambda_param, self.params.coding_labor_normalization
                 )
                 cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
                 
@@ -2928,7 +2928,7 @@ class ProgressModel:
                     rs, current_research_stock_rate, 
                     initial_research_stock_val, 
                     initial_research_stock_rate_val,
-                    self.params.software_scale
+                    self.params.r_software
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 
@@ -2945,18 +2945,18 @@ class ProgressModel:
                 software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_cognitive_output = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization, human_only=True)
+                human_only_cognitive_output = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.lambda_param, self.params.coding_labor_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
                     experiment_compute, human_only_cognitive_output, 
-                    self.params.alpha, self.params.rho_progress, self.params.zeta, human_only_aggregate_research_taste
+                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste
                 )
                 human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
                     rs, human_only_research_stock_rate,
                     initial_research_stock_val,
                     initial_research_stock_rate_val,
-                    self.params.software_scale
+                    self.params.r_software
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
                 human_only_overall_rate = compute_overall_progress_rate(
@@ -2968,7 +2968,7 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_cognitive, self.params.lambda_param, self.params.cognitive_output_normalization, human_only=True)
+                human_contrib = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.lambda_param, self.params.coding_labor_normalization, human_only=True)
                 ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
@@ -3082,15 +3082,15 @@ class ProgressModel:
             sc_sw_multiplier = None
         
         # Calculate progress rate at anchor time
-        anchor_time = self.params.anchor_time
+        present_day = self.params.present_day
         anchor_progress_rate = None
-        if anchor_time is not None:
+        if present_day is not None:
             # Check if anchor time is within our trajectory
-            if times[0] <= anchor_time <= times[-1]:
-                anchor_progress_rate = np.interp(anchor_time, times, progress_rates)
-                logger.info(f"Progress rate at anchor time ({anchor_time:.3f}): {anchor_progress_rate:.6f}")
+            if times[0] <= present_day <= times[-1]:
+                anchor_progress_rate = np.interp(present_day, times, progress_rates)
+                logger.info(f"Progress rate at anchor time ({present_day:.3f}): {anchor_progress_rate:.6f}")
             else:
-                logger.warning(f"Anchor time {anchor_time:.3f} is outside trajectory range [{times[0]:.3f}, {times[-1]:.3f}]")
+                logger.warning(f"Anchor time {present_day:.3f} is outside trajectory range [{times[0]:.3f}, {times[-1]:.3f}]")
 
         # Compute AI research taste slope in SD per anchor-progress-year (SD/year at anchor)
         ai_taste_slope_per_anchor_progress_year = None
@@ -3130,7 +3130,7 @@ class ProgressModel:
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
-            'anchor_time': anchor_time,  # Anchor time for manual horizon fitting
+            'present_day': present_day,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
             'input_time_series': {

@@ -105,12 +105,12 @@ def _snapshot_model_config(output_dir: Path) -> None:
         "RHO_COBB_DOUGLAS_THRESHOLD", "RHO_LEONTIEF_THRESHOLD", "SIGMOID_EXPONENT_CLAMP",
         "AUTOMATION_FRACTION_CLIP_MIN", "RHO_CLIP_MIN", "PARAM_CLIP_MIN",
         "RESEARCH_STOCK_START_MIN",
-        "NORMALIZATION_MIN", "ZETA_CLIP_MIN", "ZETA_CLIP_MAX",
+        "NORMALIZATION_MIN", "experiment_compute_exponent_CLIP_MIN", "experiment_compute_exponent_CLIP_MAX",
         "AGGREGATE_RESEARCH_TASTE_BASELINE", "AGGREGATE_RESEARCH_TASTE_FALLBACK",
         "TOP_PERCENTILE", "MEDIAN_TO_TOP_TASTE_GAP",
         "TASTE_SCHEDULE_TYPES", "DEFAULT_TASTE_SCHEDULE_TYPE",
         "HORIZON_EXTRAPOLATION_TYPES", "DEFAULT_HORIZON_EXTRAPOLATION_TYPE",
-        "DEFAULT_ANCHOR_TIME", "DEFAULT_ANCHOR_HORIZON", "DEFAULT_ANCHOR_DOUBLING_TIME",
+        "DEFAULT_present_day", "DEFAULT_present_horizon", "DEFAULT_present_doubling_time",
         "DEFAULT_DOUBLING_DECAY_RATE", "AI_RESEARCH_TASTE_MIN", "AI_RESEARCH_TASTE_MAX",
         "AI_RESEARCH_TASTE_MAX_SD", "BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT",
         "BASE_FOR_SOFTWARE_LOM", "MAX_RESEARCH_STOCK_RATE", "MAX_NORMALIZED_PROGRESS_RATE",
@@ -233,7 +233,7 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> An
         return x
 
     if kind == "beta":
-        a = float(dist_spec["alpha"])  # shape alpha
+        a = float(dist_spec["alpha_experiment_capacity"])  # shape alpha_experiment_capacity
         b = float(dist_spec["beta"])   # shape beta
         lo = float(dist_spec.get("min", 0.0))
         hi = float(dist_spec.get("max", 1.0))

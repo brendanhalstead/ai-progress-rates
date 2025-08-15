@@ -20,8 +20,8 @@ AUTOMATION_SLOPE_CLIP_MIN = 0.1
 AUTOMATION_SLOPE_CLIP_MAX = 10.0
 RESEARCH_STOCK_START_MIN = 1e-10
 NORMALIZATION_MIN = 1e-10
-ZETA_CLIP_MIN = 0.1
-ZETA_CLIP_MAX = 1.0
+experiment_compute_exponent_CLIP_MIN = 0.1
+experiment_compute_exponent_CLIP_MAX = 1.0
 
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
@@ -41,9 +41,9 @@ HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Avail
 DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 
 # Manual Horizon Fitting Parameters
-DEFAULT_ANCHOR_TIME = 2025.25
-DEFAULT_ANCHOR_HORIZON = 15  # Will be optimized if None
-DEFAULT_ANCHOR_DOUBLING_TIME = 0.460  # Will be optimized if None
+DEFAULT_present_day = 2025.25
+DEFAULT_present_horizon = 15  # Will be optimized if None
+DEFAULT_present_doubling_time = 0.460  # Will be optimized if None
 DEFAULT_DOUBLING_DECAY_RATE = 0.050  # Will be optimized if None
 
 # AI Research Taste clipping bounds
@@ -85,14 +85,14 @@ RELATIVE_ERROR_CLIP = 100.0
 
 # Parameter bounds for optimization
 PARAMETER_BOUNDS = {
-    'rho_cognitive': (-10, 0),
-    'rho_progress': (-1, 1),
-    'alpha': (0.05, 0.95),
-    'software_scale': (0.1, 10),
+    'rho_coding_labor': (-10, 0),
+    'rho_experiment_capacity': (-1, 1),
+    'alpha_experiment_capacity': (0.05, 0.95),
+    'r_software': (0.1, 10),
     'automation_fraction_at_superhuman_coder': (0.1, 1.0),
-    'swe_multiplier_at_anchor_time': (1.0, 10.0),
-    'cognitive_output_normalization': (0.00001, 10),
-    'zeta': (ZETA_CLIP_MIN, ZETA_CLIP_MAX),
+    'swe_multiplier_at_present_day': (1.0, 10.0),
+    'coding_labor_normalization': (0.00001, 10),
+    'experiment_compute_exponent': (experiment_compute_exponent_CLIP_MIN, experiment_compute_exponent_CLIP_MAX),
     # AI Research Taste parameter bounds
     'ai_research_taste_at_superhuman_coder': (0.1, 5),
     'ai_research_taste_at_superhuman_coder_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
@@ -100,9 +100,9 @@ PARAMETER_BOUNDS = {
     'progress_at_sc': (1.0, 500),
     'sc_time_horizon_minutes': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
-    'anchor_time': (2020.0, 2030.0),
-    'anchor_horizon': (0.01, 100),  # minutes
-    'anchor_doubling_time': (0.01, 2),  # doubling time in progress units
+    'present_day': (2020.0, 2030.0),
+    'present_horizon': (0.01, 100),  # minutes
+    'present_doubling_time': (0.01, 2),  # doubling time in progress units
     'doubling_decay_rate': (0.001, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
@@ -117,7 +117,7 @@ PARAM_VALIDATION_THRESHOLDS = {
     # removed legacy automation sigmoid thresholds
     'rho_extreme_abs': 0.8,
     'rho_product_max': 0.5,
-    'cognitive_output_normalization_max': 10
+    'coding_labor_normalization_max': 10
 }
 
 FEASIBILITY_CHECK_THRESHOLDS = {
@@ -153,14 +153,14 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # DEFAULT MODEL PARAMETERS
 # =============================================================================
 DEFAULT_PARAMETERS = {
-    'rho_cognitive': -2,
-    'rho_progress': -0.137,
-    'alpha': 0.70,
-    'software_scale': 2.25,
+    'rho_coding_labor': -2,
+    'rho_experiment_capacity': -0.137,
+    'alpha_experiment_capacity': 0.70,
+    'r_software': 2.25,
     'automation_fraction_at_superhuman_coder': 1.0,
-    'swe_multiplier_at_anchor_time': 1.05,
-    'cognitive_output_normalization': 1,
-    'zeta': 0.56,
+    'swe_multiplier_at_present_day': 1.05,
+    'coding_labor_normalization': 1,
+    'experiment_compute_exponent': 0.56,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
@@ -171,9 +171,9 @@ DEFAULT_PARAMETERS = {
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
-    'anchor_time': DEFAULT_ANCHOR_TIME,
-    'anchor_horizon': DEFAULT_ANCHOR_HORIZON,
-    'anchor_doubling_time': DEFAULT_ANCHOR_DOUBLING_TIME,
+    'present_day': DEFAULT_present_day,
+    'present_horizon': DEFAULT_present_horizon,
+    'present_doubling_time': DEFAULT_present_doubling_time,
     'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,

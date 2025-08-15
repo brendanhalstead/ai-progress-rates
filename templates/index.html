@@ -109,26 +109,26 @@
                                     <div class="mb-3">
                                         <h6 class="text-muted mb-2">Manual Horizon Fitting</h6>
                                         <div class="mb-2">
-                                            <label class="param-label">Anchor Time: <span id="anchor_time_val">Loading...</span></label>
-                                            <input type="range" class="range-input form-range" id="anchor_time" step="0.01">
+                                            <label class="param-label">Anchor Time: <span id="present_day_val">Loading...</span></label>
+                                            <input type="range" class="range-input form-range" id="present_day" step="0.01">
                                             <small class="text-muted">Reference time point for manual horizon fitting (2020-2030)</small>
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_horizon">
-                                                <label class="form-check-label" for="auto_fit_anchor_horizon">Auto-fit Anchor Horizon</label>
+                                                <input class="form-check-input" type="checkbox" id="auto_fit_present_horizon">
+                                                <label class="form-check-label" for="auto_fit_present_horizon">Auto-fit Anchor Horizon</label>
                                             </div>
-                                            <label class="param-label">Anchor Horizon: <span id="anchor_horizon_val">Loading...</span> mins</label>
-                                            <input type="range" class="range-input form-range" id="anchor_horizon" step="0.01" disabled>
+                                            <label class="param-label">Anchor Horizon: <span id="present_horizon_val">Loading...</span> mins</label>
+                                            <input type="range" class="range-input form-range" id="present_horizon" step="0.01" disabled>
                                             <small class="text-muted">Time horizon length at anchor time</small>
                                         </div>
                                         <div class="mb-2">
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="auto_fit_anchor_doubling_time">
-                                                <label class="form-check-label" for="auto_fit_anchor_doubling_time">Auto-fit Anchor Doubling Time</label>
+                                                <input class="form-check-input" type="checkbox" id="auto_fit_present_doubling_time">
+                                                <label class="form-check-label" for="auto_fit_present_doubling_time">Auto-fit Anchor Doubling Time</label>
                                             </div>
-                                            <label class="param-label">Anchor Doubling Time: <span id="anchor_doubling_time_val">Loading...</span> months</label>
-                                            <input type="range" class="range-input form-range" id="anchor_doubling_time" step="0.01" disabled>
+                                            <label class="param-label">Anchor Doubling Time: <span id="present_doubling_time_val">Loading...</span> months</label>
+                                            <input type="range" class="range-input form-range" id="present_doubling_time" step="0.01" disabled>
                                             <small class="text-muted">Months required to double time horizon from anchor value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at anchor time.</small>
                                         </div>
                                         <div class="mb-2" id="doubling_decay_rate_group">
@@ -154,9 +154,9 @@
                                 </div>
                                 <div class="collapse" id="codingAutomationParams">
                                     <div class="mb-3">
-                                        <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_anchor_time_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="swe_multiplier_at_anchor_time" step="0.01">
-                                        <small class="text-muted" id="swe_multiplier_anchor_time_text">Coding labor multiplier at the anchor time</small>
+                                        <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_present_day_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="swe_multiplier_at_present_day" step="0.01">
+                                        <small class="text-muted" id="swe_multiplier_present_day_text">Coding labor multiplier at the anchor time</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="param-label">SC Automation Level: <span id="automation_fraction_at_superhuman_coder_val">Loading...</span></label>
@@ -176,15 +176,15 @@
                                 </div>
                                 <div class="collapse" id="cognitiveOutputParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Task Substitutibility (ρ_cognitive): <span id="rho_cognitive_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="rho_cognitive" step="0.05">
+                                        <label class="param-label">Task Substitutibility (ρ_cognitive): <span id="rho_coding_labor_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="rho_coding_labor" step="0.05">
                                         <small class="text-muted">Substitutability between automated and non-automated SWE tasks.</small>
-                                        <small class="text-muted" id="rho_cognitive_range">Loading range...</small>
+                                        <small class="text-muted" id="rho_coding_labor_range">Loading range...</small>
                                     </div>
                                                                     
                                     <div class="mb-3">
-                                        <label class="param-label">Parallel Coding Labor Normalization: <span id="cognitive_output_normalization_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="cognitive_output_normalization" step="0.1">
+                                        <label class="param-label">Parallel Coding Labor Normalization: <span id="coding_labor_normalization_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="coding_labor_normalization" step="0.1">
                                         <small class="text-muted">Scale factor for parallel coding labor output (log scale: 10^value)</small>
                                     </div>
                                     
@@ -204,21 +204,21 @@
                                 </div>
                                 <div class="collapse" id="experimentCapacityParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_progress_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="rho_progress" step="0.05">
+                                        <label class="param-label">Experiment Input Substitutibility (ρ_progress): <span id="rho_experiment_capacity_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="rho_experiment_capacity" step="0.05">
                                         <small class="text-muted">Substitutability between exp. compute and parallel coding labor.</small>
-                                        <small class="text-muted" id="rho_progress_range">Loading range...</small>
+                                        <small class="text-muted" id="rho_experiment_capacity_range">Loading range...</small>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="param-label">Experiment Compute Weight (α): <span id="alpha_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="alpha" step="0.05">
+                                        <label class="param-label">Experiment Compute Weight (α): <span id="alpha_experiment_capacity_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="alpha_experiment_capacity" step="0.05">
                                         <small class="text-muted">Higher values favor experiment compute over parallel coding labor</small>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="param-label">Experiment Compute Discounting (ζ): <span id="zeta_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="zeta" step="0.05">
+                                        <label class="param-label">Experiment Compute Discounting (ζ): <span id="experiment_compute_exponent_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="experiment_compute_exponent" step="0.05">
                                         <small class="text-muted">Relates OOMs of experiment compute to OOMs of parallel coding labor.</small>
                                     </div>
                                 </div>
@@ -272,10 +272,10 @@
                                 </div>
                                 <div class="collapse" id="overallProgressParams">
                                     <div class="mb-3">
-                                        <label class="param-label">Returns to Software R&D: <span id="software_scale_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="software_scale" step="0.05">
+                                        <label class="param-label">Returns to Software R&D: <span id="r_software_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="r_software" step="0.05">
                                         <small class="text-muted">Determines the number of doublings of software efficiency per doubling in cumulative research effort.</small>
-                                        <small class="text-muted" id="software_scale_range">Loading range...</small>
+                                        <small class="text-muted" id="r_software_range">Loading range...</small>
                                     </div>
                                 </div>
                             </div>
@@ -516,14 +516,14 @@
         let usePreciseInputs = false;
         // Central list of parameter IDs managed by the UI/collector
         const PARAMETER_IDS = [
-            'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
-            'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_anchor_time',
-            'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
+            'rho_coding_labor', 'rho_experiment_capacity', 'alpha_experiment_capacity', 'r_software',
+            'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_present_day',
+            'coding_labor_normalization', 'lambda', 'experiment_compute_exponent', 'ai_research_taste_at_superhuman_coder',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
             'horizon_extrapolation_type',
             // Manual horizon fitting parameters
-            'anchor_time', 'anchor_horizon', 'anchor_doubling_time', 'doubling_decay_rate'
+            'present_day', 'present_horizon', 'present_doubling_time', 'doubling_decay_rate'
         ];
         
         // Load parameter configuration from server
@@ -706,8 +706,8 @@
         
         function updateAnchorTimeDisplay() {
             // Update the dynamic anchor time text in the SWE Multiplier section
-            const anchorTimeSlider = document.getElementById('anchor_time');
-            const anchorTimeText = document.getElementById('swe_multiplier_anchor_time_text');
+            const anchorTimeSlider = document.getElementById('present_day');
+            const anchorTimeText = document.getElementById('swe_multiplier_present_day_text');
             
             if (anchorTimeSlider && anchorTimeText) {
                 const anchorTimeValue = parseFloat(anchorTimeSlider.value);
@@ -775,12 +775,12 @@
             console.log('Updating slider:', input.id, 'to value:', value);
             
 			// Special handling for optional parameters - show "Auto-fit" when checkbox is checked
-			if (input.id === 'anchor_horizon' || input.id === 'anchor_doubling_time' || input.id === 'doubling_decay_rate') {
+			if (input.id === 'present_horizon' || input.id === 'present_doubling_time' || input.id === 'doubling_decay_rate') {
                 const autoFitCheckbox = document.getElementById('auto_fit_' + input.id);
                 if (autoFitCheckbox && autoFitCheckbox.checked) {
                     displayValue = 'Auto-fit';
                 } else {
-					if (input.id === 'anchor_doubling_time') {
+					if (input.id === 'present_doubling_time') {
 						// Display in decimal months instead of decimal years
 						displayValue = (value * 12).toFixed(1);
 					} else if (input.id === 'doubling_decay_rate') {
@@ -790,7 +790,7 @@
 						displayValue = value.toFixed(3);
 					}
                 }
-            } else if (input.id === 'anchor_time') {
+            } else if (input.id === 'present_day') {
                 // Format anchor time as readable date
                 displayValue = formatDecimalYearToDate(value);
             } else if (input.id === 'automation_fraction_at_superhuman_coder') {
@@ -798,12 +798,12 @@
                 displayValue = (value * 100).toFixed(1) + '%';
             } else if (input.id === 'ai_research_taste_at_superhuman_coder_sd') {
                 displayValue = value.toFixed(2) + ' SD';
-            } else if (input.id === 'rho_progress' || input.id === 'rho_cognitive' || input.id === 'lambda' || input.id === 'swe_multiplier_at_anchor_time') {
+            } else if (input.id === 'rho_experiment_capacity' || input.id === 'rho_coding_labor' || input.id === 'lambda' || input.id === 'swe_multiplier_at_present_day') {
                 // Higher precision for substitutability parameters, lambda, and SWE multiplier
                 displayValue = value.toFixed(2);
                                         } else if (input.id.includes('progress') || input.id.includes('research_stock')) {
                 displayValue = value.toFixed(1);
-            } else if (input.id === 'cognitive_output_normalization') {
+            } else if (input.id === 'coding_labor_normalization') {
                 // Show actual value; respect precise mode
                 const actualValue = usePreciseInputs ? value : Math.pow(10, value);
                 displayValue = actualValue < 0.001 ? actualValue.toExponential(2) : actualValue.toExponential(2);
@@ -853,8 +853,8 @@
                 console.error('Display element not found:', displayId);
             }
             
-            // Update anchor time display text if this is the anchor_time parameter
-            if (input.id === 'anchor_time') {
+            // Update anchor time display text if this is the present_day parameter
+            if (input.id === 'present_day') {
                 updateAnchorTimeDisplay();
             }
         }
@@ -878,7 +878,7 @@
                         value = parseFloat(element.val());
                         
                         // Special handling for parameters that are log-scaled in slider mode
-                        if (id === 'cognitive_output_normalization') {
+                        if (id === 'coding_labor_normalization') {
                             // In precise mode, numeric input is actual value; otherwise transform from log slider value
                             if (!usePreciseInputs) value = Math.pow(10, value);
                         } else if (id === 'sc_time_horizon_minutes') {
@@ -886,7 +886,7 @@
                         }
                         
                         // Special handling for optional parameters - set to null if auto-fit checkbox is checked
-                        if (id === 'anchor_horizon' || id === 'anchor_doubling_time' || id === 'doubling_decay_rate') {
+                        if (id === 'present_horizon' || id === 'present_doubling_time' || id === 'doubling_decay_rate') {
                             const autoFitCheckbox = document.getElementById('auto_fit_' + id);
                             if (autoFitCheckbox && autoFitCheckbox.checked) {
                                 value = null;
@@ -903,12 +903,12 @@
                         } else {
                             // Hardcoded fallbacks as last resort
                             const fallbacks = {
-                                'rho_cognitive': -2, 'rho_progress': -0.1, 'alpha': 0.5,
-                                'software_scale': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
-                                'swe_multiplier_at_anchor_time': 2.0, 'cognitive_output_normalization': 1, 'zeta': 0.4,
+                                'rho_coding_labor': -2, 'rho_experiment_capacity': -0.1, 'alpha_experiment_capacity': 0.5,
+                                'r_software': 0.5, 'automation_fraction_at_superhuman_coder': 0.99,
+                                'swe_multiplier_at_present_day': 2.0, 'coding_labor_normalization': 1, 'experiment_compute_exponent': 0.4,
                                 'ai_research_taste_at_superhuman_coder': 0.95, 'ai_research_taste_at_superhuman_coder_sd': null, 'ai_research_taste_slope': 1.2,
                                 'sc_time_horizon_minutes': 50000.0,
-                                'anchor_time': 2025.25, 'anchor_horizon': null, 'anchor_doubling_time': null, 'doubling_decay_rate': null
+                                'present_day': 2025.25, 'present_horizon': null, 'present_doubling_time': null, 'doubling_decay_rate': null
                             };
                             value = fallbacks[id] || 1;
                         }
@@ -1378,7 +1378,7 @@
                                 let value = response.parameters[key];
                                 
                                 // Only convert cognitive output normalization to log scale for display
-                                if (key === 'cognitive_output_normalization') {
+                                if (key === 'coding_labor_normalization') {
                                     // Convert to log scale for display
                                     value = Math.log10(Math.max(value, 1e-5));
                                 }
@@ -1676,7 +1676,7 @@
                         const [min, max] = bounds;
                         
                         // Special handling for certain parameters
-                        if (paramName === 'cognitive_output_normalization') {
+                        if (paramName === 'coding_labor_normalization') {
                             // This slider uses log scale, so convert bounds and default
                             slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
                             slider.max = Math.log10(max);
@@ -1775,7 +1775,7 @@
             }
             
             // Initialize auto-fit checkboxes and their corresponding sliders
-            const autoFitParams = ['anchor_horizon', 'anchor_doubling_time', 'doubling_decay_rate'];
+            const autoFitParams = ['present_horizon', 'present_doubling_time', 'doubling_decay_rate'];
             autoFitParams.forEach(paramId => {
                 const checkbox = document.getElementById('auto_fit_' + paramId);
                 const slider = document.getElementById(paramId);
@@ -1822,7 +1822,7 @@
             
             // Special handling for values that are log-scaled in slider mode
             if (!usePreciseInputs) {
-                if (key === 'cognitive_output_normalization') {
+                if (key === 'coding_labor_normalization') {
                     newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
                 } else if (key === 'sc_time_horizon_minutes') {
                     newValue = Math.log10(Math.max(value, 1));
@@ -1838,7 +1838,7 @@
                 
                 // Apply log scale conversion to bounds for slider mode only
                 if (!usePreciseInputs) {
-                    if (key === 'cognitive_output_normalization') {
+                    if (key === 'coding_labor_normalization') {
                         minVal = Math.log10(Math.max(bounds[0], 1e-5));
                         maxVal = Math.log10(bounds[1]);
                     } else if (key === 'sc_time_horizon_minutes') {
@@ -1857,15 +1857,15 @@
                 // If still no bounds, use hardcoded fallbacks as last resort
                 if (isNaN(minVal) || isNaN(maxVal)) {
                 const fallbackBounds = {
-                        'rho_cognitive': [-10, 1],
-                        'rho_progress': [-1, 1],
-                        'alpha': [0.05, 0.95],
-                        'software_scale': [0.1, 10],
+                        'rho_coding_labor': [-10, 1],
+                        'rho_experiment_capacity': [-1, 1],
+                        'alpha_experiment_capacity': [0.05, 0.95],
+                        'r_software': [0.1, 10],
                     'automation_fraction_at_superhuman_coder': [0.1, 0.99],
 
-                        'swe_multiplier_at_anchor_time': [1.0, 10.0],
-                        'cognitive_output_normalization': [-5, 1],
-                        'zeta': [0.1, 1.0],
+                        'swe_multiplier_at_present_day': [1.0, 10.0],
+                        'coding_labor_normalization': [-5, 1],
+                        'experiment_compute_exponent': [0.1, 1.0],
                         'ai_research_taste_at_superhuman_coder': [0.1, 5],
                         'ai_research_taste_slope': [0.1, 10],
                         'sc_time_horizon_minutes': [3, 6]  // Log scale bounds
@@ -1908,7 +1908,7 @@
                 if (precise) {
                     // Switching to precise numeric inputs
                     let newVal = current;
-                    if (id === 'cognitive_output_normalization' || id === 'sc_time_horizon_minutes') {
+                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes') {
                         // Convert from log slider value to actual value
                         newVal = Math.pow(10, current);
                     }
@@ -1933,9 +1933,9 @@
                 } else {
                     // Switching back to slider inputs
                     let newVal = current;
-                    if (id === 'cognitive_output_normalization' || id === 'sc_time_horizon_minutes') {
+                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes') {
                         // Convert from actual value back to log slider value
-                        newVal = Math.log10(Math.max(current, id === 'cognitive_output_normalization' ? 1e-5 : 1));
+                        newVal = Math.log10(Math.max(current, id === 'coding_labor_normalization' ? 1e-5 : 1));
                     }
 
                     el.type = 'range';
@@ -1958,22 +1958,22 @@
         function initializeFallbackControls() {
             // Fallback initialization with hardcoded values when config is not available
                 const fallbackData = {
-                'rho_cognitive': { min: -10, max: 1, value: -2, range: '[-10, 0]' },
-                'rho_progress': { min: -1, max: 1, value: -0.2, range: '[-1, 1]' },
-                'alpha': { min: 0.05, max: 0.95, value: 0.5 },
-                'software_scale': { min: 0.1, max: 10, value: 1.0, range: '[0.1, 10]' },
+                'rho_coding_labor': { min: -10, max: 1, value: -2, range: '[-10, 0]' },
+                'rho_experiment_capacity': { min: -1, max: 1, value: -0.2, range: '[-1, 1]' },
+                'alpha_experiment_capacity': { min: 0.05, max: 0.95, value: 0.5 },
+                'r_software': { min: 0.1, max: 10, value: 1.0, range: '[0.1, 10]' },
                     'automation_fraction_at_superhuman_coder': { min: 0.1, max: 0.99, value: 0.99 },
 
-                'swe_multiplier_at_anchor_time': { min: 1.0, max: 10.0, value: 2.0 },
-                'cognitive_output_normalization': { min: -5, max: 1, value: 0 },
-                'zeta': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' },
+                'swe_multiplier_at_present_day': { min: 1.0, max: 10.0, value: 2.0 },
+                'coding_labor_normalization': { min: -5, max: 1, value: 0 },
+                'experiment_compute_exponent': { min: 0.1, max: 1.0, value: 0.4, range: '[0.1, 1.0]' },
                 'ai_research_taste_at_superhuman_coder': { min: 0.1, max: 5, value: 0.95 },
                 'ai_research_taste_slope': { min: 0.1, max: 10, value: 1.2 },
                 'sc_time_horizon_minutes': { min: 3, max: 6, value: 4.7 },  // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
                 // Manual horizon fitting parameters
-                'anchor_time': { min: 2020.0, max: 2030.0, value: 2025.25 },
-                'anchor_horizon': { min: 0.01, max: 10000.0, value: 1000.0 },  // Default to reasonable value
-                'anchor_doubling_time': { min: 0.01, max: 100.0, value: 2.0 },  // Default to reasonable value
+                'present_day': { min: 2020.0, max: 2030.0, value: 2025.25 },
+                'present_horizon': { min: 0.01, max: 10000.0, value: 1000.0 },  // Default to reasonable value
+                'present_doubling_time': { min: 0.01, max: 100.0, value: 2.0 },  // Default to reasonable value
                 'doubling_decay_rate': { min: 0.001, max: 1.0, value: 0.1 }  // Default to reasonable value
             };
             
@@ -2015,7 +2015,7 @@
             });
             
             // Initialize auto-fit checkboxes and their corresponding sliders
-            const autoFitParams = ['anchor_horizon', 'anchor_doubling_time', 'doubling_decay_rate'];
+            const autoFitParams = ['present_horizon', 'present_doubling_time', 'doubling_decay_rate'];
             autoFitParams.forEach(paramId => {
                 const checkbox = document.getElementById('auto_fit_' + paramId);
                 const slider = document.getElementById(paramId);
@@ -2051,15 +2051,15 @@
                 // Fallback to hardcoded values (reduced reliance on hardcoded data)
                 console.warn('Using fallback parameter names for checkboxes');
                 params = {
-                    'rho_cognitive': 'Cognitive Elasticity',
-                    'rho_progress': 'Progress Elasticity',
-                    'alpha': 'Compute Weight',
-                    'software_scale': 'Software Scale',
+                    'rho_coding_labor': 'Cognitive Elasticity',
+                    'rho_experiment_capacity': 'Progress Elasticity',
+                    'alpha_experiment_capacity': 'Compute Weight',
+                    'r_software': 'Software Scale',
                     'automation_fraction_at_superhuman_coder': 'SC Automation Fraction:',
 
-                    'swe_multiplier_at_anchor_time': 'SWE Multiplier at Anchor Time',
-                    'cognitive_output_normalization': 'Parallel Coding Labor Normalization',
-                    'zeta': 'Experiment Compute Discounting',
+                    'swe_multiplier_at_present_day': 'SWE Multiplier at Anchor Time',
+                    'coding_labor_normalization': 'Parallel Coding Labor Normalization',
+                    'experiment_compute_exponent': 'Experiment Compute Discounting',
                     'ai_research_taste_at_superhuman_coder': 'SC Research Taste',
                     'ai_research_taste_slope': 'AI Research Taste Slope',
                     'sc_time_horizon_minutes': 'Time Horizon to Superhuman Coder'

@@ -1783,14 +1783,14 @@ def time_series_to_dict(data: TimeSeriesData):
 def params_to_dict(params: Parameters):
     """Convert parameters to dictionary for JSON serialization""" 
     param_dict = {
-        'rho_cognitive': params.rho_cognitive,
-        'rho_progress': params.rho_progress,
-        'alpha': params.alpha,
-        'software_scale': params.software_scale,
+        'rho_coding_labor': params.rho_coding_labor,
+        'rho_experiment_capacity': params.rho_experiment_capacity,
+        'alpha_experiment_capacity': params.alpha_experiment_capacity,
+        'r_software': params.r_software,
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
 
-        'cognitive_output_normalization': params.cognitive_output_normalization,
-        'zeta': params.zeta,
+        'coding_labor_normalization': params.coding_labor_normalization,
+        'experiment_compute_exponent': params.experiment_compute_exponent,
             'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
             'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
             'ai_research_taste_slope': params.ai_research_taste_slope,
@@ -1799,9 +1799,9 @@ def params_to_dict(params: Parameters):
         'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
         'horizon_extrapolation_type': params.horizon_extrapolation_type,
         # Manual horizon fitting parameters
-        'anchor_time': params.anchor_time,
-        'anchor_horizon': params.anchor_horizon,
-        'anchor_doubling_time': params.anchor_doubling_time,
+        'present_day': params.present_day,
+        'present_horizon': params.present_horizon,
+        'present_doubling_time': params.present_doubling_time,
         'doubling_decay_rate': params.doubling_decay_rate,
         # Baseline Annual Compute Multiplier
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
@@ -2013,22 +2013,22 @@ def get_parameter_config():
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'descriptions': {
-                'rho_cognitive': {
+                'rho_coding_labor': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
                     'description': 'Elasticity of substitution between AI and human cognitive labor',
                     'units': 'dimensionless'
                 },
-                'rho_progress': {
+                'rho_experiment_capacity': {
                     'name': 'Progress Elasticity (ρ_progress)', 
                     'description': 'Elasticity of substitution in progress production function',
                     'units': 'dimensionless'
                 },
-                'alpha': {
+                'alpha_experiment_capacity': {
                     'name': 'Compute Weight (α)',
                     'description': 'Weight of compute vs cognitive output in progress production',
                     'units': 'dimensionless'
                 },
-                'software_scale': {
+                'r_software': {
                     'name': 'Software Scale',
                     'description': 'Scale factor for software progress',
                     'units': 'dimensionless'
@@ -2039,17 +2039,17 @@ def get_parameter_config():
                     'units': 'fraction'
                 },
                 
-                'swe_multiplier_at_anchor_time': {
+                'swe_multiplier_at_present_day': {
                     'name': 'SWE Multiplier at Anchor Time',
                     'description': 'Software engineering productivity multiplier at the anchor time',
                     'units': 'dimensionless'
                 },
-                'cognitive_output_normalization': {
+                'coding_labor_normalization': {
                     'name': 'Cognitive Output Normalization',
                     'description': 'Normalization factor for cognitive output',
                     'units': 'dimensionless'
                 },
-                'zeta': {
+                'experiment_compute_exponent': {
                     'name': 'Experiment Compute Discounting (ζ)',
                     'description': 'Diminishing returns factor for experiment compute',
                     'units': 'dimensionless'
@@ -2092,17 +2092,17 @@ def get_parameter_config():
                     'units': 'categorical'
                 },
                 # Manual horizon fitting parameters
-                'anchor_time': {
+                'present_day': {
                     'name': 'Anchor Time',
                     'description': 'Reference time point for manual horizon fitting',
                     'units': 'year'
                 },
-                'anchor_horizon': {
+                'present_horizon': {
                     'name': 'Anchor Horizon',
                     'description': 'Time horizon length at the anchor time (leave empty for auto-fit)',
                     'units': 'minutes'
                 },
-                'anchor_doubling_time': {
+                'present_doubling_time': {
                     'name': 'Anchor Doubling Time',
                     'description': 'Doubling time parameter at the anchor point (leave empty for auto-fit)',
                     'units': 'progress units'
@@ -2741,13 +2741,13 @@ def get_default_data():
     return jsonify({
         'time_series': time_series_to_dict(time_series),
         'parameters': {
-            'rho_cognitive': params.rho_cognitive,
-            'rho_progress': params.rho_progress,
-            'alpha': params.alpha,
-            'software_scale': params.software_scale,
+            'rho_coding_labor': params.rho_coding_labor,
+            'rho_experiment_capacity': params.rho_experiment_capacity,
+            'alpha_experiment_capacity': params.alpha_experiment_capacity,
+            'r_software': params.r_software,
             'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
-            'cognitive_output_normalization': params.cognitive_output_normalization,
-            'zeta': params.zeta,
+            'coding_labor_normalization': params.coding_labor_normalization,
+            'experiment_compute_exponent': params.experiment_compute_exponent,
             'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
@@ -2755,9 +2755,9 @@ def get_default_data():
             'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
             'horizon_extrapolation_type': params.horizon_extrapolation_type,
             # Manual horizon fitting parameters
-            'anchor_time': params.anchor_time,
-            'anchor_horizon': params.anchor_horizon,
-            'anchor_doubling_time': params.anchor_doubling_time,
+            'present_day': params.present_day,
+            'present_horizon': params.present_horizon,
+            'present_doubling_time': params.present_doubling_time,
             'doubling_decay_rate': params.doubling_decay_rate,
             # Baseline Annual Compute Multiplier  
             'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
