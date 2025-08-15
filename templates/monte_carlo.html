@@ -58,6 +58,8 @@
                     <div class="card-header d-flex align-items-center justify-content-between">
                         <span>Run Settings</span>
                         <div class="btn-group btn-group-sm">
+                            <button id="loadCfgBtn" class="btn btn-outline-secondary">Load Sampling Configuration</button>
+                            <button id="saveCfgBtn" class="btn btn-outline-secondary">Save Sampling Configuration</button>
                             <button id="loadFromFileBtn" class="btn btn-outline-primary">Reset to Defaults</button>
                         </div>
                     </div>
@@ -94,6 +96,7 @@
                         <div class="d-grid">
                             <button id="runBtn" class="btn btn-primary">Run Monte Carlo</button>
                         </div>
+                        <input type="file" id="cfgFileInput" accept=".yaml,.yml,application/x-yaml,text/yaml" style="display:none;" />
                     </div>
                 </div>
 
@@ -155,7 +158,7 @@
                     </div>
                     <div class="card-body" style="max-height: 70vh; overflow: auto;">
                         <div class="text-muted small mb-2">
-                            Only parameters listed below are sampled. Any parameter not listed is held fixed at its default value from the model (as defined in model_config.py) for all rollouts. Clicking the ✕ on a row removes that parameter from sampling, reverting it to its default (no variation). If omitted, categorical parameters fall back to their defaults (horizon extrapolation type and taste schedule type).
+                            Clicking the ✕ on a row reverts it to the default behavior defined in sampling_config.yaml. 
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle" id="distTable">
@@ -543,6 +546,50 @@
             }
         }
 
+        async function exportCurrentConfig() {
+            try {
+                const cfg = collectConfigFromUI();
+                const res = await fetch('/api/monte-carlo/export-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `Export failed (${res.status})`);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sampling_config.yaml';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert(e.message || 'Failed to export sampling configuration');
+            }
+        }
+
+        async function importConfigFromYamlText(yamlText) {
+            try {
+                const form = new FormData();
+                // Prefer file upload endpoint path for robust parsing
+                const file = new Blob([yamlText], { type: 'application/x-yaml' });
+                form.append('file', file, 'sampling_config.yaml');
+                const res = await fetch('/api/monte-carlo/import-config', {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Import failed');
+                renderConfig(data.config);
+            } catch (e) {
+                alert(e.message || 'Failed to import sampling configuration');
+            }
+        }
+
         function collectConfigFromUI() {
             const cfg = {
                 seed: parseInt(document.getElementById('seed').value || '42'),
@@ -783,6 +830,22 @@
         document.getElementById('loadFromFileBtn').addEventListener('click', () => loadDefaultConfig('file'));
         document.getElementById('runBtn').addEventListener('click', startRun);
         document.getElementById('addParamBtn').addEventListener('click', () => addRow('', { dist: 'fixed', value: 0 }));
+        document.getElementById('saveCfgBtn').addEventListener('click', exportCurrentConfig);
+        document.getElementById('loadCfgBtn').addEventListener('click', () => {
+            const input = document.getElementById('cfgFileInput');
+            input.value = '';
+            input.click();
+        });
+        document.getElementById('cfgFileInput').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                await importConfigFromYamlText(text);
+            } catch (err) {
+                alert('Failed to read selected file');
+            }
+        });
 
         // Initial load: always from sampling_config.yaml
         loadDefaultConfig('file');

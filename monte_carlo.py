@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import shutil
 import signal
 
-from flask import Blueprint, jsonify, render_template, request, send_file, abort
+from flask import Blueprint, jsonify, render_template, request, send_file, abort, Response
 
 import yaml
 import io
@@ -460,6 +460,108 @@ def download_run_zip(job_id: str):
 
     # Stream the zip file
     return send_file(str(zip_path), as_attachment=True, download_name=zip_name)
+
+
+@mc_bp.route("/api/monte-carlo/export-config", methods=["POST"])
+def export_sampling_config():
+    """Convert current UI config JSON to a sampling_config.yaml text and return it.
+
+    Expects JSON body matching the UI's collectConfigFromUI() output.
+    Returns YAML text with keys: seed, initial_progress, time_range, num_rollouts, input_data, parameters.
+    """
+    try:
+        payload = request.json or {}
+
+        # Map UI fields to YAML schema
+        yaml_cfg: Dict[str, Any] = {
+            "seed": payload.get("seed", 42),
+            "initial_progress": payload.get("initial_progress", 0.0),
+            "time_range": payload.get("time_range"),
+            "num_rollouts": payload.get("num_samples", payload.get("num_rollouts", 1000)),
+            "input_data": payload.get("input_data") or None,
+            "parameters": payload.get("parameters", {}),
+        }
+
+        # Basic validation
+        if not isinstance(yaml_cfg["parameters"], dict) or not yaml_cfg["parameters"]:
+            return jsonify({"success": False, "error": "Missing or invalid 'parameters' distribution config"}), 400
+
+        # Normalize time_range
+        tr = yaml_cfg.get("time_range")
+        if not (isinstance(tr, (list, tuple)) and len(tr) == 2):
+            yaml_cfg.pop("time_range", None)
+        else:
+            try:
+                yaml_cfg["time_range"] = [float(tr[0]), float(tr[1])]
+            except Exception:
+                yaml_cfg.pop("time_range", None)
+
+        # Drop input_data if empty
+        if not yaml_cfg.get("input_data"):
+            yaml_cfg.pop("input_data", None)
+
+        # Dump to YAML (preserve key order, human-friendly)
+        yaml_text = yaml.safe_dump(yaml_cfg, sort_keys=False)
+        # Return as a file-like response so the client can download easily
+        headers = {
+            "Content-Disposition": "attachment; filename=\"sampling_config.yaml\""
+        }
+        return Response(yaml_text, mimetype="application/x-yaml", headers=headers)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@mc_bp.route("/api/monte-carlo/import-config", methods=["POST"])
+def import_sampling_config():
+    """Parse an uploaded sampling_config.yaml and return a UI-ready JSON config.
+
+    Accepts either:
+      - multipart/form-data with a file field named 'file'
+      - application/json with a 'yaml' string field
+    Returns: { success: True, config: {...} }
+    """
+    try:
+        yaml_text: Optional[str] = None
+
+        # Multipart file upload path
+        if "file" in request.files:
+            f = request.files["file"]
+            yaml_text = f.read().decode("utf-8", errors="ignore")
+        elif request.is_json:
+            body = request.get_json(silent=True) or {}
+            y = body.get("yaml")
+            if isinstance(y, str) and y.strip():
+                yaml_text = y
+
+        if not yaml_text:
+            return jsonify({"success": False, "error": "No YAML provided"}), 400
+
+        data = yaml.safe_load(yaml_text)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Invalid YAML: expected a mapping at top-level"}), 400
+
+        params = data.get("parameters", {})
+        if not isinstance(params, dict) or not params:
+            return jsonify({"success": False, "error": "YAML missing 'parameters' mapping"}), 400
+
+        # Build UI-ready config; UI supports either num_samples or num_rollouts
+        num_rollouts = data.get("num_rollouts")
+        if not isinstance(num_rollouts, (int, float)):
+            num_rollouts = data.get("num_samples")
+
+        ui_cfg: Dict[str, Any] = {
+            "seed": data.get("seed", 42),
+            "initial_progress": data.get("initial_progress", 0.0),
+            "time_range": data.get("time_range"),
+            "num_rollouts": num_rollouts,
+            "num_samples": num_rollouts,
+            "input_data": data.get("input_data"),
+            "parameters": params,
+        }
+
+        return jsonify({"success": True, "config": ui_cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @mc_bp.route("/api/monte-carlo/cancel/<job_id>", methods=["POST"]) 
