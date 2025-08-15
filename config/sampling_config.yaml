@@ -149,7 +149,7 @@ parameters:
     max: 20.0
     clip_to_bounds: true
 
-  # CES lambda transformation
-  lambda:
+  # Coding labor exponent
+  coding_labor_exponent:
     dist: fixed
     value: 0.5

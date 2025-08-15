@@ -1805,8 +1805,8 @@ def params_to_dict(params: Parameters):
         'doubling_decay_rate': params.doubling_decay_rate,
         # Baseline Annual Compute Multiplier
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
-        # Lambda parameter
-        'lambda': params.lambda_param
+        # Coding labor exponent
+        'coding_labor_exponent': params.coding_labor_exponent
     }
     
     # Add calculated SC information if available from the current session
@@ -1834,11 +1834,7 @@ def compute_model():
     
     # Parse parameters
     params_dict = data.get('parameters', {})
-    
-    # Handle parameter name mapping (lambda is a reserved keyword in Python)
-    if 'lambda' in params_dict:
-        params_dict['lambda_param'] = params_dict.pop('lambda')
-    
+
     params = Parameters(**params_dict)
     
     # Use stored time series or default
@@ -2117,8 +2113,8 @@ def get_parameter_config():
                     'description': 'Annual multiplier for baseline compute growth (effective compute = multiplier^progress)',
                     'units': 'dimensionless'
                 },
-                'lambda': {
-                    'name': 'Lambda (λ)',
+                'coding_labor_exponent': {
+                    'name': 'Coding Labor Exponent',
                     'description': 'Power transformation parameter applied to CES output before normalization',
                     'units': 'dimensionless'
                 }
@@ -2237,11 +2233,7 @@ def estimate_params():
         
         # Get initial parameters and initial progress
         initial_params_dict = data.get('initial_parameters', {})
-        
-        # Handle parameter name mapping (lambda is a reserved keyword in Python)
-        if 'lambda' in initial_params_dict:
-            initial_params_dict['lambda_param'] = initial_params_dict.pop('lambda')
-        
+
         initial_params = Parameters(**initial_params_dict)
         initial_progress = data.get('initial_progress', 0.0)
         fixed_params = data.get('fixed_params', [])
@@ -2761,8 +2753,8 @@ def get_default_data():
             'doubling_decay_rate': params.doubling_decay_rate,
             # Baseline Annual Compute Multiplier  
             'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
-            # Lambda parameter
-            'lambda': params.lambda_param
+            # Coding labor exponent
+            'coding_labor_exponent': params.coding_labor_exponent
         }
     })
 

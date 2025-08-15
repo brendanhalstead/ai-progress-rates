@@ -106,8 +106,8 @@ PARAMETER_BOUNDS = {
     'doubling_decay_rate': (0.001, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
-    # Lambda parameter bounds
-    'lambda': (0.0, 2.0)
+    # Coding labor exponent bounds
+    'coding_labor_exponent': (0.0, 2.0)
 }
 
 # Validation thresholds for parameter combinations
@@ -177,8 +177,8 @@ DEFAULT_PARAMETERS = {
     'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
-    # Lambda parameter
-    'lambda': 0.5,
+    # Coding labor exponent
+    'coding_labor_exponent': 0.5,
 }
 
 # =============================================================================

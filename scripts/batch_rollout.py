@@ -276,14 +276,6 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
     return sampled
 
 
-def _normalize_parameter_names_for_constructor(params: Dict[str, Any]) -> Dict[str, Any]:
-    # Parameters dataclass uses lambda_param instead of 'lambda'
-    if "lambda" in params:
-        params = dict(params)
-        params["lambda_param"] = params.pop("lambda")
-    return params
-
-
 def _write_json(path: Path, obj: Any) -> None:
     path.write_text(json.dumps(obj, indent=2, default=str))
 
@@ -422,8 +414,8 @@ def main() -> None:
                 sampled_params.setdefault("taste_schedule_type", cfg.DEFAULT_TASTE_SCHEDULE_TYPE)
 
                 # Prepare constructor kwargs
-                ctor_params = _normalize_parameter_names_for_constructor(sampled_params)
-                params_obj = Parameters(**ctor_params)
+
+                params_obj = Parameters(**sampled_params)
 
                 # Suppress stdout/stderr, warnings, and logging during simulation
                 with _suppress_noise():

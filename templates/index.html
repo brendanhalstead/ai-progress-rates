@@ -189,8 +189,8 @@
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="param-label">Lambda (λ): <span id="lambda_val">Loading...</span></label>
-                                        <input type="range" class="range-input form-range" id="lambda" step="0.05">
+                                        <label class="param-label">Coding Labor Exponent: <span id="coding_labor_exponent_val">Loading...</span></label>
+                                        <input type="range" class="range-input form-range" id="coding_labor_exponent" step="0.05">
                                         <small class="text-muted">Power transformation parameter applied to CES output before normalization</small>
                                     </div>
                                 </div>
@@ -518,7 +518,7 @@
         const PARAMETER_IDS = [
             'rho_coding_labor', 'rho_experiment_capacity', 'alpha_experiment_capacity', 'r_software',
             'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_present_day',
-            'coding_labor_normalization', 'lambda', 'experiment_compute_exponent', 'ai_research_taste_at_superhuman_coder',
+            'coding_labor_normalization', 'coding_labor_exponent', 'experiment_compute_exponent', 'ai_research_taste_at_superhuman_coder',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
             'horizon_extrapolation_type',
@@ -798,8 +798,8 @@
                 displayValue = (value * 100).toFixed(1) + '%';
             } else if (input.id === 'ai_research_taste_at_superhuman_coder_sd') {
                 displayValue = value.toFixed(2) + ' SD';
-            } else if (input.id === 'rho_experiment_capacity' || input.id === 'rho_coding_labor' || input.id === 'lambda' || input.id === 'swe_multiplier_at_present_day') {
-                // Higher precision for substitutability parameters, lambda, and SWE multiplier
+            } else if (input.id === 'rho_experiment_capacity' || input.id === 'rho_coding_labor' || input.id === 'coding_labor_exponent' || input.id === 'swe_multiplier_at_present_day') {
+                // Higher precision for substitutability parameters, coding labor exponent, and SWE multiplier
                 displayValue = value.toFixed(2);
                                         } else if (input.id.includes('progress') || input.id.includes('research_stock')) {
                 displayValue = value.toFixed(1);
