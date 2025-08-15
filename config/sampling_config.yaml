@@ -49,8 +49,8 @@ parameters:
     clip_to_bounds: true
   doubling_decay_rate:
     dist: beta
-    alpha: 0.5
-    beta: 10.0
+    alpha: 1.5
+    beta: 20.0
     min: 0.000001
     max: 0.5
     clip_to_bounds: true
