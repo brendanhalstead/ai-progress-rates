@@ -295,19 +295,18 @@ def monte_carlo_page():
 
 @mc_bp.route("/api/monte-carlo/default-config", methods=["GET"])
 def get_default_sampling_config():
-    source = request.args.get("source", "generated")
-    # Optionally load the repo config file
-    if source == "file" and DEFAULT_SAMPLING_CFG_PATH.exists():
-        try:
-            text = DEFAULT_SAMPLING_CFG_PATH.read_text()
-            data = yaml.safe_load(text)
-            return jsonify({"success": True, "config": data, "source": "file"})
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
-
-    # Generated default based on bounds/defaults
-    config = _build_default_distribution_config()
-    return jsonify({"success": True, "config": config, "source": "generated"})
+    # Always load from config/sampling_config.yaml; no generated fallback
+    if not DEFAULT_SAMPLING_CFG_PATH.exists():
+        return jsonify({
+            "success": False,
+            "error": f"sampling_config.yaml not found at {DEFAULT_SAMPLING_CFG_PATH}"
+        }), 404
+    try:
+        text = DEFAULT_SAMPLING_CFG_PATH.read_text()
+        data = yaml.safe_load(text)
+        return jsonify({"success": True, "config": data, "source": "file"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @mc_bp.route("/api/monte-carlo/run", methods=["POST"])

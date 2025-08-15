@@ -56,8 +56,7 @@
                     <div class="card-header d-flex align-items-center justify-content-between">
                         <span>Run Settings</span>
                         <div class="btn-group btn-group-sm">
-                            <button id="loadGeneratedBtn" class="btn btn-outline-primary">Generated Defaults</button>
-                            <button id="loadFromFileBtn" class="btn btn-outline-secondary">From sampling_config.yaml</button>
+                            <button id="loadFromFileBtn" class="btn btn-outline-primary">Reset to Defaults</button>
                         </div>
                     </div>
                     <div class="card-body">
@@ -788,13 +787,12 @@
             }
         }
 
-        document.getElementById('loadGeneratedBtn').addEventListener('click', () => loadDefaultConfig('generated'));
         document.getElementById('loadFromFileBtn').addEventListener('click', () => loadDefaultConfig('file'));
         document.getElementById('runBtn').addEventListener('click', startRun);
         document.getElementById('addParamBtn').addEventListener('click', () => addRow('', { dist: 'fixed', value: 0 }));
 
-        // Initial load
-        loadDefaultConfig('generated');
+        // Initial load: always from sampling_config.yaml
+        loadDefaultConfig('file');
 
         // Cancel job and delete files when user exits the page
         function sendCancelBeacon() {
