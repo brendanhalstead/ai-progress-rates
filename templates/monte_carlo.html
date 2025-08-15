@@ -104,6 +104,32 @@
 
                 <div class="card mt-3">
                     <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live SC-time Histogram</span>
+                        <span id="liveHistStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveHistWrap" style="display:none;">
+                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live SC-time histogram" />
+                        </div>
+                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating SC-time histogram while rollouts are running.</div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live Horizon Trajectories</span>
+                        <span id="liveTrajStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveTrajWrap" style="display:none;">
+                            <img id="imgLiveTraj" class="img-fluid rounded border" alt="Live horizon trajectories" />
+                        </div>
+                        <div id="liveTrajEmpty" class="text-muted small">Start a job to see a live-updating horizon trajectories plot while rollouts are running.</div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
                         <span>Rollout Analysis</span>
                         <span class="small text-muted">Auto-generated after run</span>
                     </div>
@@ -144,6 +170,8 @@
         let currentConfig = null;
         let jobId = null;
         let pollTimer = null;
+        let liveHistTimer = null;
+        let liveTrajTimer = null;
 
         function field(name, placeholder = '', value = '') {
             return `<input type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
@@ -536,6 +564,10 @@
             document.getElementById('runBtn').disabled = true;
             document.getElementById('jobStatus').textContent = 'Submitting job...';
             document.getElementById('jobLog').textContent = '';
+            stopLiveHist();
+            stopLiveTraj();
+            setLiveHistVisible(false);
+            setLiveTrajVisible(false);
             try {
                 const res = await fetch('/api/monte-carlo/run', {
                     method: 'POST',
@@ -547,6 +579,8 @@
                 jobId = data.job_id;
                 document.getElementById('jobStatus').textContent = `Job ${jobId} started...`;
                 pollJob();
+                startLiveHist();
+                startLiveTraj();
             } catch (e) {
                 document.getElementById('jobStatus').textContent = `Error: ${e.message}`;
                 document.getElementById('runBtn').disabled = false;
@@ -564,11 +598,16 @@
                     const outDir = j.output_dir ? ` | output: ${j.output_dir}` : '';
                     document.getElementById('jobStatus').textContent = `Status: ${status}${outDir}`;
                     document.getElementById('jobLog').textContent = (data.log_tail || []).join('\n');
+                    // Toggle live visibility when running
+                    if (status === 'running') { setLiveHistVisible(true); setLiveTrajVisible(true); }
+                    else { setLiveHistVisible(false); setLiveTrajVisible(false); }
                     if (status === 'running') {
                         clearTimeout(pollTimer);
                         pollTimer = setTimeout(pollJob, 1500);
                     } else {
                         document.getElementById('runBtn').disabled = false;
+                        stopLiveHist();
+                        stopLiveTraj();
                         // Attempt to show artifacts if the job succeeded
                         if (status === 'succeeded') {
                             renderArtifacts(j);
@@ -582,6 +621,80 @@
                 document.getElementById('jobStatus').textContent = `Error polling job: ${e.message}`;
                 document.getElementById('runBtn').disabled = false;
             }
+        }
+
+        function setLiveHistVisible(show) {
+            const wrap = document.getElementById('liveHistWrap');
+            const empty = document.getElementById('liveHistEmpty');
+            if (show) {
+                wrap.style.display = '';
+                empty.style.display = 'none';
+            } else {
+                wrap.style.display = 'none';
+                empty.style.display = '';
+            }
+        }
+
+        function startLiveHist() {
+            stopLiveHist();
+            const img = document.getElementById('imgLiveScHist');
+            const statusEl = document.getElementById('liveHistStatus');
+            const tick = async () => {
+                if (!jobId) return;
+                const url = `/api/monte-carlo/live-sc-hist/${jobId}.png?t=${Date.now()}`;
+                // Update image; use onload/onerror to reflect status
+                img.onload = () => { statusEl.textContent = ''; };
+                img.onerror = () => { statusEl.textContent = 'waiting for data…'; };
+                img.src = url;
+            };
+            tick();
+            liveHistTimer = setInterval(tick, 2000);
+        }
+
+        function stopLiveHist() {
+            const statusEl = document.getElementById('liveHistStatus');
+            if (liveHistTimer) {
+                clearInterval(liveHistTimer);
+                liveHistTimer = null;
+            }
+            statusEl.textContent = '';
+        }
+
+        function setLiveTrajVisible(show) {
+            const wrap = document.getElementById('liveTrajWrap');
+            const empty = document.getElementById('liveTrajEmpty');
+            if (show) {
+                wrap.style.display = '';
+                empty.style.display = 'none';
+            } else {
+                wrap.style.display = 'none';
+                empty.style.display = '';
+            }
+        }
+
+        function startLiveTraj() {
+            stopLiveTraj();
+            const img = document.getElementById('imgLiveTraj');
+            const statusEl = document.getElementById('liveTrajStatus');
+            const tick = async () => {
+                if (!jobId) return;
+                const params = new URLSearchParams({ t: String(Date.now()), max: '2000', stop_at_sc: '0' });
+                const url = `/api/monte-carlo/live-horizon-trajectories/${jobId}.png?${params.toString()}`;
+                img.onload = () => { statusEl.textContent = ''; };
+                img.onerror = () => { statusEl.textContent = 'waiting for data…'; };
+                img.src = url;
+            };
+            tick();
+            liveTrajTimer = setInterval(tick, 2500);
+        }
+
+        function stopLiveTraj() {
+            const statusEl = document.getElementById('liveTrajStatus');
+            if (liveTrajTimer) {
+                clearInterval(liveTrajTimer);
+                liveTrajTimer = null;
+            }
+            statusEl.textContent = '';
         }
 
         function renderArtifacts(job) {

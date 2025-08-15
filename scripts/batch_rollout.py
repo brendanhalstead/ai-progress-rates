@@ -436,6 +436,7 @@ def main() -> None:
                     "parameters": _to_jsonable(sampled_params),
                 }
                 f_samples.write(json.dumps(sample_record) + "\n")
+                f_samples.flush()
 
                 # Persist rollout record
                 rollout_record = {
@@ -444,11 +445,14 @@ def main() -> None:
                     "results": _to_jsonable(model.results),
                 }
                 f_rollouts.write(json.dumps(rollout_record) + "\n")
+                f_rollouts.flush()
 
             except Exception as e:
                 # Persist failure info to keep alignment between files
                 f_samples.write(json.dumps({"sample_id": i, "parameters": None, "error": str(e)}) + "\n")
+                f_samples.flush()
                 f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "results": None, "error": str(e)}) + "\n")
+                f_rollouts.flush()
             # Manual progress update when tqdm is unavailable
             if _tqdm is None:
                 completed = i + 1

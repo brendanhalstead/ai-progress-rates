@@ -18,6 +18,23 @@ from typing import Any, Dict, List, Optional, Tuple
 from flask import Blueprint, jsonify, render_template, request, send_file, abort
 
 import yaml
+import io
+import numpy as np
+from datetime import datetime, timedelta
+
+# Configure matplotlib for headless servers (for live histogram rendering)
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None  # Endpoint will handle absence gracefully
+
+# Optional KDE support
+try:
+    from scipy.stats import gaussian_kde  # type: ignore
+except Exception:
+    gaussian_kde = None  # KDE overlay will be skipped if SciPy unavailable
 
 import model_config as cfg
 
@@ -176,6 +193,22 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                     lf.write(line)
                     lf.flush()
                     lines.append(line)
+                    # Try to detect the run directory early while the job is running
+                    with _jobs_lock:
+                        ji_early = _jobs.get(job_id)
+                        current_out = ji_early.get("output_dir") if ji_early else None
+                    if not current_out:
+                        try:
+                            # Choose most recently modified directory under outputs/
+                            existing = _list_output_dirs()
+                            if existing:
+                                cand = max(existing, key=lambda p: p.stat().st_mtime)
+                                with _jobs_lock:
+                                    ji_set = _jobs.get(job_id)
+                                    if ji_set is not None:
+                                        ji_set["output_dir"] = str(cand)
+                        except Exception:
+                            pass
             finally:
                 proc.wait()
                 # Finalize status
@@ -193,6 +226,19 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                                 subprocess.run(plot_cmd, cwd=str(REPO_ROOT), stdout=lf_app, stderr=subprocess.STDOUT, check=False)
                             except Exception as _e:
                                 lf_app.write(f"\n[WARN] plot_rollouts failed: {_e}\n")
+                            # Horizon trajectories plot
+                            try:
+                                plot_cmd_ht = [
+                                    sys.executable,
+                                    str(SCRIPTS_DIR / "plot_rollouts.py"),
+                                    "--run-dir",
+                                    str(out_dir),
+                                    "--mode",
+                                    "horizon_trajectories",
+                                ]
+                                subprocess.run(plot_cmd_ht, cwd=str(REPO_ROOT), stdout=lf_app, stderr=subprocess.STDOUT, check=False)
+                            except Exception as _e:
+                                lf_app.write(f"\n[WARN] plot_rollouts horizon_trajectories failed: {_e}\n")
                             # Sensitivity (with plots)
                             try:
                                 sens_cmd = [sys.executable, str(SCRIPTS_DIR / "sensitivity_analysis.py"), "--run-dir", str(out_dir), "--plot"]
@@ -205,6 +251,7 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                     try:
                         known = [
                             "sc_time_hist.png",
+                            "horizon_trajectories.png",
                             "sensitivity_spearman_top.png",
                             "sensitivity_permutation_top.png",
                         ]
@@ -404,3 +451,326 @@ def download_run_zip(job_id: str):
     # Stream the zip file
     return send_file(str(zip_path), as_attachment=True, download_name=zip_name)
 
+
+@mc_bp.route("/api/monte-carlo/live-sc-hist/<job_id>.png", methods=["GET"])
+def live_sc_histogram(job_id: str):
+    """Serve a live-updating SC-time histogram PNG based on current rollouts.jsonl."""
+    if plt is None:
+        return jsonify({"success": False, "error": "matplotlib not available"}), 500
+
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+    out_dir = job.get("output_dir")
+    if not out_dir:
+        return jsonify({"success": False, "error": "Output directory not available yet"}), 404
+
+    rollouts_path = Path(out_dir) / "rollouts.jsonl"
+    if not rollouts_path.exists():
+        return jsonify({"success": False, "error": "rollouts.jsonl not found yet"}), 404
+
+    sc_times: List[float] = []
+    try:
+        with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                res = obj.get("results") if isinstance(obj, dict) else None
+                if isinstance(res, dict):
+                    val = res.get("sc_time")
+                    if val is not None:
+                        try:
+                            v = float(val)
+                            if np.isfinite(v):
+                                sc_times.append(v)
+                        except Exception:
+                            pass
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to read rollouts: {e}"}), 500
+
+    def _decimal_year_to_date_string(decimal_year: float) -> str:
+        try:
+            year = int(np.floor(decimal_year))
+            frac = float(decimal_year - year)
+            start = datetime(year, 1, 1)
+            end = datetime(year + 1, 1, 1)
+            total_seconds = (end - start).total_seconds()
+            dt = start + timedelta(seconds=frac * total_seconds)
+            return dt.date().isoformat()
+        except Exception:
+            return f"{decimal_year:.3f}"
+
+    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=150)
+    try:
+        ax.set_title("Live SC-time Distribution", fontsize=10)
+        if len(sc_times) >= 2:
+            data = np.asarray(sc_times, dtype=float)
+            bins = min(50, max(10, int(np.sqrt(len(data)))))
+            counts, bin_edges, _ = ax.hist(
+                data,
+                bins=bins,
+                edgecolor="black",
+                alpha=0.6,
+                label="Histogram",
+                color="#4E79A7",
+            )
+
+            # KDE overlay if available and data is not degenerate
+            if gaussian_kde is not None and len(data) >= 3 and np.std(data) > 0:
+                try:
+                    xs = np.linspace(float(data.min()), float(data.max()), 512)
+                    kde = gaussian_kde(data)
+                    bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
+                    kde_counts = kde(xs) * len(data) * bin_width
+                    ax.plot(xs, kde_counts, color="tab:orange", linewidth=2.0, label="Gaussian KDE")
+                except Exception:
+                    kde_counts = np.array([])
+            else:
+                kde_counts = np.array([])
+
+            # Percentiles and annotations
+            try:
+                q10, q50, q90 = np.quantile(data, [0.1, 0.5, 0.9])
+                ymax_hist = float(np.max(counts) if counts.size else 0.0)
+                ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
+                ymax = max(ymax_hist, ymax_kde, 1.0)
+                y_annot = ymax * 0.95
+                ax.axvline(q10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+                ax.axvline(q50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+                ax.axvline(q90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+                ax.text(q10, y_annot, f"P10: {_decimal_year_to_date_string(q10)}", rotation=90,
+                        va="top", ha="right", color="tab:gray", fontsize=8,
+                        bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
+                ax.text(q50, y_annot, f"Median: {_decimal_year_to_date_string(q50)}", rotation=90,
+                        va="top", ha="right", color="tab:green", fontsize=8,
+                        bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
+                ax.text(q90, y_annot, f"P90: {_decimal_year_to_date_string(q90)}", rotation=90,
+                        va="top", ha="right", color="tab:gray", fontsize=8,
+                        bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
+            except Exception:
+                pass
+
+            ax.set_xlabel("SC Time (decimal year)")
+            ax.set_ylabel("Count")
+            ax.grid(True, axis='y', alpha=0.25)
+            ax.legend(loc="upper left", fontsize=8)
+        else:
+            ax.text(0.5, 0.5, "Collecting rollouts...", ha='center', va='center', fontsize=12)
+            ax.axis('off')
+
+        ax.figure.text(0.99, 0.01, f"n={len(sc_times)}", ha='right', va='bottom', fontsize=8, color="#666666")
+
+        buf = io.BytesIO()
+        fig.tight_layout()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        return send_file(buf, mimetype="image/png")
+    finally:
+        plt.close(fig)
+
+
+@mc_bp.route("/api/monte-carlo/live-horizon-trajectories/<job_id>.png", methods=["GET"])
+def live_horizon_trajectories(job_id: str):
+    """Serve a live-updating horizon trajectories PNG based on current rollouts.jsonl.
+    
+    Query params:
+      - max: int, maximum trajectories to draw (default 2000)
+      - stop_at_sc: 0/1, mask each trajectory after its own sc_time (default 0)
+    """
+    if plt is None:
+        return jsonify({"success": False, "error": "matplotlib not available"}), 500
+
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+    out_dir = job.get("output_dir")
+    if not out_dir:
+        return jsonify({"success": False, "error": "Output directory not available yet"}), 404
+
+    rollouts_path = Path(out_dir) / "rollouts.jsonl"
+    if not rollouts_path.exists():
+        return jsonify({"success": False, "error": "rollouts.jsonl not found yet"}), 404
+
+    # Parse query params
+    try:
+        max_trajectories = int(request.args.get("max", 2000))
+    except Exception:
+        max_trajectories = 2000
+    stop_at_sc = request.args.get("stop_at_sc", "0") in {"1", "true", "True"}
+
+    # Read trajectories similar to scripts/plot_rollouts.py
+    times_arr: Optional[np.ndarray] = None
+    trajectories: List[np.ndarray] = []
+    sc_times: List[Optional[float]] = []
+    try:
+        with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                results = rec.get("results") if isinstance(rec, dict) else None
+                if not isinstance(results, dict):
+                    continue
+                t = results.get("times")
+                h = results.get("horizon_lengths")
+                sc_val = results.get("sc_time")
+                if t is None or h is None:
+                    continue
+                try:
+                    t_np = np.asarray(t, dtype=float)
+                    h_np = np.asarray(h, dtype=float)
+                except Exception:
+                    continue
+                if t_np.ndim != 1 or h_np.ndim != 1 or t_np.size != h_np.size:
+                    continue
+                if times_arr is None:
+                    times_arr = t_np
+                trajectories.append(h_np)
+                try:
+                    sc_times.append(float(sc_val) if sc_val is not None and np.isfinite(float(sc_val)) else None)
+                except Exception:
+                    sc_times.append(None)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to read rollouts: {e}"}), 500
+
+    if times_arr is None or len(trajectories) == 0:
+        # Render a placeholder image
+        fig, ax = plt.subplots(figsize=(6, 3.2), dpi=150)
+        try:
+            ax.text(0.5, 0.5, "Collecting rollouts...", ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            buf = io.BytesIO()
+            fig.tight_layout()
+            fig.savefig(buf, format="png", bbox_inches="tight")
+            buf.seek(0)
+            return send_file(buf, mimetype="image/png")
+        finally:
+            plt.close(fig)
+
+    # Clean and optionally mask trajectories
+    min_horizon_minutes = 0.001
+    max_work_year_minutes = float(120000 * 52 * 40 * 60)
+    cleaned: List[np.ndarray] = []
+    for idx, t in enumerate(trajectories):
+        arr = t.astype(float)
+        arr[~np.isfinite(arr)] = np.nan
+        arr[arr <= 0] = np.nan
+        arr = np.clip(arr, min_horizon_minutes, max_work_year_minutes)
+        if stop_at_sc and idx < len(sc_times) and sc_times[idx] is not None:
+            sc = sc_times[idx]
+            if sc is not None:
+                arr = arr.copy()
+                arr[times_arr > float(sc)] = np.nan
+        cleaned.append(arr)
+
+    # Compute median trajectory
+    num_plot = min(len(cleaned), max_trajectories)
+    if num_plot == 0:
+        num_plot = min(len(cleaned), 1)
+    stacked = np.vstack([cleaned[i] for i in range(num_plot)])
+    median_traj = np.nanmedian(stacked, axis=0)
+
+    # Tick values and labels (work-time units)
+    def _get_time_tick_values_and_labels() -> Tuple[List[float], List[str]]:
+        tick_values = [
+            0.033333,
+            0.5,
+            2,
+            8,
+            30,
+            120,
+            480,
+            2400,
+            10380,
+            41520,
+            124560,
+            622800,
+            2491200,
+            12456000,
+            49824000,
+            199296000,
+            797184000,
+            3188736000,
+            14947200000,
+        ]
+        tick_labels = [
+            "2 sec",
+            "30 sec",
+            "2 min",
+            "8 min",
+            "30 min",
+            "2 hrs",
+            "8 hrs",
+            "1 week",
+            "1 month",
+            "4 months",
+            "1 year",
+            "5 years",
+            "20 years",
+            "100 years",
+            "400 years",
+            "1,600 years",
+            "6,400 years",
+            "25,600 years",
+            "120,000 years",
+        ]
+        return tick_values, tick_labels
+
+    def _now_decimal_year() -> float:
+        now = datetime.utcnow()
+        start = datetime(now.year, 1, 1)
+        end = datetime(now.year + 1, 1, 1)
+        frac = (now - start).total_seconds() / (end - start).total_seconds()
+        return float(now.year + frac)
+
+    # Render figure
+    fig, ax = plt.subplots(figsize=(8.5, 4.8), dpi=150)
+    try:
+        ax.set_title("Live Horizon Trajectories", fontsize=10)
+        # Draw individual trajectories
+        alpha = 0.08
+        for i in range(num_plot):
+            ax.plot(times_arr, cleaned[i], color=(0.2, 0.5, 0.7, alpha), linewidth=1.0)
+
+        # Median
+        ax.plot(times_arr, median_traj, color="tab:green", linestyle="--", linewidth=2.0, label="Central Trajectory")
+
+        # Current horizon line (15 min)
+        ax.axhline(15.0, color="red", linewidth=2.0, label="Current Horizon (15 min)")
+
+        # Current time vertical line
+        ax.axvline(_now_decimal_year(), color="tab:blue", linestyle="--", linewidth=1.75, label="Current Time")
+
+        # Axes formatting
+        ax.set_yscale("log")
+        tick_values, tick_labels = _get_time_tick_values_and_labels()
+        ax.set_yticks(tick_values)
+        ax.set_yticklabels(tick_labels)
+
+        finite_max = float(np.nanmax(stacked)) if np.isfinite(np.nanmax(stacked)) else max_work_year_minutes
+        ymin = min(tick_values)
+        ymax = min(max(finite_max, max(tick_values)), max_work_year_minutes)
+        ax.set_ylim(ymin, ymax)
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Time Horizon")
+        ax.grid(True, which="both", axis="y", alpha=0.25)
+        ax.legend(loc="upper left", fontsize=8)
+
+        buf = io.BytesIO()
+        fig.tight_layout()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        return send_file(buf, mimetype="image/png")
+    finally:
+        plt.close(fig)
