@@ -8,6 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.0/dist/nouislider.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.0/dist/nouislider.min.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -183,13 +185,28 @@
         let liveHistTimer = null;
         let liveTrajTimer = null;
         let cancelOnUnload = false;
+        
+        // Generate unique ids so labels can associate with inputs
+        let __uidCounter = 0;
+        function uid(prefix = 'id') {
+            __uidCounter += 1;
+            return `${prefix}-${__uidCounter}`;
+        }
 
         function field(name, placeholder = '', value = '') {
-            return `<input type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+            const id = uid(`txt-${name}`);
+            const label = placeholder ? `<label for="${id}" class="form-label small mb-0">${placeholder}</label>` : '';
+            return `${label}<input id="${id}" type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
         }
 
         function numberField(name, placeholder = '', value = '') {
-            return `<input type="number" step="any" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+            const id = uid(`num-${name}`);
+            const label = placeholder ? `<label for="${id}" class="form-label small mb-0">${placeholder}</label>` : '';
+            return `${label}<input id="${id}" type="number" step="any" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+        }
+
+        function hiddenNumberField(name, value = '') {
+            return `<input type="hidden" class="dist-field" data-key="${name}" value="${value}">`;
         }
 
         function selectDist(name, value) {
@@ -217,20 +234,20 @@
                 const sliderMin = (s.min !== undefined) ? s.min : defMin;
                 const sliderMax = (s.max !== undefined) ? s.max : defMax;
                 return `<div class="row g-1">
-                    <div class="col-3">${numberField('mean','mean', s.mean ?? '')}</div>
-                    <div class="col-3">${numberField('sd','sd', s.sd ?? s.sigma ?? '')}</div>
-                    <div class="col-3">${numberField('ci80_low','CI80 low (10%)', s.ci80_low ?? '')}</div>
-                    <div class="col-3">${numberField('ci80_high','CI80 high (90%)', s.ci80_high ?? '')}</div>
-                    <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
-                    <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
                     <div class="col-12 mt-1">
-                        <input type="range" class="form-range ci80-slider-low" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
-                        <input type="range" class="form-range ci80-slider-high mt-1" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
-                        <div class="d-flex justify-content-between small text-muted">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
+                    ${hiddenNumberField('ci80_low', s.ci80_low ?? '')}
+                    ${hiddenNumberField('ci80_high', s.ci80_high ?? '')}
+                    ${hiddenNumberField('mean', s.mean ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? s.sigma ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
                 </div>`;
             }
             if (dist === 'lognormal') {
@@ -240,20 +257,20 @@
                 const sliderMin = (s.min !== undefined) ? s.min : defMin;
                 const sliderMax = (s.max !== undefined) ? s.max : defMax;
                 return `<div class="row g-1">
-                    <div class="col-3">${numberField('mu','mu (log)', s.mu ?? '')}</div>
-                    <div class="col-3">${numberField('sigma','sigma (log)', s.sigma ?? '')}</div>
-                    <div class="col-3">${numberField('ci80_low','CI80 low', s.ci80_low ?? '')}</div>
-                    <div class="col-3">${numberField('ci80_high','CI80 high', s.ci80_high ?? '')}</div>
-                    <div class="col-2 mt-1">${numberField('min','min', s.min ?? '')}</div>
-                    <div class="col-2 mt-1">${numberField('max','max', s.max ?? '')}</div>
                     <div class="col-12 mt-1">
-                        <input type="range" class="form-range ci80-slider-low" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
-                        <input type="range" class="form-range ci80-slider-high mt-1" min="${sliderMin}" max="${sliderMax}" step="any" data-default-min="${defMin}" data-default-max="${defMax}">
-                        <div class="d-flex justify-content-between small text-muted">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
+                    ${hiddenNumberField('ci80_low', s.ci80_low ?? '')}
+                    ${hiddenNumberField('ci80_high', s.ci80_high ?? '')}
+                    ${hiddenNumberField('mu', s.mu ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
                 </div>`;
             }
             if (dist === 'beta') {
@@ -268,8 +285,8 @@
                 const values = Array.isArray(s.values) ? s.values.join(',') : '';
                 const probs = Array.isArray(s.p) ? s.p.join(',') : '';
                 return `<div class="row g-1">
-                    <div class="col-8"><input type="text" class="form-control form-control-sm dist-field" data-key="values" placeholder='comma-separated values' value="${values}"></div>
-                    <div class="col-4"><input type="text" class="form-control form-control-sm dist-field" data-key="p" placeholder='probs (optional)' value="${probs}"></div>
+                    <div class="col-8">${field('values','values (comma-separated)', values)}</div>
+                    <div class="col-4">${field('p','p (optional, probabilities)', probs)}</div>
                 </div>`;
             }
             return '';
@@ -345,8 +362,7 @@
             const dist = tr.querySelector('.dist-select')?.value;
             if (dist !== 'normal' && dist !== 'lognormal') return;
             const specCell = tr.querySelector('.spec-cell');
-            const lowSlider = specCell.querySelector('.ci80-slider-low');
-            const highSlider = specCell.querySelector('.ci80-slider-high');
+            const sliderDiv = specCell.querySelector('.ci80-interval-slider');
             const lowField = specCell.querySelector('.dist-field[data-key="ci80_low"]');
             const highField = specCell.querySelector('.dist-field[data-key="ci80_high"]');
             const minField = specCell.querySelector('.dist-field[data-key="min"]');
@@ -356,11 +372,11 @@
             const muField = specCell.querySelector('.dist-field[data-key="mu"]');
             const sigmaField = specCell.querySelector('.dist-field[data-key="sigma"]');
 
-            if (!lowSlider || !highSlider || !lowField || !highField) return;
+            if (!sliderDiv || !lowField || !highField) return;
 
             function getBounds() {
-                const defaultMin = parseNum(lowSlider.getAttribute('data-default-min'));
-                const defaultMax = parseNum(lowSlider.getAttribute('data-default-max'));
+                const defaultMin = parseNum(sliderDiv.getAttribute('data-default-min'));
+                const defaultMax = parseNum(sliderDiv.getAttribute('data-default-max'));
                 const minVal = parseNum(minField?.value);
                 const maxVal = parseNum(maxField?.value);
                 const minB = isFiniteNumber(minVal) ? minVal : defaultMin;
@@ -368,20 +384,37 @@
                 return [minB, maxB];
             }
 
-            function applyBoundsToSliders() {
-                const [minB, maxB] = getBounds();
-                if (isFiniteNumber(minB)) {
-                    lowSlider.min = String(minB);
-                    highSlider.min = String(minB);
+            function ensureSlider(lowVal, highVal, rangeMin, rangeMax) {
+                // Destroy existing slider if present to avoid duplicate bindings
+                if (sliderDiv.noUiSlider) {
+                    sliderDiv.noUiSlider.destroy();
                 }
-                if (isFiniteNumber(maxB)) {
-                    lowSlider.max = String(maxB);
-                    highSlider.max = String(maxB);
+                noUiSlider.create(sliderDiv, {
+                    start: [lowVal, highVal],
+                    connect: true,
+                    range: { min: rangeMin, max: rangeMax }
+                });
+                sliderDiv.noUiSlider.on('update', (values) => {
+                    const low = parseNum(values[0]);
+                    const high = parseNum(values[1]);
+                    if (isFiniteNumber(low)) lowField.value = String(low);
+                    if (isFiniteNumber(high)) highField.value = String(high);
+                    updateSliderLabels(specCell, low, high);
+                });
+            }
+
+            function updateSliderRange() {
+                const [minB, maxB] = getBounds();
+                if (sliderDiv.noUiSlider) {
+                    const current = sliderDiv.noUiSlider.get().map(parseNum);
+                    const newLow = clamp(current[0], minB, maxB);
+                    const newHigh = clamp(current[1], minB, maxB);
+                    sliderDiv.noUiSlider.updateOptions({ range: { min: minB, max: maxB } }, true);
+                    sliderDiv.noUiSlider.set([newLow, newHigh]);
                 }
             }
 
-            function setSlidersFromFieldsOrDefaults() {
-                applyBoundsToSliders();
+            function setSliderFromFieldsOrDefaults() {
                 const [minB, maxB] = getBounds();
                 let lowVal = parseNum(lowField.value);
                 let highVal = parseNum(highField.value);
@@ -391,14 +424,14 @@
                         const mean = parseNum(meanField?.value);
                         const sd = parseNum(sdField?.value) ?? parseNum(sigmaField?.value);
                         const [dl, dh] = computeNormalCI(mean, sd);
-                        lowVal = lowVal ?? dl;
-                        highVal = highVal ?? dh;
+                        lowVal = (isFiniteNumber(lowVal) ? lowVal : dl);
+                        highVal = (isFiniteNumber(highVal) ? highVal : dh);
                     } else if (dist === 'lognormal') {
                         const mu = parseNum(muField?.value);
                         const sigma = parseNum(sigmaField?.value) ?? parseNum(sdField?.value);
                         const [dl, dh] = computeLognormalCI(mu, sigma);
-                        lowVal = lowVal ?? dl;
-                        highVal = highVal ?? dh;
+                        lowVal = (isFiniteNumber(lowVal) ? lowVal : dl);
+                        highVal = (isFiniteNumber(highVal) ? highVal : dh);
                     }
                 }
 
@@ -416,88 +449,48 @@
                     highVal = mid;
                 }
 
-                if (isFiniteNumber(lowVal)) {
-                    lowSlider.value = String(lowVal);
-                    lowField.value = String(lowVal);
-                }
-                if (isFiniteNumber(highVal)) {
-                    highSlider.value = String(highVal);
-                    highField.value = String(highVal);
-                }
-                updateSliderLabels(specCell, parseNum(lowField.value), parseNum(highField.value));
+                // Initialize slider
+                const initLow = isFiniteNumber(lowVal) ? lowVal : (isFiniteNumber(minB) ? minB : 0);
+                const initHigh = isFiniteNumber(highVal) ? highVal : (isFiniteNumber(maxB) ? maxB : 1);
+                ensureSlider(initLow, initHigh, isFiniteNumber(minB) ? minB : 0, isFiniteNumber(maxB) ? maxB : 1);
+
+                // Set hidden fields and labels now
+                lowField.value = String(initLow);
+                highField.value = String(initHigh);
+                updateSliderLabels(specCell, initLow, initHigh);
             }
 
-            function syncFromSliders(changed) {
-                applyBoundsToSliders();
-                let lowVal = parseNum(lowSlider.value);
-                let highVal = parseNum(highSlider.value);
-                const [minB, maxB] = getBounds();
-                lowVal = clamp(lowVal, minB, maxB);
-                highVal = clamp(highVal, minB, maxB);
-                if (changed === 'low' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
-                    highVal = lowVal;
-                    highSlider.value = String(highVal);
-                }
-                if (changed === 'high' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && highVal < lowVal) {
-                    lowVal = highVal;
-                    lowSlider.value = String(lowVal);
-                }
-                lowField.value = String(lowVal);
-                highField.value = String(highVal);
-                updateSliderLabels(specCell, lowVal, highVal);
-            }
-
-            function syncFromFields(changed) {
-                applyBoundsToSliders();
-                let lowVal = parseNum(lowField.value);
-                let highVal = parseNum(highField.value);
-                const [minB, maxB] = getBounds();
-                if (isFiniteNumber(lowVal)) lowVal = clamp(lowVal, minB, maxB);
-                if (isFiniteNumber(highVal)) highVal = clamp(highVal, minB, maxB);
-                if (changed === 'low' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
-                    highVal = lowVal;
-                    highField.value = String(highVal);
-                }
-                if (changed === 'high' && isFiniteNumber(lowVal) && isFiniteNumber(highVal) && highVal < lowVal) {
-                    lowVal = highVal;
-                    lowField.value = String(lowVal);
-                }
-                if (isFiniteNumber(lowVal)) lowSlider.value = String(lowVal);
-                if (isFiniteNumber(highVal)) highSlider.value = String(highVal);
-                updateSliderLabels(specCell, lowVal, highVal);
-            }
-
-            // Event bindings
-            lowSlider.addEventListener('input', () => syncFromSliders('low'));
-            highSlider.addEventListener('input', () => syncFromSliders('high'));
-            lowField.addEventListener('input', () => syncFromFields('low'));
-            highField.addEventListener('input', () => syncFromFields('high'));
-            minField?.addEventListener('input', () => setSlidersFromFieldsOrDefaults());
-            maxField?.addEventListener('input', () => setSlidersFromFieldsOrDefaults());
+            // Bind reactions to bound fields and distribution params
+            minField?.addEventListener('input', () => {
+                updateSliderRange();
+            });
+            maxField?.addEventListener('input', () => {
+                updateSliderRange();
+            });
             if (dist === 'normal') {
                 meanField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
                 sdField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
                 sigmaField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
             } else if (dist === 'lognormal') {
                 muField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
                 sigmaField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
                 sdField?.addEventListener('input', () => {
-                    if (!lowField.value && !highField.value) setSlidersFromFieldsOrDefaults();
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
             }
 
-            // Initial sync
-            setSlidersFromFieldsOrDefaults();
+            // Initial setup
+            setSliderFromFieldsOrDefaults();
         }
 
         function addRow(paramName, distSpec) {

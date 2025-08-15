@@ -89,7 +89,7 @@ parameters:
   ai_research_taste_at_superhuman_coder_sd:
     dist: normal
     mean: 0.0
-    sd: 3.0
+    sd: 0.2
     min: -10.0
     max: 23.0
     clip_to_bounds: true
@@ -120,19 +120,11 @@ parameters:
 
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
   anchor_time:
-    dist: normal
-    mean: 2025.25
-    sd: 0
-    min: 2025.0
-    max: 2026.0
-    clip_to_bounds: true
+    dist: fixed
+    value: 2025.25
   anchor_horizon:
-    dist: normal
-    mean: 15.0
-    sd: 0
-    min: 0.01
-    max: 100.0
-    clip_to_bounds: true
+    dist: fixed
+    value: 15.0
   anchor_doubling_time:
     dist: lognormal
     mu: -0.776  # ~0.46
@@ -144,7 +136,7 @@ parameters:
     dist: lognormal
     mu: -2.996  # ~0.05
     sigma: 0.5
-    min: 0.001
+    min: 0.0001
     max: 0.5
     clip_to_bounds: true
 
@@ -159,8 +151,5 @@ parameters:
 
   # CES lambda transformation
   lambda:
-    dist: beta
-    alpha: 2.0
-    beta: 5.0
-    min: 0.0
-    max: 2.0
+    dist: fixed
+    value: 0.5
