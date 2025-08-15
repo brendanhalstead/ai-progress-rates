@@ -233,7 +233,7 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> An
         return x
 
     if kind == "beta":
-        a = float(dist_spec["alpha_experiment_capacity"])  # shape alpha_experiment_capacity
+        a = float(dist_spec["alpha"])  # shape alpha
         b = float(dist_spec["beta"])   # shape beta
         lo = float(dist_spec.get("min", 0.0))
         hi = float(dist_spec.get("max", 1.0))

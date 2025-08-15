@@ -40,7 +40,7 @@ parameters:
     clip_to_bounds: true
   alpha_experiment_capacity:
     dist: beta
-    alpha_experiment_capacity: 2.0
+    alpha: 2.0
     beta: 2.0
     min: 0.05
     max: 0.95
@@ -57,15 +57,11 @@ parameters:
     max: 10.0
     clip_to_bounds: true
   coding_labor_normalization:
-    dist: lognormal
-    mu: -1.20  # ~exp(-1.20) ≈ 0.30
-    sigma: 0.5
-    min: 0.00001
-    max: 10.0
-    clip_to_bounds: true
+    dist: fixed
+    value: 1.0
   experiment_compute_exponent:
     dist: beta
-    alpha_experiment_capacity: 2.0
+    alpha: 2.0
     beta: 2.0
     min: 0.1
     max: 1.0
@@ -73,7 +69,7 @@ parameters:
   # Automation
   automation_fraction_at_superhuman_coder:
     dist: beta
-    alpha_experiment_capacity: 3.0
+    alpha: 3.0
     beta: 1.5
     min: 0.1
     max: 1.0
@@ -133,12 +129,8 @@ parameters:
     max: 2.0
     clip_to_bounds: true
   doubling_decay_rate:
-    dist: lognormal
-    mu: -2.996  # ~0.05
-    sigma: 0.5
-    min: 0.0001
-    max: 0.5
-    clip_to_bounds: true
+    dist: beta
+    
 
   # Baseline annual compute multiplier
   baseline_annual_compute_multiplier:
