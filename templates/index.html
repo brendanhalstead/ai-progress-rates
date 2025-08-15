@@ -76,6 +76,12 @@
                         <!-- Parameters Panel -->
                         <div class="tab-pane fade show active" id="params-panel">
                             <h5>Model Parameters</h5>
+                            <div class="d-flex justify-content-end align-items-center mb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="preciseInputMode">
+                                    <label class="form-check-label" for="preciseInputMode" title="Type exact values with high precision">Precise input mode</label>
+                                </div>
+                            </div>
 
                             <div class="param-group">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -506,6 +512,19 @@
         })();
         // Global parameter configuration from server
         let parameterConfig = null;
+        // Global precise input mode toggle
+        let usePreciseInputs = false;
+        // Central list of parameter IDs managed by the UI/collector
+        const PARAMETER_IDS = [
+            'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
+            'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_anchor_time',
+            'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
+            'ai_research_taste_at_superhuman_coder_sd',
+            'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
+            'horizon_extrapolation_type',
+            // Manual horizon fitting parameters
+            'anchor_time', 'anchor_horizon', 'anchor_doubling_time', 'doubling_decay_rate'
+        ];
         
         // Load parameter configuration from server
         async function loadParameterConfig() {
@@ -579,6 +598,11 @@
                 initializeParameterControls();
                 initializeControls();
                 populateFixedParamsCheckboxes();
+
+                // Wire up precise input toggle
+                $('#preciseInputMode').on('change', function() {
+                    setInputMode(this.checked);
+                });
                 
                 // Wait for session to be ready, then compute model
                 sessionPromise.then(() => {
@@ -780,12 +804,12 @@
                                         } else if (input.id.includes('progress') || input.id.includes('research_stock')) {
                 displayValue = value.toFixed(1);
             } else if (input.id === 'cognitive_output_normalization') {
-                // Convert log scale value to actual value
-                const actualValue = Math.pow(10, value);
-                displayValue = actualValue.toExponential(2);
+                // Show actual value; respect precise mode
+                const actualValue = usePreciseInputs ? value : Math.pow(10, value);
+                displayValue = actualValue < 0.001 ? actualValue.toExponential(2) : actualValue.toExponential(2);
             } else if (input.id === 'sc_time_horizon_minutes') {
-                // Convert log scale value to actual value in minutes, then to work months or work years
-                const actualValueMinutes = Math.pow(10, value);
+                // Convert minutes to work months/years; respect precise mode
+                const actualValueMinutes = usePreciseInputs ? value : Math.pow(10, value);
                 const workMonths = actualValueMinutes / 10380; // 173 hours * 60 mins = 10380 minutes per work month
                 const workYears = actualValueMinutes / 124560; // 124560 minutes per work year
                 
@@ -840,16 +864,7 @@
             const params = {};
             
             // List of expected parameters with their element IDs
-            const parameterIds = [
-                'rho_cognitive', 'rho_progress', 'alpha', 'software_scale',
-                'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_anchor_time',
-                'cognitive_output_normalization', 'lambda', 'zeta', 'ai_research_taste_at_superhuman_coder',
-                'ai_research_taste_at_superhuman_coder_sd',
-                'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
-                'horizon_extrapolation_type',
-                // Manual horizon fitting parameters
-                'anchor_time', 'anchor_horizon', 'anchor_doubling_time', 'doubling_decay_rate'
-            ];
+            const parameterIds = PARAMETER_IDS;
             
             parameterIds.forEach(id => {
                 const element = $('#' + id);
@@ -862,11 +877,12 @@
                     } else {
                         value = parseFloat(element.val());
                         
-                        // Special handling for log scale parameters
+                        // Special handling for parameters that are log-scaled in slider mode
                         if (id === 'cognitive_output_normalization') {
-                            value = Math.pow(10, value);
+                            // In precise mode, numeric input is actual value; otherwise transform from log slider value
+                            if (!usePreciseInputs) value = Math.pow(10, value);
                         } else if (id === 'sc_time_horizon_minutes') {
-                            value = Math.pow(10, value);
+                            if (!usePreciseInputs) value = Math.pow(10, value);
                         }
                         
                         // Special handling for optional parameters - set to null if auto-fit checkbox is checked
@@ -1794,16 +1810,23 @@
                     }
                 });
             }
+            // If precise mode is currently enabled, ensure inputs reflect that mode
+            if (usePreciseInputs) {
+                setInputMode(true);
+            }
         }
         
         function applyParameterBounds(key, value) {
             // Centralized bounds checking and transformation for UI controls
             let newValue = value;
             
-            // Special handling for cognitive_output_normalization (log scale conversion)
-            if (key === 'cognitive_output_normalization') {
-                // Convert from actual value to log scale for the slider
-                newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
+            // Special handling for values that are log-scaled in slider mode
+            if (!usePreciseInputs) {
+                if (key === 'cognitive_output_normalization') {
+                    newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
+                } else if (key === 'sc_time_horizon_minutes') {
+                    newValue = Math.log10(Math.max(value, 1));
+                }
             }
             
             // Get bounds from parameter config if available, otherwise use element attributes or fallbacks
@@ -1813,10 +1836,15 @@
                 minVal = bounds[0];
                 maxVal = bounds[1];
                 
-                // Apply log scale conversion to bounds for cognitive_output_normalization
-                if (key === 'cognitive_output_normalization') {
-                    minVal = Math.log10(Math.max(bounds[0], 1e-5));
-                    maxVal = Math.log10(bounds[1]);
+                // Apply log scale conversion to bounds for slider mode only
+                if (!usePreciseInputs) {
+                    if (key === 'cognitive_output_normalization') {
+                        minVal = Math.log10(Math.max(bounds[0], 1e-5));
+                        maxVal = Math.log10(bounds[1]);
+                    } else if (key === 'sc_time_horizon_minutes') {
+                        minVal = Math.log10(Math.max(bounds[0], 1));
+                        maxVal = Math.log10(bounds[1]);
+                    }
                 }
             } else {
                 // Fall back to element attributes or hardcoded bounds
@@ -1855,6 +1883,76 @@
             }
             
             return newValue;
+        }
+
+        function setInputMode(precise) {
+            usePreciseInputs = !!precise;
+            // Iterate through all known parameter controls and toggle their types/values
+            PARAMETER_IDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                // Skip non-input controls (e.g., selects) and checkboxes
+                const tag = el.tagName ? el.tagName.toLowerCase() : '';
+                if (tag !== 'input') return;
+                if (el.type === 'checkbox') return;
+
+                // Save original slider attributes if not already saved
+                if (!el.dataset.rangeMin) el.dataset.rangeMin = el.min ?? '';
+                if (!el.dataset.rangeMax) el.dataset.rangeMax = el.max ?? '';
+                if (!el.dataset.rangeStep) el.dataset.rangeStep = el.step ?? '';
+
+                // Determine new value respecting special log-scaled parameters
+                let current = parseFloat(el.value);
+                if (!isFinite(current)) current = 0;
+
+                if (precise) {
+                    // Switching to precise numeric inputs
+                    let newVal = current;
+                    if (id === 'cognitive_output_normalization' || id === 'sc_time_horizon_minutes') {
+                        // Convert from log slider value to actual value
+                        newVal = Math.pow(10, current);
+                    }
+
+                    // Switch type and classes
+                    el.type = 'number';
+                    el.classList.remove('form-range', 'range-input');
+                    el.classList.add('form-control', 'form-control-sm');
+                    el.step = 'any';
+                    el.min = '';
+                    el.max = '';
+                    el.value = newVal;
+
+                    // Bind input handler for display + auto-update
+                    $(el).off('input.precise').on('input.precise', function() {
+                        updateDisplayValue(this);
+                        if ($('#autoUpdate').is(':checked')) {
+                            clearTimeout(window.updateTimer);
+                            window.updateTimer = setTimeout(computeModel, 300);
+                        }
+                    });
+                } else {
+                    // Switching back to slider inputs
+                    let newVal = current;
+                    if (id === 'cognitive_output_normalization' || id === 'sc_time_horizon_minutes') {
+                        // Convert from actual value back to log slider value
+                        newVal = Math.log10(Math.max(current, id === 'cognitive_output_normalization' ? 1e-5 : 1));
+                    }
+
+                    el.type = 'range';
+                    el.classList.remove('form-control', 'form-control-sm');
+                    el.classList.add('form-range', 'range-input');
+                    el.min = el.dataset.rangeMin || el.min;
+                    el.max = el.dataset.rangeMax || el.max;
+                    el.step = el.dataset.rangeStep || el.step || '0.01';
+                    el.value = newVal;
+
+                    // Remove precise input handler
+                    $(el).off('input.precise');
+                }
+
+                // Refresh display text for each control
+                updateDisplayValue(el);
+            });
         }
         
         function initializeFallbackControls() {
