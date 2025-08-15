@@ -155,11 +155,11 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 DEFAULT_PARAMETERS = {
     'rho_cognitive': -2,
     'rho_progress': -0.137,
-    'alpha': 0.69,
+    'alpha': 0.70,
     'software_scale': 2.25,
     'automation_fraction_at_superhuman_coder': 1.0,
     'swe_multiplier_at_anchor_time': 1.05,
-    'cognitive_output_normalization': 0.3,
+    'cognitive_output_normalization': 1,
     'zeta': 0.56,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
@@ -178,7 +178,7 @@ DEFAULT_PARAMETERS = {
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # Lambda parameter
-    'lambda': 0.57,
+    'lambda': 0.5,
 }
 
 # =============================================================================
