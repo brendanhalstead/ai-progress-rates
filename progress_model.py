@@ -597,6 +597,62 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
     
     return result_with_lambda * cognitive_normalization
 
+def compute_rho_from_asymptotes(inf_labor_asymptote: float, inf_compute_asymptote: float) -> float:
+    """
+    Compute the substitution parameter rho from the asymptotes of the experiment capacity CES.
+    Solve for rho in the equation:
+    inf_labor_asymptote**rho + inf_compute_asymptote**rho = 1
+    """
+    # Validate inputs
+    if not np.isfinite(inf_labor_asymptote) or not np.isfinite(inf_compute_asymptote):
+        logger.warning("Non-finite asymptotes provided to compute_rho_from_asymptotes; falling back to 0.0")
+        return 0.0
+
+    # Ensure strictly positive bases to avoid undefined powers
+    a = float(inf_labor_asymptote)
+    b = float(inf_compute_asymptote)
+
+    if a <= 0 or b <= 0:
+        logger.warning(f"Non-positive asymptote(s) a={a}, b={b}; falling back to 0.0")
+        return 0.0
+
+    # Small epsilon to avoid numerical issues when values are extremely close to 0
+    a = max(a, cfg.NORMALIZATION_MIN)
+    b = max(b, cfg.NORMALIZATION_MIN)
+
+    def equation(rho: float) -> float:
+        return np.power(a, rho) + np.power(b, rho) - 1.0
+
+    # Bracket within the valid CES range for rho
+    lower = cfg.RHO_CLIP_MIN
+    upper = 1.0
+
+    f_lower = equation(lower)
+    f_upper = equation(upper)
+
+    # If already satisfies at a bound, return that bound (rare but possible)
+    if abs(f_lower) < 1e-12:
+        return float(lower)
+    if abs(f_upper) < 1e-12:
+        return float(upper)
+
+    # Check for a valid bracket
+    if f_lower * f_upper > 0:
+        # This indicates inputs inconsistent with rho in (-inf, 1]; fallback to Cobb-Douglas
+        logger.warning(
+            f"Asymptotes a={a}, b={b} do not bracket a root in [${lower}, ${upper}]; falling back to rho=0.0"
+        )
+        return 0.0
+
+    try:
+        rho = optimize.brentq(equation, lower, upper, maxiter=100, xtol=1e-12)
+    except Exception as e:
+        logger.warning(f"Root finding failed in compute_rho_from_asymptotes: {e}; falling back to 0.0")
+        return 0.0
+
+    # Clip to valid range and return
+    return float(np.clip(rho, cfg.RHO_CLIP_MIN, 1.0))
+    
 
 def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
