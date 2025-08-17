@@ -94,7 +94,6 @@ PARAMETER_BOUNDS = {
     'coding_labor_normalization': (0.00001, 10),
     'experiment_compute_exponent': (experiment_compute_exponent_CLIP_MIN, experiment_compute_exponent_CLIP_MAX),
     # AI Research Taste parameter bounds
-    'ai_research_taste_at_superhuman_coder': (0.1, 5),
     'ai_research_taste_at_superhuman_coder_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
