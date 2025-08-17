@@ -232,10 +232,14 @@
             }
             if (dist === 'normal') {
                 const sdVal = (s.sd ?? s.sigma);
-                const defMin = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean - 3 * sdVal) : -10;
-                const defMax = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean + 3 * sdVal) : 10;
-                const sliderMin = (s.min !== undefined) ? s.min : defMin;
-                const sliderMax = (s.max !== undefined) ? s.max : defMax;
+                let defMin = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean - 3 * sdVal) : -10;
+                let defMax = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean + 3 * sdVal) : 10;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
                 return `<div class="row g-1">
                     <div class="col-12 mt-1">
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
@@ -245,8 +249,8 @@
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
-                    ${hiddenNumberField('ci80_low', s.ci80_low ?? '')}
-                    ${hiddenNumberField('ci80_high', s.ci80_high ?? '')}
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
                     ${hiddenNumberField('mean', s.mean ?? '')}
                     ${hiddenNumberField('sd', s.sd ?? s.sigma ?? '')}
                     ${hiddenNumberField('sigma', s.sigma ?? s.sd ?? '')}
@@ -256,10 +260,14 @@
             }
             if (dist === 'lognormal') {
                 const sigmaVal = (s.sigma ?? s.sd);
-                const defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
-                const defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
-                const sliderMin = (s.min !== undefined) ? s.min : defMin;
-                const sliderMax = (s.max !== undefined) ? s.max : defMax;
+                let defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
+                let defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
                 return `<div class="row g-1">
                     <div class="col-12 mt-1">
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
@@ -269,8 +277,8 @@
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
-                    ${hiddenNumberField('ci80_low', s.ci80_low ?? '')}
-                    ${hiddenNumberField('ci80_high', s.ci80_high ?? '')}
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
                     ${hiddenNumberField('mu', s.mu ?? '')}
                     ${hiddenNumberField('sigma', s.sigma ?? '')}
                     ${hiddenNumberField('sd', s.sd ?? '')}
@@ -315,6 +323,25 @@
                     if (v !== '') spec[k] = parseFloat(v);
                 }
             });
+            // Prefer ci80 array syntax for normal/lognormal if low/high present
+            if (dist === 'normal' || dist === 'lognormal') {
+                const low = spec.ci80_low;
+                const high = spec.ci80_high;
+                if (Number.isFinite(low) && Number.isFinite(high)) {
+                    spec.ci80 = [low, high];
+                    delete spec.ci80_low;
+                    delete spec.ci80_high;
+                    if (dist === 'normal') {
+                        delete spec.mean;
+                        delete spec.sd;
+                        delete spec.sigma;
+                    } else if (dist === 'lognormal') {
+                        delete spec.mu;
+                        delete spec.sigma;
+                        delete spec.sd;
+                    }
+                }
+            }
             // Auto add clip_to_bounds when bounds are present
             if ((spec.min !== undefined || spec.max !== undefined) && dist !== 'fixed' && dist !== 'choice') {
                 spec.clip_to_bounds = true;
@@ -450,6 +477,10 @@
                 const [minB, maxB] = getBounds();
                 let lowVal = parseNum(lowField.value);
                 let highVal = parseNum(highField.value);
+                const minValRaw = parseNum(minField?.value);
+                const maxValRaw = parseNum(maxField?.value);
+                const hasMinExplicit = isFiniteNumber(minValRaw);
+                const hasMaxExplicit = isFiniteNumber(maxValRaw);
 
                 if (!isFiniteNumber(lowVal) || !isFiniteNumber(highVal)) {
                     if (dist === 'normal') {
@@ -467,13 +498,16 @@
                     }
                 }
 
-                if (isFiniteNumber(minB)) {
-                    if (isFiniteNumber(lowVal)) lowVal = Math.max(minB, lowVal);
-                    if (isFiniteNumber(highVal)) highVal = Math.max(minB, highVal);
+                // Only clamp to explicit user-provided min/max, not defaults
+                if (hasMinExplicit) {
+                    const mb = minValRaw;
+                    if (isFiniteNumber(lowVal)) lowVal = Math.max(mb, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.max(mb, highVal);
                 }
-                if (isFiniteNumber(maxB)) {
-                    if (isFiniteNumber(lowVal)) lowVal = Math.min(maxB, lowVal);
-                    if (isFiniteNumber(highVal)) highVal = Math.min(maxB, highVal);
+                if (hasMaxExplicit) {
+                    const xb = maxValRaw;
+                    if (isFiniteNumber(lowVal)) lowVal = Math.min(xb, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.min(xb, highVal);
                 }
                 if (isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
                     const mid = (lowVal + highVal) / 2;
@@ -484,7 +518,21 @@
                 // Initialize slider
                 const initLow = isFiniteNumber(lowVal) ? lowVal : (isFiniteNumber(minB) ? minB : 0);
                 const initHigh = isFiniteNumber(highVal) ? highVal : (isFiniteNumber(maxB) ? maxB : 1);
-                ensureSlider(initLow, initHigh, isFiniteNumber(minB) ? minB : 0, isFiniteNumber(maxB) ? maxB : 1);
+                // Ensure the slider range accommodates the specified CI80 even when bounds/defaults are narrow
+                // Base the range on defaults but expand to include CI values
+                let rangeMin = isFiniteNumber(minB) ? Math.min(minB, initLow) : initLow;
+                let rangeMax = isFiniteNumber(maxB) ? Math.max(maxB, initHigh) : initHigh;
+                // If user explicitly set min/max, also include them in the range
+                if (hasMinExplicit) rangeMin = Math.min(rangeMin, minValRaw);
+                if (hasMaxExplicit) rangeMax = Math.max(rangeMax, maxValRaw);
+                if (!isFiniteNumber(rangeMin)) rangeMin = 0;
+                if (!isFiniteNumber(rangeMax)) rangeMax = 1;
+                if (rangeMax <= rangeMin) {
+                    // Expand slightly to create a visible range
+                    const eps = Math.max(1e-9, Math.abs(rangeMin) * 1e-6 + 1);
+                    rangeMax = rangeMin + eps;
+                }
+                ensureSlider(initLow, initHigh, rangeMin, rangeMax);
 
                 // Set hidden fields and labels now
                 lowField.value = String(initLow);

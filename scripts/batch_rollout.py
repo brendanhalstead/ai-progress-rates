@@ -30,7 +30,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 
 import numpy as np
 import yaml
@@ -55,6 +55,9 @@ import model_config as cfg
 from progress_model import (
     ProgressModel, Parameters, load_time_series_data
 )
+
+# Track which parameters we have already warned about for CI-first precedence
+_ci_first_warned_params: Set[str] = set()
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,7 +174,7 @@ def _suppress_noise():
             logging.disable(previous_disable_threshold)
 
 
-def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> Any:
+def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator, param_name: Optional[str] = None) -> Any:
     kind = dist_spec.get("dist", "fixed")
 
     if kind == "fixed":
@@ -184,10 +187,30 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> An
 
     if kind == "normal":
         # Support parameterization by mean/sd (or sigma) OR by 80% CI (q10,q90)
-        # If 80% CI is provided, it takes precedence
-        if "ci80_low" in dist_spec and "ci80_high" in dist_spec:
-            q10 = float(dist_spec["ci80_low"])  # 10th percentile
-            q90 = float(dist_spec["ci80_high"]) # 90th percentile
+        # If 80% CI is provided (ci80_low/high or ci80: [low, high]), it takes precedence
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            # Warn once per parameter if both CI and mean/sd are provided
+            if (
+                ("mean" in dist_spec or "sd" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mean/sd provided; "
+                    f"using 80% CI and ignoring mean/sd.",
+                )
+                _ci_first_warned_params.add(param_name)
+            if has_array:
+                ci = dist_spec["ci80"]
+                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
+                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
+                q10 = float(ci[0])  # 10th percentile
+                q90 = float(ci[1])  # 90th percentile
+            else:
+                q10 = float(dist_spec["ci80_low"])  # 10th percentile
+                q90 = float(dist_spec["ci80_high"]) # 90th percentile
             if not np.isfinite(q10) or not np.isfinite(q90):
                 raise ValueError("ci80_low/ci80_high for normal must be finite numbers")
             # Ensure ordering
@@ -208,10 +231,30 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator) -> An
 
     if kind == "lognormal":
         # Support parameterization by mu/sigma in log-space OR by 80% CI in original space
-        # If 80% CI is provided, it takes precedence
-        if "ci80_low" in dist_spec and "ci80_high" in dist_spec:
-            q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units
-            q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units
+        # If 80% CI is provided (ci80_low/high or ci80: [low, high]), it takes precedence
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            # Warn once per parameter if both CI and mu/sigma are provided
+            if (
+                ("mu" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
+                    f"using 80% CI and ignoring mu/sigma.",
+                )
+                _ci_first_warned_params.add(param_name)
+            if has_array:
+                ci = dist_spec["ci80"]
+                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
+                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
+                q10 = float(ci[0])  # 10th percentile in original units
+                q90 = float(ci[1])  # 90th percentile in original units
+            else:
+                q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units
+                q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units
             if not np.isfinite(q10) or not np.isfinite(q90) or q10 <= 0 or q90 <= 0:
                 raise ValueError("ci80_low/ci80_high for lognormal must be positive finite numbers")
             if q10 > q90:
@@ -264,7 +307,7 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
     for name, spec in param_dists.items():
         if name == "automation_anchors":
             continue
-        val = _sample_from_dist(spec, rng)
+        val = _sample_from_dist(spec, rng, name)
 
         # Clip to bounds unless explicitly disabled, when bounds exist
         clip_requested = spec.get("clip_to_bounds", True)

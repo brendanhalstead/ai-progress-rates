@@ -10,6 +10,9 @@
 # - lognormal uses parameters in log space: mu, sigma; supports min/max with clip_to_bounds
 # - beta draws in [0,1] then scales to [min,max]
 # - choice supports optional probabilities p
+# - 80% CI-first: For normal/lognormal, if ci80 is provided as [low, high] OR ci80_low/ci80_high are provided,
+#   they TAKE PRECEDENCE over mean/sd (normal) or mu/sigma (lognormal). If both are present, mean/sd or mu/sigma
+#   are ignored and a warning is emitted once per parameter.
 
 seed: 32432432
 initial_progress: 0.0
@@ -23,15 +26,11 @@ parameters:
   # Superhuman coder time horizon + extrapolation
   sc_time_horizon_minutes:
     dist: lognormal
-    mu: 11.73  # ~124560 minutes
-    sigma: 1.0
-    min: 1000.0
-    max: 100000000000.0
-    clip_to_bounds: true
+    ci80: [62280, 9964800000] # [6 work months, 80,000 work years]
   horizon_extrapolation_type:
     dist: choice
     values: ["exponential", "decaying doubling time"]
-    p: [0.25, 0.75]
+    p: [0.3, 0.7]
 
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
   present_day:
@@ -81,9 +80,8 @@ parameters:
     dist: fixed
     value: 1.00
   swe_multiplier_at_present_day:
-    dist: normal
-    mean: 1.05
-    sd: 0.2
+    dist: lognormal
+    ci80: [1.08, 2.5]
     min: 1.0
     max: 10.0
     clip_to_bounds: true
@@ -91,26 +89,19 @@ parameters:
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
     dist: normal
-    mean: 0.0
-    sd: 0.2
-    min: -10.0
-    max: 23.0
+    ci80: [-2.5, 4.5]
     clip_to_bounds: true
   ai_research_taste_slope:
     dist: lognormal
-    mu: 1.5  # ~2.0
-    sigma: 0.5
-    min: 0.1
-    max: 10.0
+    ci80: [0.45, 7.65]
     clip_to_bounds: true
   taste_schedule_type:
     dist: fixed
     value: "SDs per effective OOM"
-
   # Software scale / normalization
   r_software:
     dist: fixed
-    value: 2.40
+    value: 2.8
 
   # Baseline annual compute multiplier
   baseline_annual_compute_multiplier:
