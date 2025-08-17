@@ -241,6 +241,7 @@
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
                         <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
@@ -264,6 +265,7 @@
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
                         <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
@@ -333,11 +335,38 @@
             return Number.isFinite(n) ? n : null;
         }
 
+        // Format numbers for display in CI labels
+        function formatNumber(value) {
+            if (!isFiniteNumber(value)) return '';
+            try {
+                return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value);
+            } catch (e) {
+                const n = Number(value);
+                return Number.isFinite(n) && n.toPrecision ? n.toPrecision(4) : String(n);
+            }
+        }
+
         function updateSliderLabels(specCell, lowVal, highVal) {
             const lowSpan = specCell.querySelector('.ci80-low-val');
             const highSpan = specCell.querySelector('.ci80-high-val');
-            if (lowSpan) lowSpan.textContent = isFiniteNumber(lowVal) ? String(lowVal) : '';
-            if (highSpan) highSpan.textContent = isFiniteNumber(highVal) ? String(highVal) : '';
+            const medSpan = specCell.querySelector('.ci80-med-val');
+            if (lowSpan) lowSpan.textContent = isFiniteNumber(lowVal) ? formatNumber(lowVal) : '';
+            if (highSpan) highSpan.textContent = isFiniteNumber(highVal) ? formatNumber(highVal) : '';
+            if (medSpan) {
+                const tr = specCell.closest('tr');
+                const dist = tr?.querySelector('.dist-select')?.value;
+                let median = null;
+                if (isFiniteNumber(lowVal) && isFiniteNumber(highVal)) {
+                    if (dist === 'normal') {
+                        median = (lowVal + highVal) / 2;
+                    } else if (dist === 'lognormal') {
+                        if (lowVal > 0 && highVal > 0) {
+                            median = Math.sqrt(lowVal * highVal);
+                        }
+                    }
+                }
+                medSpan.textContent = isFiniteNumber(median) ? formatNumber(median) : '';
+            }
         }
 
         function clamp(value, min, max) {
