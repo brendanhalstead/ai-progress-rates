@@ -241,6 +241,7 @@
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
                         <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="median-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
@@ -264,6 +265,7 @@
                         <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
                         <div class="d-flex justify-content-between small text-muted mt-1">
                             <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="median-val"></span></span>
                             <span>CI80 high: <span class="ci80-high-val"></span></span>
                         </div>
                     </div>
@@ -336,8 +338,30 @@
         function updateSliderLabels(specCell, lowVal, highVal) {
             const lowSpan = specCell.querySelector('.ci80-low-val');
             const highSpan = specCell.querySelector('.ci80-high-val');
-            if (lowSpan) lowSpan.textContent = isFiniteNumber(lowVal) ? String(lowVal) : '';
-            if (highSpan) highSpan.textContent = isFiniteNumber(highVal) ? String(highVal) : '';
+            const medianSpan = specCell.querySelector('.median-val');
+
+            function fmt(v) {
+                return isFiniteNumber(v) ? String(Math.round(v * 10000) / 10000) : '';
+            }
+
+            if (lowSpan) lowSpan.textContent = fmt(lowVal);
+            if (highSpan) highSpan.textContent = fmt(highVal);
+
+            if (medianSpan) {
+                // Determine distribution type from closest row's select
+                const distSelect = specCell.closest('tr')?.querySelector('.dist-select');
+                const distType = distSelect ? distSelect.value : null;
+                let medianVal = null;
+                if (distType === 'normal') {
+                    const meanField = specCell.querySelector('.dist-field[data-key="mean"]');
+                    medianVal = parseNum(meanField?.value);
+                } else if (distType === 'lognormal') {
+                    const muField = specCell.querySelector('.dist-field[data-key="mu"]');
+                    const mu = parseNum(muField?.value);
+                    medianVal = isFiniteNumber(mu) ? Math.exp(mu) : null;
+                }
+                medianSpan.textContent = fmt(medianVal);
+            }
         }
 
         function clamp(value, min, max) {
