@@ -20,9 +20,12 @@ AUTOMATION_SLOPE_CLIP_MIN = 0.1
 AUTOMATION_SLOPE_CLIP_MAX = 10.0
 RESEARCH_STOCK_START_MIN = 1e-10
 NORMALIZATION_MIN = 1e-10
-experiment_compute_exponent_CLIP_MIN = 0.1
-experiment_compute_exponent_CLIP_MAX = 1.0
+experiment_compute_exponent_CLIP_MIN = 0.001
+experiment_compute_exponent_CLIP_MAX = 10.0
 
+# =============================================================================
+# OTHER RANDOM CONSTANTS
+# =============================================================================
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
@@ -55,6 +58,11 @@ AI_RESEARCH_TASTE_MAX_SD = 23
 BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
 
 BASE_FOR_SOFTWARE_LOM = 10.0
+
+# labor and compute anchors are based on these
+REFERENCE_YEAR = 2024.0
+REFERENCE_LABOR_CHANGE = 30.0
+REFERENCE_COMPUTE_CHANGE = 0.1
 
 # =============================================================================
 # MODEL RATE & VALUE CAPS
@@ -106,7 +114,12 @@ PARAMETER_BOUNDS = {
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
     # Coding labor exponent bounds
-    'coding_labor_exponent': (0.0, 2.0)
+    'coding_labor_exponent': (0.0, 2.0),
+    # exp capacity pseudoparameters
+    'inf_labor_asymptote': (0, 100000),
+    'inf_compute_asymptote': (0, 100000),
+    'labor_anchor_exp_cap': (0, 1000),
+    'compute_anchor_exp_cap': (0, 1000)
 }
 
 # Validation thresholds for parameter combinations
@@ -153,13 +166,14 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_coding_labor': -2,
+    'direct_input_exp_cap_ces_params': False,
     'rho_experiment_capacity': -0.137,
-    'alpha_experiment_capacity': 0.70,
+    'alpha_experiment_capacity': 0.701,
     'r_software': 2.40,
     'automation_fraction_at_superhuman_coder': 1.0,
     'swe_multiplier_at_present_day': 1.05,
     'coding_labor_normalization': 1,
-    'experiment_compute_exponent': 0.56,
+    'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
@@ -177,7 +191,12 @@ DEFAULT_PARAMETERS = {
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # Coding labor exponent
-    'coding_labor_exponent': 0.5,
+    'coding_labor_exponent': 0.481,
+    # exp capacity pseudoparameters
+    'inf_labor_asymptote': 15.0,
+    'inf_compute_asymptote': 5000,
+    'labor_anchor_exp_cap': 1.6,
+    'compute_anchor_exp_cap': 0.4
 }
 
 # =============================================================================

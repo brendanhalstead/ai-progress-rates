@@ -1858,6 +1858,11 @@ def compute_model():
     # Store results (including auxiliary metrics for potential export)
     session_data['current_params'] = params
     session_data['results'] = all_metrics
+    # Persist current direct/derived mode from parameters for diagnostics
+    try:
+        session_data['use_direct_ces_parameters'] = bool(getattr(params, 'direct_input_exp_cap_ces_params', False))
+    except Exception:
+        session_data['use_direct_ces_parameters'] = False
     
     # Create multi-tab dashboard using the calculated metrics
     figures = create_multi_tab_dashboard(all_metrics, time_range)
@@ -1894,7 +1899,14 @@ def compute_model():
         'success': True,
         'plots': plots,
         'tabs': tabs_info,
-        'summary': summary
+        'summary': summary,
+        # Surface computed exp capacity params so UI can display when using pseudoparameters
+        'exp_capacity_params': {
+            'rho': float(all_metrics.get('exp_capacity_params', {}).get('rho')) if all_metrics.get('exp_capacity_params') else None,
+            'alpha': float(all_metrics.get('exp_capacity_params', {}).get('alpha')) if all_metrics.get('exp_capacity_params') else None,
+            'experiment_compute_exponent': float(all_metrics.get('exp_capacity_params', {}).get('experiment_compute_exponent')) if all_metrics.get('exp_capacity_params') else None,
+            'coding_labor_exponent': float(all_metrics.get('exp_capacity_params', {}).get('coding_labor_exponent')) if all_metrics.get('exp_capacity_params') else None,
+        }
     })
         
     # except Exception as e:
@@ -2022,6 +2034,27 @@ def get_parameter_config():
                     'name': 'Coding Labor Exponent',
                     'description': 'Power transformation parameter applied to CES output before normalization',
                     'units': 'dimensionless'
+                },
+                # exp capacity pseudoparameters
+                'inf_labor_asymptote': {
+                    'name': 'Infinite Labor Asymptote',
+                    'description': 'Asymptotic experiment capacity as labor → ∞ (holding compute finite)',
+                    'units': 'capacity units'
+                },
+                'inf_compute_asymptote': {
+                    'name': 'Infinite Compute Asymptote',
+                    'description': 'Asymptotic experiment capacity as compute → ∞ (holding labor finite)',
+                    'units': 'capacity units'
+                },
+                'labor_anchor_exp_cap': {
+                    'name': 'Labor Anchor Experiment Capacity',
+                    'description': 'Experiment capacity at the labor anchor used to infer CES parameters',
+                    'units': 'capacity units'
+                },
+                'compute_anchor_exp_cap': {
+                    'name': 'Compute Anchor Experiment Capacity',
+                    'description': 'Experiment capacity at the compute anchor used to infer CES parameters',
+                    'units': 'capacity units'
                 }
             }
         }

@@ -250,6 +250,7 @@ class Parameters:
     
     # Production function parameters
     rho_coding_labor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_coding_labor'])
+    direct_input_exp_cap_ces_params: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['direct_input_exp_cap_ces_params'])
     rho_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_experiment_capacity'])
     alpha_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha_experiment_capacity'])
     r_software: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['r_software'])
@@ -284,6 +285,12 @@ class Parameters:
     # Coding labor exponent for CES output transformation
     coding_labor_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_exponent'])
     
+    # exp capacity pseudoparameters
+    inf_labor_asymptote: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inf_labor_asymptote'])
+    inf_compute_asymptote: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inf_compute_asymptote'])
+    labor_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['labor_anchor_exp_cap'])
+    compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['compute_anchor_exp_cap'])
+    
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
         # Sanitize elasticity parameters
@@ -294,43 +301,20 @@ class Parameters:
             # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
             # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
             self.rho_coding_labor = np.clip(self.rho_coding_labor, cfg.RHO_CLIP_MIN, 1.0)
-        
-        if not np.isfinite(self.rho_experiment_capacity):
-            logger.warning(f"Non-finite rho_experiment_capacity: {self.rho_experiment_capacity}, setting to 0")
-            self.rho_experiment_capacity = 0.0
-        else:
-            # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
-            # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_experiment_capacity = np.clip(self.rho_experiment_capacity, cfg.RHO_CLIP_MIN, 1.0)
-        
-        # Sanitize weights
-        if not np.isfinite(self.alpha_experiment_capacity):
-            logger.warning(f"Non-finite alpha_experiment_capacity: {self.alpha_experiment_capacity}, setting to 0.5")
-            self.alpha_experiment_capacity = 0.5
-        else:
-            self.alpha_experiment_capacity = np.clip(self.alpha_experiment_capacity, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
-        
+                
         if not np.isfinite(self.r_software):
             logger.warning(f"Non-finite r_software: {self.r_software}, setting to 1.0")
             self.r_software = 1.0
         else:
             self.r_software = np.clip(self.r_software, 0.1, 10.0)
-        
-        if not np.isfinite(self.experiment_compute_exponent):
-            logger.warning(f"Non-finite experiment_compute_exponent: {self.experiment_compute_exponent}, setting to {cfg.DEFAULT_PARAMETERS['experiment_compute_exponent']}")
-            self.experiment_compute_exponent = cfg.DEFAULT_PARAMETERS['experiment_compute_exponent']
-        else:
-            self.experiment_compute_exponent = np.clip(self.experiment_compute_exponent, cfg.experiment_compute_exponent_CLIP_MIN, cfg.experiment_compute_exponent_CLIP_MAX)
-        
+                
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
             logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']}")
             self.automation_fraction_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']
         else:
             self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
-        
-        # Legacy automation sigmoid parameters removed
-        
+                
         # Sanitize AI research taste parameters
         # If SD-specification is provided, convert to raw taste via TasteDistribution
         if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
@@ -346,9 +330,7 @@ class Parameters:
             self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
         else:
             self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, cfg.AI_RESEARCH_TASTE_MAX)
-        
-        # Legacy sigmoid midpoint for AI research taste removed
-        
+                
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
             self.ai_research_taste_slope = 1.0
@@ -415,15 +397,6 @@ class Parameters:
             bounds = cfg.PARAMETER_BOUNDS.get('baseline_annual_compute_multiplier', (1.0, 20.0))
             self.baseline_annual_compute_multiplier = np.clip(self.baseline_annual_compute_multiplier, bounds[0], bounds[1])
         
-        # Validate coding labor exponent parameter
-        if not np.isfinite(self.coding_labor_exponent) or self.coding_labor_exponent < 0:
-            logger.warning(f"Invalid coding_labor_exponent: {self.coding_labor_exponent}, setting to default")
-            self.coding_labor_exponent = cfg.DEFAULT_PARAMETERS['coding_labor_exponent']
-        else:
-            # Ensure it's within bounds
-            bounds = cfg.PARAMETER_BOUNDS.get('coding_labor_exponent', (0.0, 2.0))
-            self.coding_labor_exponent = np.clip(self.coding_labor_exponent, bounds[0], bounds[1])
-
 
 @dataclass
 class AnchorConstraint:
@@ -2442,8 +2415,27 @@ class ProgressModel:
         Returns:
             Tuple of (times, cumulative_progress_values, research_stock_values)
         """
+        # first, compute exp capacity params from asymptotes and anchors
+        if not self.params.direct_input_exp_cap_ces_params:
+            ref_exp_compute = _log_interp(cfg.REFERENCE_YEAR, self.data.time, self.data.experiment_compute)
+            ref_coding_labor = _log_interp(cfg.REFERENCE_YEAR, self.data.time, self.data.L_HUMAN)
+            logger.info(f"ref_exp_compute: {ref_exp_compute}, ref_coding_labor: {ref_coding_labor}")
+            rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent = compute_exp_capacity_params_from_anchors(
+                self.params.inf_labor_asymptote, 
+                self.params.inf_compute_asymptote, 
+                (cfg.REFERENCE_COMPUTE_CHANGE, self.params.compute_anchor_exp_cap), 
+                (cfg.REFERENCE_LABOR_CHANGE, self.params.labor_anchor_exp_cap), 
+                ref_exp_compute, ref_coding_labor
+            )
+            self.params.rho_experiment_capacity = rho
+            self.params.alpha_experiment_capacity = alpha_experiment_capacity
+            self.params.experiment_compute_exponent = experiment_compute_exponent
+            self.params.coding_labor_exponent = coding_labor_exponent
+            logger.info(f"computed exp capacity params: rho: {rho}, alpha: {alpha_experiment_capacity}, experiment_compute_exponent: {experiment_compute_exponent}, coding_labor_exponent: {coding_labor_exponent}")
+        else:
+            logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}, coding_labor_exponent: {self.params.coding_labor_exponent}")
 
-        # first compute human-only trajectory
+        # next compute human-only trajectory
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
         
         # estimate horizon trajectory from METR data using human-only trajectory
@@ -2778,6 +2770,12 @@ class ProgressModel:
                 'L_AI': self.data.L_AI,
                 'experiment_compute': self.data.experiment_compute,
                 'training_compute_growth_rate': self.data.training_compute_growth_rate
+            },
+            'exp_capacity_params': {
+                'rho': self.params.rho_experiment_capacity,
+                'alpha': self.params.alpha_experiment_capacity,
+                'experiment_compute_exponent': self.params.experiment_compute_exponent,
+                'coding_labor_exponent': self.params.coding_labor_exponent
             }
         }
         
