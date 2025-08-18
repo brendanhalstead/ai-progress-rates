@@ -41,11 +41,7 @@ parameters:
     value: 15.0
   present_doubling_time:
     dist: lognormal
-    mu: -0.776  # ~0.46
-    sigma: 0.3
-    min: 0.01
-    max: 2.0
-    clip_to_bounds: true
+    ci80: [0.25, 0.667]
   doubling_decay_rate:
     dist: beta
     alpha: 1.5
@@ -59,21 +55,29 @@ parameters:
   rho_coding_labor:
     dist: fixed
     value: -2.0
-  coding_labor_normalization:
-    dist: fixed
-    value: 1.0
 
   # experiment capacity
-  rho_experiment_capacity:
+  direct_input_exp_cap_ces_params:
     dist: fixed
-    value: -0.137
-  alpha_experiment_capacity:
-    dist: fixed
-    value: 0.70
-
-  experiment_compute_exponent:
-    dist: fixed
-    value: 0.56
+    value: false
+  inf_compute_asymptote:
+    dist: shifted_lognormal
+    ci80: [25, 1000000]
+    shift: 1.0
+  inf_labor_asymptote:
+    dist: shifted_lognormal
+    ci80: [1, 200]
+    shift: 1.0
+  labor_anchor_exp_cap:
+    dist: shifted_lognormal
+    ci80: [0.3, 1.2]
+    shift: 1.0
+  compute_anchor_exp_cap:
+    dist: lognormal
+    ci80: [0.25, 0.571]
+    min: 0.125
+    max: 1
+    clip_to_bounds: true
 
   # Automation
   automation_fraction_at_superhuman_coder:
@@ -84,31 +88,17 @@ parameters:
     ci80: [0.08, 1.5]
     shift: 1.0
 
-
-
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
     dist: normal
     ci80: [-2.5, 4.5]
-    clip_to_bounds: true
   ai_research_taste_slope:
     dist: lognormal
     ci80: [0.45, 7.65]
-    clip_to_bounds: true
   taste_schedule_type:
     dist: fixed
     value: "SDs per effective OOM"
   # Software scale / normalization
   r_software:
-    dist: fixed
-    value: 2.8
-
-  # Baseline annual compute multiplier
-  baseline_annual_compute_multiplier:
-    dist: fixed
-    value: 4.5
-
-  # Coding labor exponent
-  coding_labor_exponent:
-    dist: fixed
-    value: 0.5
+    dist: lognormal
+    ci80: [0.7, 9]
