@@ -76,8 +76,6 @@ parameters:
     dist: shifted_lognormal
     ci80: [0.75, 3.0]
     shift: 1.0
-    max: 8.0
-    clip_to_bounds: true
 
   swe_multiplier_at_present_day:
     dist: shifted_lognormal
