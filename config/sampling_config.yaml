@@ -92,9 +92,6 @@ parameters:
   ai_research_taste_slope:
     dist: lognormal
     ci80: [0.45, 7.65]
-  taste_schedule_type:
-    dist: fixed
-    value: "SDs per effective OOM"
   # Software scale / normalization
   r_software:
     dist: lognormal
