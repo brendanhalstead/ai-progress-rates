@@ -652,7 +652,49 @@ def compute_rho_from_asymptotes(inf_labor_asymptote: float, inf_compute_asymptot
 
     # Clip to valid range and return
     return float(np.clip(rho, cfg.RHO_CLIP_MIN, 1.0))
+
+def compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote: float, inf_labor_asymptote: float, compute_anchor: tuple[float, float], rho: float) -> float:
+    """
+    Compute the experiment compute exponent from the asymptotes and anchor.
+
+    """
+    k = (inf_compute_asymptote/inf_labor_asymptote)**rho
+    C = compute_anchor[0]
+    S = compute_anchor[1]
+
+    return (1/(rho*np.log(C))) * np.log(S**rho + k*(S**rho-1))
+
+
+def compute_coding_labor_exponent_from_anchor(inf_compute_asymptote: float, inf_labor_asymptote: float, labor_anchor: tuple[float, float], rho: float) -> float:
+    """
+    Compute the experiment compute exponent from the asymptotes and anchor.
+    """
+    k = (inf_compute_asymptote/inf_labor_asymptote)**rho
+    L = labor_anchor[0]
+    S = labor_anchor[1]
+
+    return (1/(rho*np.log(L))) * np.log(S**rho + (S**rho-1)/k)
     
+def compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote: float, inf_compute_asymptote: float, experiment_compute_exponent, coding_labor_exponent, current_exp_compute:float, current_coding_labor:float, rho: float) -> float:
+    """
+    Compute the alpha parameter for the experiment capacity CES from the asymptotes and anchors.
+    """
+    k = (inf_compute_asymptote/inf_labor_asymptote)**rho
+    d = experiment_compute_exponent
+    s = coding_labor_exponent
+    C = current_exp_compute
+    L = current_coding_labor
+    return 1/(1 + k * (C**d / L**s)**rho)
+
+def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_compute_asymptote: float, compute_anchor: tuple[float, float], labor_anchor: tuple[float, float], current_exp_compute:float, current_coding_labor:float) -> tuple[float, float, float, float]:
+    """
+    Compute the parameters for the experiment capacity CES from the asymptotes and anchors.
+    """
+    rho = compute_rho_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote)
+    experiment_compute_exponent = compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote, inf_labor_asymptote, compute_anchor, rho)
+    coding_labor_exponent = compute_coding_labor_exponent_from_anchor(inf_compute_asymptote, inf_labor_asymptote, labor_anchor, rho)
+    alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, coding_labor_exponent, current_exp_compute, current_coding_labor, rho)
+    return rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent
 
 def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
