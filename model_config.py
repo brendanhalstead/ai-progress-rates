@@ -113,7 +113,7 @@ PARAMETER_BOUNDS = {
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
     'present_doubling_time': (0.01, 2),  # doubling time in progress units
-    'doubling_decay_rate': (0.001, 0.5),  # decay rate
+    'doubling_decay_rate': (-0.5, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
     # Coding labor exponent bounds

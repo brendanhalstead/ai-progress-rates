@@ -301,23 +301,16 @@ class Parameters:
         if not np.isfinite(self.rho_coding_labor):
             logger.warning(f"Non-finite rho_coding_labor: {self.rho_coding_labor}, setting to 0")
             self.rho_coding_labor = 0.0
-        else:
-            # Standard CES rho is in (-inf, 1]. We clamp to a reasonable range.
-            # rho -> 0 is Cobb-Douglas, rho -> 1 is perfect substitutes.
-            self.rho_coding_labor = np.clip(self.rho_coding_labor, cfg.RHO_CLIP_MIN, 1.0)
+
                 
         if not np.isfinite(self.r_software):
             logger.warning(f"Non-finite r_software: {self.r_software}, setting to 1.0")
             self.r_software = 1.0
-        else:
-            self.r_software = np.clip(self.r_software, 0.1, 10.0)
                 
         # Sanitize automation parameters
         if not np.isfinite(self.automation_fraction_at_superhuman_coder):
             logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']}")
             self.automation_fraction_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']
-        else:
-            self.automation_fraction_at_superhuman_coder = np.clip(self.automation_fraction_at_superhuman_coder, cfg.PARAM_CLIP_MIN, 1.0 - cfg.PARAM_CLIP_MIN)
                 
         # Sanitize AI research taste parameters
         # If SD-specification is provided, convert to raw taste via TasteDistribution
@@ -332,23 +325,14 @@ class Parameters:
         if not np.isfinite(self.ai_research_taste_at_superhuman_coder):
             logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
             self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
-        else:
-            self.ai_research_taste_at_superhuman_coder = np.clip(self.ai_research_taste_at_superhuman_coder, cfg.PARAM_CLIP_MIN, cfg.AI_RESEARCH_TASTE_MAX)
                 
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
-            self.ai_research_taste_slope = 1.0
-        else:
-            # Clamp slope to reasonable range to prevent numerical instability
-            self.ai_research_taste_slope = np.clip(self.ai_research_taste_slope, cfg.AUTOMATION_SLOPE_CLIP_MIN, cfg.AUTOMATION_SLOPE_CLIP_MAX)
-        
+            self.ai_research_taste_slope = 1.0        
         # Sanitize time horizon parameter
         if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
             logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
             self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
-        else:
-            # Clamp to reasonable bounds
-            self.sc_time_horizon_minutes = np.clip(self.sc_time_horizon_minutes, cfg.PARAMETER_BOUNDS['sc_time_horizon_minutes'][0], cfg.PARAMETER_BOUNDS['sc_time_horizon_minutes'][1])
         
         # Sanitize categorical parameters
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
@@ -359,31 +343,22 @@ class Parameters:
         if not np.isfinite(self.present_day):
             logger.warning(f"Non-finite present_day: {self.present_day}, setting to default")
             self.present_day = cfg.DEFAULT_present_day
-        else:
-            # Clamp to reasonable time range
-            self.present_day = np.clip(self.present_day, 2020.0, 2030.0)
         
         # Validate optional parameters - if provided, ensure they're finite and positive
         if self.present_horizon is not None:
             if not np.isfinite(self.present_horizon) or self.present_horizon <= 0:
                 logger.warning(f"Invalid present_horizon: {self.present_horizon}, setting to None for optimization")
                 self.present_horizon = None
-            else:
-                self.present_horizon = np.clip(self.present_horizon, 0.01, 10000.0)
         
         if self.present_doubling_time is not None:
             if not np.isfinite(self.present_doubling_time) or self.present_doubling_time <= 0:
                 logger.warning(f"Invalid present_doubling_time: {self.present_doubling_time}, setting to None for optimization")
                 self.present_doubling_time = None
-            else:
-                self.present_doubling_time = np.clip(self.present_doubling_time, 0.01, 100.0)
         
         if self.doubling_decay_rate is not None:
-            if not np.isfinite(self.doubling_decay_rate) or self.doubling_decay_rate <= 0:
+            if not np.isfinite(self.doubling_decay_rate):
                 logger.warning(f"Invalid doubling_decay_rate: {self.doubling_decay_rate}, setting to None for optimization")
                 self.doubling_decay_rate = None
-            else:
-                self.doubling_decay_rate = np.clip(self.doubling_decay_rate, 0.001, 1.0)
 
         # Sanitize benchmarks & gaps parameters
         if not isinstance(self.benchmarks_and_gaps_mode, (bool, np.bool_)):
@@ -397,17 +372,11 @@ class Parameters:
         if not np.isfinite(self.coding_labor_normalization) or self.coding_labor_normalization <= 0:
             logger.warning(f"Invalid coding_labor_normalization: {self.coding_labor_normalization}, setting to 1.0")
             self.coding_labor_normalization = 1.0
-        else:
-            self.coding_labor_normalization = max(cfg.NORMALIZATION_MIN, self.coding_labor_normalization)
         
         # Validate baseline annual compute multiplier
         if not np.isfinite(self.baseline_annual_compute_multiplier) or self.baseline_annual_compute_multiplier <= 0:
             logger.warning(f"Invalid baseline_annual_compute_multiplier: {self.baseline_annual_compute_multiplier}, setting to default")
             self.baseline_annual_compute_multiplier = cfg.BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT
-        else:
-            # Ensure it's within reasonable bounds
-            bounds = cfg.PARAMETER_BOUNDS.get('baseline_annual_compute_multiplier', (1.0, 20.0))
-            self.baseline_annual_compute_multiplier = np.clip(self.baseline_annual_compute_multiplier, bounds[0], bounds[1])
         
 
 @dataclass
@@ -1155,11 +1124,11 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
     (progress_1, automation_1), (progress_2, automation_2) = anchor_points
     
     # Validate anchor values
-    if automation_1 <= 0.0 or automation_1 >= 1.0:
+    if automation_1 <= 0.0 or automation_1 > 1.0:
         logger.warning(f"automation_fraction at progress {progress_1} must be in (0, 1), got {automation_1}")
         automation_1 = np.clip(automation_1, 1e-6, 1.0 - 1e-6)
     
-    if automation_2 <= 0.0 or automation_2 >= 1.0:
+    if automation_2 <= 0.0 or automation_2 > 1.0:
         logger.warning(f"automation_fraction at progress {progress_2} must be in (0, 1), got {automation_2}")
         automation_2 = np.clip(automation_2, 1e-6, 1.0 - 1e-6)
     
@@ -1866,31 +1835,30 @@ class ProgressModel:
             return a * x + b
         
         def decaying_doubling_time_func(t, H_0, A_0, T_0):
-            """Decaying doubling time function with numerical safeguards"""
+            """Decaying doubling time function with numerical safeguards.
+            Supports A_0 in (-inf, 1), excluding A_0 == 0. Handles both accelerating (A_0>0) and decelerating (A_0<0) cases.
+            """
             try:
                 # Handle scalar vs array inputs
                 is_scalar = np.isscalar(t)
                 t_arr = np.atleast_1d(t)
                 
                 # Ensure parameters are within valid ranges
-                if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                # A_0 must be < 1 and != 0; H_0 and T_0 must be > 0
+                if T_0 <= 0 or H_0 <= 0 or A_0 >= 1 or A_0 == 0:
                     fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
                 
                 # Calculate the base term (1 - A_0 * t / T_0)
                 base_term = 1 - A_0 * t_arr / T_0
-                
-                # Check for negative or zero base terms
-                if np.any(base_term <= 0):
-                    fallback = np.full_like(t_arr, np.log(1e12))
-                    return fallback[0] if is_scalar else fallback
+                # Clamp to small positive to avoid domain errors
+                base_term = np.maximum(base_term, 1e-12)
                 
                 # Calculate the exponent
                 log_denominator = np.log(1 - A_0)
-                if log_denominator >= 0:  # This should be negative for valid A_0
+                if not np.isfinite(log_denominator) or abs(log_denominator) < 1e-12:
                     fallback = np.full_like(t_arr, np.log(1e12))
                     return fallback[0] if is_scalar else fallback
-                
                 exponent = np.log(2) / log_denominator
                 
                 # Calculate the result
@@ -2018,7 +1986,7 @@ class ProgressModel:
                         param_name = params_to_optimize[0]
                         
                         def fit_single_param(param_val):
-                            if param_name == 'A_0' and (param_val <= 0 or param_val >= 1):
+                            if param_name == 'A_0' and (param_val >= 1 or abs(param_val) < 1e-6):
                                 return 1e6
                             if param_name in ['H_0', 'T_0'] and param_val <= 0:
                                 return 1e6
@@ -2036,12 +2004,14 @@ class ProgressModel:
                                 try:
                                     t_shifted = t_vals - anchor_progress
                                     base_term = 1 - A_0_val * t_shifted / T_0_val
+                                    # Clamp to small positive to avoid domain errors
+                                    base_term = np.maximum(base_term, 1e-12)
                                     
-                                    # Check for negative or zero base terms
-                                    if np.any(base_term <= 0):
+                                    # Guard against A_0 near 0 or >=1
+                                    log_denominator = np.log(1 - A_0_val)
+                                    if not np.isfinite(log_denominator) or abs(log_denominator) < 1e-12:
                                         return np.full_like(t_vals, np.log(1e12))
-                                    
-                                    exponent = np.log(2) / np.log(1 - A_0_val)
+                                    exponent = np.log(2) / log_denominator
                                     result = H_0_val * (base_term ** exponent)
                                     
                                     if np.any(~np.isfinite(result)) or np.any(result <= 0):
@@ -2056,7 +2026,7 @@ class ProgressModel:
                         
                         # Set bounds based on parameter type
                         if param_name == 'A_0':
-                            bounds = (1e-6, 0.999)
+                            bounds = (-0.999, 0.999)
                             initial_guess = 0.05
                         elif param_name == 'H_0':
                             bounds = (1e-6, 1e6)
@@ -2088,7 +2058,7 @@ class ProgressModel:
                             T_0_val = param_dict['T_0']
                             A_0_val = param_dict['A_0']
                             
-                            if A_0_val <= 0 or A_0_val >= 1 or H_0_val <= 0 or T_0_val <= 0:
+                            if A_0_val >= 1 or abs(A_0_val) < 1e-6 or H_0_val <= 0 or T_0_val <= 0:
                                 return 1e6
                             
                             # Use shifted function
@@ -2096,11 +2066,13 @@ class ProgressModel:
                                 try:
                                     t_shifted = t_vals - anchor_progress
                                     base_term = 1 - A_0_val * t_shifted / T_0_val
+                                    # Clamp to small positive to avoid domain errors
+                                    base_term = np.maximum(base_term, 1e-12)
                                     
-                                    if np.any(base_term <= 0):
+                                    log_denominator = np.log(1 - A_0_val)
+                                    if not np.isfinite(log_denominator) or abs(log_denominator) < 1e-12:
                                         return np.full_like(t_vals, np.log(1e12))
-                                    
-                                    exponent = np.log(2) / np.log(1 - A_0_val)
+                                    exponent = np.log(2) / log_denominator
                                     result = H_0_val * (base_term ** exponent)
                                     
                                     if np.any(~np.isfinite(result)) or np.any(result <= 0):
@@ -2118,7 +2090,7 @@ class ProgressModel:
                         p0 = []
                         for param_name in params_to_optimize:
                             if param_name == 'A_0':
-                                bounds.append((1e-6, 0.999))
+                                bounds.append((-0.999, 0.999))
                                 p0.append(0.05)
                             elif param_name == 'H_0':
                                 bounds.append((1e-6, 1e6))
@@ -2162,7 +2134,7 @@ class ProgressModel:
                         progress_values, 
                         log_horizon_values,
                         p0=[H_0_init, A_0_init, T_0_init],
-                        bounds=([1e-6, 1e-6, 1e-6], [np.inf, 0.999, np.inf])  # Reasonable bounds
+                        bounds=([1e-6, -0.999, 1e-6], [np.inf, 0.999, np.inf])  # Allow negative A_0 but exclude 0 implicitly via fit
                     )
                     H_0, A_0, T_0 = popt
                     
@@ -2181,7 +2153,7 @@ class ProgressModel:
                         progress_arr = np.atleast_1d(progress)
                         
                         # Ensure parameters are within valid ranges
-                        if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                        if T_0 <= 0 or H_0 <= 0 or A_0 >= 1 or A_0 == 0:
                             fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
@@ -2194,14 +2166,12 @@ class ProgressModel:
                             # Original form: horizon(t) = H_0 * (1 - A_0 * t / T_0)^exponent
                             base_term = 1 - A_0 * progress_arr / T_0
                         
-                        # Check for negative or zero base terms
-                        if np.any(base_term <= 0):
-                            fallback = np.full_like(progress_arr, 1e12)
-                            return fallback[0] if is_scalar else fallback
+                        # Clamp to small positive to avoid domain errors
+                        base_term = np.maximum(base_term, 1e-12)
                         
                         # Calculate the exponent
                         log_denominator = np.log(1 - A_0)
-                        if log_denominator >= 0:  # This should be negative for valid A_0
+                        if not np.isfinite(log_denominator) or abs(log_denominator) < 1e-12:
                             fallback = np.full_like(progress_arr, 1e12)
                             return fallback[0] if is_scalar else fallback
                         
@@ -2228,7 +2198,7 @@ class ProgressModel:
                 if target_horizon > 0:
                     try:
                         # Add numerical safeguards
-                        if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                        if T_0 <= 0 or H_0 <= 0 or A_0 >= 1 or A_0 == 0:
                             logger.warning("Invalid parameters for progress_at_sc calculation")
                             self.params.progress_at_sc = None
                         elif target_horizon <= 0:
@@ -2325,22 +2295,20 @@ class ProgressModel:
                 progress_arr = np.atleast_1d(progress)
                 
                 # Ensure parameters are within valid ranges
-                if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
+                # Allow A_0 < 0, disallow A_0 == 0 and A_0 >= 1
+                if T_0 <= 0 or H_0 <= 0 or A_0 >= 1 or A_0 == 0:
                     fallback = np.full_like(progress_arr, 1e12)
                     return fallback[0] if is_scalar else fallback
                 
                 # Use shifted form with updated anchor progress
                 progress_shifted = progress_arr - new_anchor_progress
                 base_term = 1 - A_0 * progress_shifted / T_0
-                
-                # Check for negative or zero base terms
-                if np.any(base_term <= 0):
-                    fallback = np.full_like(progress_arr, 1e12)
-                    return fallback[0] if is_scalar else fallback
+                # Clamp to small positive to avoid domain errors
+                base_term = np.maximum(base_term, 1e-12)
                 
                 # Calculate the exponent
                 log_denominator = np.log(1 - A_0)
-                if log_denominator >= 0:  # This should be negative for valid A_0
+                if not np.isfinite(log_denominator) or abs(log_denominator) < 1e-12:
                     fallback = np.full_like(progress_arr, 1e12)
                     return fallback[0] if is_scalar else fallback
                 
