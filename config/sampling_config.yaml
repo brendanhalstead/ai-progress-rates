@@ -72,17 +72,20 @@ parameters:
     dist: shifted_lognormal
     ci80: [0.3, 1.2]
     shift: 1.0
-  compute_anchor_exp_cap:
-    dist: lognormal
-    ci80: [0.25, 0.571]
-    min: 0.125
-    max: 1
+  inv_compute_anchor_exp_cap:
+    dist: shifted_lognormal
+    ci80: [0.75, 3.0]
+    shift: 1.0
+    max: 8.0
     clip_to_bounds: true
 
   swe_multiplier_at_present_day:
     dist: shifted_lognormal
     ci80: [0.08, 1.5]
     shift: 1.0
+  automation_interp_type:
+    dist: fixed
+    value: "linear
 
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
