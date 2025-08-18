@@ -2427,6 +2427,11 @@ class ProgressModel:
             logger.info(f"computed exp capacity params: rho: {rho}, alpha: {alpha_experiment_capacity}, experiment_compute_exponent: {experiment_compute_exponent}, coding_labor_exponent: {coding_labor_exponent}")
         else:
             logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}, coding_labor_exponent: {self.params.coding_labor_exponent}")
+        
+        # hackily handle doubling_decay_rate = 0 case
+        if self.params.doubling_decay_rate == 0:
+            logger.info(f"doubling_decay_rate is 0, setting to exponential")
+            self.params.horizon_extrapolation_type = "exponential"
 
         # next compute human-only trajectory
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
