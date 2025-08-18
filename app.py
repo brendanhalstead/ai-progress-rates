@@ -2144,13 +2144,16 @@ def select_data():
         dataset = data.get('dataset', 'default')
 
         import os
-        base_dir = os.path.dirname(__file__)
+        base_dir = os.path.join(os.path.dirname(__file__), 'inputs')
 
         dataset_to_file = {
             'default': 'input_data.csv',
-            'russia': 'input_data_russia.csv',
-            'us_black_site': 'input_data_us_black_site.csv',
-            'cn_black_site': 'input_data_cn_black_site.csv'
+            'pretrain_russia': 'pretrain_russia.csv',
+            'pretrain_us_black_site': 'pretrain_us_black_site.csv',
+            'pretrain_cn_black_site': 'pretrain_cn_black_site.csv',
+            'rl_russia': 'rl_russia.csv',
+            'rl_us_black_site': 'rl_us_black_site.csv',
+            'rl_cn_black_site': 'rl_cn_black_site.csv'
         }
 
         if dataset not in dataset_to_file:
