@@ -1744,63 +1744,6 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
             logger.warning(f"Integration method {method} raised exception: {e}")
             continue
     
-    # If all methods fail, try simple Euler method as ultimate fallback
-    if sol is None or not sol.success:
-        assert False, "All scipy integration methods failed, ignoring Euler fallback and quitting"        
-        try:
-            # Simple Euler integration as last resort
-            n_steps = max(cfg.EULER_FALLBACK_MIN_STEPS, int(abs(t_end - t_start) * cfg.EULER_FALLBACK_STEPS_PER_YEAR))  # Adaptive step count
-            times = np.linspace(t_start, t_end, n_steps)
-            dt = (t_end - t_start) / (n_steps - 1)
-            
-            # Log Euler step size information
-            if cfg.ODE_STEP_SIZE_LOGGING:
-                logger.info(f"Euler fallback integration: dt={dt:.2e}, n_steps={n_steps}, "
-                           f"time_range=[{t_start:.2f}, {t_end:.2f}]")
-            
-            progress_values = np.zeros(n_steps)
-            research_stock_values = np.zeros(n_steps)
-            progress_values[0] = initial_progress
-            research_stock_values[0] = initial_research_stock
-            
-            for i in range(1, n_steps):
-                try:
-                    state = [progress_values[i-1], research_stock_values[i-1]]
-                    rates = progress_rate_at_time(times[i-1], state, time_series_data, params, initial_research_stock_rate, initial_research_stock)
-                    
-                    # Validate and clamp rates
-                    for j in range(len(rates)):
-                        if not np.isfinite(rates[j]) or rates[j] < 0:
-                            rates[j] = 0.0
-                    
-                    progress_values[i] = progress_values[i-1] + rates[0] * dt
-                    research_stock_values[i] = research_stock_values[i-1] + rates[1] * dt
-                    
-                    # Ensure values don't become too large
-                    if progress_values[i] > cfg.PROGRESS_ODE_CLAMP_MAX:
-                        progress_values[i] = cfg.PROGRESS_ODE_CLAMP_MAX
-                    
-                    if research_stock_values[i] <= 0:
-                        research_stock_values[i] = max(research_stock_values[i-1], 1e-6)
-                    elif research_stock_values[i] > cfg.RESEARCH_STOCK_ODE_CLAMP_MAX:
-                        research_stock_values[i] = cfg.RESEARCH_STOCK_ODE_CLAMP_MAX
-                        
-                except Exception as e:
-                    logger.warning(f"Euler step failed at i={i}: {e}")
-                    progress_values[i] = progress_values[i-1]  # Keep previous values
-                    research_stock_values[i] = research_stock_values[i-1]
-            
-            # Convert back to original time range
-            final_times = np.linspace(min(time_range), max(time_range), cfg.DENSE_OUTPUT_POINTS)
-            final_progress = np.interp(final_times, times, progress_values)
-            final_research_stock = np.interp(final_times, times, research_stock_values)
-            
-            return final_times, final_progress, final_research_stock
-            
-        except Exception as e:
-            logger.error(f"Even Euler fallback failed: {e}")
-            raise RuntimeError(f"All integration methods failed. Last error: {e}")
-    
     # Create dense output over time range
     try:
         times = np.linspace(min(time_range), max(time_range), cfg.DENSE_OUTPUT_POINTS)
