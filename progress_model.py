@@ -291,6 +291,7 @@ class Parameters:
     inf_compute_asymptote: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inf_compute_asymptote'])
     labor_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['labor_anchor_exp_cap'])
     compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['compute_anchor_exp_cap'])
+    inv_compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inv_compute_anchor_exp_cap'])
     
     # Benchmarks and gaps mode
     benchmarks_and_gaps_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode'])
@@ -363,6 +364,10 @@ class Parameters:
             if not np.isfinite(self.doubling_decay_rate):
                 logger.warning(f"Invalid doubling_decay_rate: {self.doubling_decay_rate}, setting to None for optimization")
                 self.doubling_decay_rate = None
+
+        if self.inv_compute_anchor_exp_cap is not None:
+            logger.warning(f"inv_compute_anchor_exp_cap is not None, overriding compute_anchor_exp_cap to 1 / inv_compute_anchor_exp_cap")
+            self.compute_anchor_exp_cap = 1 / self.inv_compute_anchor_exp_cap
 
         # Sanitize benchmarks & gaps parameters
         if not isinstance(self.benchmarks_and_gaps_mode, (bool, np.bool_)):

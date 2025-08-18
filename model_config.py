@@ -122,7 +122,8 @@ PARAMETER_BOUNDS = {
     'inf_labor_asymptote': (0, 100000),
     'inf_compute_asymptote': (0, 100000),
     'labor_anchor_exp_cap': (0, 1000),
-    'compute_anchor_exp_cap': (0, 1000)
+    'compute_anchor_exp_cap': (0, 1000),
+    'inv_compute_anchor_exp_cap': (0, 10),
 }
 
 # Validation thresholds for parameter combinations
@@ -200,7 +201,8 @@ DEFAULT_PARAMETERS = {
     'inf_labor_asymptote': 15.0,
     'inf_compute_asymptote': 5000,
     'labor_anchor_exp_cap': 1.6,
-    'compute_anchor_exp_cap': 0.4,
+    'compute_anchor_exp_cap': None,
+    'inv_compute_anchor_exp_cap': 2.5,
     # benchmarks and gaps mode
     'benchmarks_and_gaps_mode': False,
     'gap_size_ooms': 2.0,

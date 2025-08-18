@@ -264,8 +264,8 @@
                                             <small class="text-muted">Compared to 2024 baseline</small>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="param-label">Exp. Cap. with 0.1x compute: <span id="compute_anchor_exp_cap_val">Loading...</span>x</label>
-                                            <input type="range" class="range-input form-range" id="compute_anchor_exp_cap" step="0.01">
+                                            <label class="param-label">Exp. Cap. Reduction with 0.1x compute: <span id="inv_compute_anchor_exp_cap_val">Loading...</span>x</label>
+                                            <input type="range" class="range-input form-range" id="inv_compute_anchor_exp_cap" step="0.01">
                                             <small class="text-muted">Compared to 2024 baseline</small>
                                         </div>
                                         <div class="mt-2">
@@ -574,7 +574,7 @@
             'automation_interp_type',
             'coding_labor_normalization', 'coding_labor_exponent', 'experiment_compute_exponent',
             // exp capacity pseudoparameters
-            'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'compute_anchor_exp_cap',
+            'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'inv_compute_anchor_exp_cap',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
             'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_size_ooms',
@@ -2043,7 +2043,7 @@
                         'inf_labor_asymptote': [0, 1000000],
                         'inf_compute_asymptote': [0, 1000000],
                         'labor_anchor_exp_cap': [0, 1000000],
-                        'compute_anchor_exp_cap': [0, 1000000]
+                        'inv_compute_anchor_exp_cap': [0, 1000000]
                     };
                     
                     if (fallbackBounds[key]) {
@@ -2173,12 +2173,12 @@
                 }
             });
             // Ensure pseudoparameter sliders have some bounds when server config is unavailable
-            ;['inf_labor_asymptote','inf_compute_asymptote','labor_anchor_exp_cap','compute_anchor_exp_cap'].forEach(id => {
+            ;['inf_labor_asymptote','inf_compute_asymptote','labor_anchor_exp_cap','inv_compute_anchor_exp_cap'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el && el.type === 'range') {
                     if (!el.min) el.min = 0;
                     if (!el.max) el.max = 1000000;
-                    if (!el.value) el.value = id === 'inf_compute_asymptote' ? 5000 : (id === 'inf_labor_asymptote' ? 15 : (id === 'labor_anchor_exp_cap' ? 1.6 : 0.4));
+                    if (!el.value) el.value = id === 'inf_compute_asymptote' ? 5000 : (id === 'inf_labor_asymptote' ? 15 : (id === 'labor_anchor_exp_cap' ? 1.6 : 2.5));
                     updateDisplayValue(el);
                 }
             });

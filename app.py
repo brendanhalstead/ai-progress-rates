@@ -2074,8 +2074,13 @@ def get_parameter_config():
                 },
                 'compute_anchor_exp_cap': {
                     'name': 'Compute Anchor Experiment Capacity',
-                    'description': 'Experiment capacity at the compute anchor used to infer CES parameters',
+                    'description': 'Experiment capacity at the compute anchor used to infer CES parameters (direct form, deprecated in UI)',
                     'units': 'capacity units'
+                },
+                'inv_compute_anchor_exp_cap': {
+                    'name': 'Exp. Cap. Reduction with 0.1x compute',
+                    'description': 'Inverse form: capacity at 0.1x compute relative to baseline (i.e., reduction factor). The model uses 1 / value internally for the direct anchor.',
+                    'units': 'x relative to baseline'
                 }
             }
         }
