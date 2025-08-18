@@ -64,6 +64,9 @@ REFERENCE_YEAR = 2024.0
 REFERENCE_LABOR_CHANGE = 30.0
 REFERENCE_COMPUTE_CHANGE = 0.1
 
+# benchmarks and gaps mode
+SATURATION_HORIZON_MINUTES = 10380.0
+
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
@@ -196,7 +199,10 @@ DEFAULT_PARAMETERS = {
     'inf_labor_asymptote': 15.0,
     'inf_compute_asymptote': 5000,
     'labor_anchor_exp_cap': 1.6,
-    'compute_anchor_exp_cap': 0.4
+    'compute_anchor_exp_cap': 0.4,
+    # benchmarks and gaps mode
+    'benchmarks_and_gaps_mode': True,
+    'gap_size_ooms': 2.0,
 }
 
 # =============================================================================

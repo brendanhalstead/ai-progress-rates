@@ -1806,7 +1806,10 @@ def params_to_dict(params: Parameters):
         # Baseline Annual Compute Multiplier
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
         # Coding labor exponent
-        'coding_labor_exponent': params.coding_labor_exponent
+        'coding_labor_exponent': params.coding_labor_exponent,
+        # Benchmarks & gaps mode
+        'benchmarks_and_gaps_mode': bool(getattr(params, 'benchmarks_and_gaps_mode', False)),
+        'gap_size_ooms': float(getattr(params, 'gap_size_ooms', 0.0))
     }
     
     # Add calculated SC information if available from the current session
@@ -1925,6 +1928,7 @@ def get_parameter_config():
             'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
+            'saturation_horizon_minutes': cfg.SATURATION_HORIZON_MINUTES,
             'descriptions': {
                 'rho_coding_labor': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -1998,6 +2002,16 @@ def get_parameter_config():
                     'name': 'Time Horizon to Superhuman Coder',
                     'description': 'Time horizon length corresponding to superhuman coder achievement',
                     'units': 'minutes'
+                },
+                'benchmarks_and_gaps_mode': {
+                    'name': 'Benchmarks & Gaps Mode',
+                    'description': 'Compute SC progress at saturation horizon plus specified gap',
+                    'units': 'boolean'
+                },
+                'gap_size_ooms': {
+                    'name': 'Gap Size (OOMs)',
+                    'description': 'Additional effective OOMs after saturation horizon to reach SC',
+                    'units': 'OOMs'
                 },
                 'horizon_extrapolation_type': {
                     'name': 'Horizon Extrapolation Type',

@@ -291,6 +291,10 @@ class Parameters:
     labor_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['labor_anchor_exp_cap'])
     compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['compute_anchor_exp_cap'])
     
+    # Benchmarks and gaps mode
+    benchmarks_and_gaps_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode'])
+    gap_size_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_size_ooms'])
+    
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
         # Sanitize elasticity parameters
@@ -380,6 +384,14 @@ class Parameters:
                 self.doubling_decay_rate = None
             else:
                 self.doubling_decay_rate = np.clip(self.doubling_decay_rate, 0.001, 1.0)
+
+        # Sanitize benchmarks & gaps parameters
+        if not isinstance(self.benchmarks_and_gaps_mode, (bool, np.bool_)):
+            logger.warning(f"Invalid benchmarks_and_gaps_mode: {self.benchmarks_and_gaps_mode}, setting to False")
+            self.benchmarks_and_gaps_mode = cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode']
+        if not np.isfinite(self.gap_size_ooms) or self.gap_size_ooms < 0:
+            logger.warning(f"Invalid gap_size_ooms: {self.gap_size_ooms}, setting to default")
+            self.gap_size_ooms = cfg.DEFAULT_PARAMETERS['gap_size_ooms']
 
         # Sanitize normalization parameters
         if not np.isfinite(self.coding_labor_normalization) or self.coding_labor_normalization <= 0:
@@ -1942,14 +1954,20 @@ class ProgressModel:
                     """Map progress to horizon length using fitted exponential model"""
                     return np.exp(slope * progress + intercept)
                 
-                # Calculate progress level where horizon reaches sc_time_horizon_minutes
-                if self.params.sc_time_horizon_minutes > 0:
+                # Calculate progress level where horizon reaches the target horizon
+                # Target depends on benchmarks_and_gaps_mode
+                target_horizon = cfg.SATURATION_HORIZON_MINUTES if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                if target_horizon > 0:
                     try:
-                        # Solve: sc_time_horizon_minutes = exp(slope * progress + intercept)
-                        # Therefore: progress = (log(sc_time_horizon_minutes) - intercept) / slope
-                        calculated_progress_at_sc = (np.log(self.params.sc_time_horizon_minutes) - intercept) / slope
+                        # Solve: target_horizon = exp(slope * progress + intercept)
+                        # Therefore: progress = (log(target_horizon) - intercept) / slope
+                        calculated_progress_at_sc = (np.log(target_horizon) - intercept) / slope
+                        # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
+                        if getattr(self.params, 'benchmarks_and_gaps_mode', False):
+                            calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
+                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {cfg.SATURATION_HORIZON_MINUTES} and adding gap {self.params.gap_size_ooms} OOMs")
                         self.params.progress_at_sc = calculated_progress_at_sc
-                        logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {calculated_progress_at_sc:.4f}")
+                        logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
                         logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None
@@ -2204,19 +2222,21 @@ class ProgressModel:
                         fallback = np.full_like(progress_arr, 1e12)
                         return fallback[0] if np.isscalar(progress) else fallback
                 
-                # Calculate progress level where horizon reaches sc_time_horizon_minutes
-                if self.params.sc_time_horizon_minutes > 0:
+                # Calculate progress level where horizon reaches the target horizon
+                # Target depends on benchmarks_and_gaps_mode
+                target_horizon = cfg.SATURATION_HORIZON_MINUTES if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                if target_horizon > 0:
                     try:
                         # Add numerical safeguards
                         if T_0 <= 0 or A_0 <= 0 or A_0 >= 1 or H_0 <= 0:
                             logger.warning("Invalid parameters for progress_at_sc calculation")
                             self.params.progress_at_sc = None
-                        elif self.params.sc_time_horizon_minutes <= 0:
+                        elif target_horizon <= 0:
                             logger.warning("Invalid sc_time_horizon_minutes for calculation")
                             self.params.progress_at_sc = None
                         else:
                             # Check if the ratio is valid
-                            ratio = self.params.sc_time_horizon_minutes / H_0
+                            ratio = target_horizon / H_0
                             if ratio <= 0:
                                 logger.warning("Invalid ratio for progress_at_sc calculation")
                                 self.params.progress_at_sc = None
@@ -2241,12 +2261,17 @@ class ProgressModel:
                                             # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
+                                        # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
+                                        if getattr(self.params, 'benchmarks_and_gaps_mode', False):
+                                            calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
+                                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {cfg.SATURATION_HORIZON_MINUTES} and adding gap {self.params.gap_size_ooms} OOMs")
+                                        
                                         if not np.isfinite(calculated_progress_at_sc):
                                             logger.warning("Invalid progress_at_sc result")
                                             self.params.progress_at_sc = None
                                         else:
                                             self.params.progress_at_sc = calculated_progress_at_sc
-                                            logger.info(f"Progress level at sc_time_horizon_minutes ({self.params.sc_time_horizon_minutes} min): {calculated_progress_at_sc:.4f}")
+                                            logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError, OverflowError) as e:
                         logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None

@@ -98,3 +98,11 @@ parameters:
   r_software:
     dist: lognormal
     ci80: [0.7, 9]
+
+  # Benchmarks & Gaps mode
+  benchmarks_and_gaps_mode:
+    dist: fixed
+    value: false
+  gap_size_ooms:
+    dist: fixed
+    value: 2.0

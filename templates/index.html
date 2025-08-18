@@ -92,6 +92,17 @@
                                 </div>
                                 <div class="collapse" id="timeHorizonParams">
                                     <div class="mb-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="benchmarks_and_gaps_mode">
+                                            <label class="form-check-label" for="benchmarks_and_gaps_mode">Benchmarks & Gaps mode</label>
+                                        </div>
+                                        <div class="mb-2" id="gap_size_ooms_group" style="display:none;">
+                                            <label class="param-label">Gap Size: <span id="gap_size_ooms_val">Loading...</span> OOMs</label>
+                                            <input type="range" class="range-input form-range" id="gap_size_ooms" step="0.1" min="0" max="10">
+                                            <small class="text-muted">Additional effective OOMs required for SC after reaching 1 month time horizon</small>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3" id="sc_time_horizon_group">
                                         <label class="param-label">80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months</label>
                                         <input type="range" class="range-input form-range" id="sc_time_horizon_minutes" step="0.1">
                                         <small class="text-muted">Time horizon corresponding to superhuman coder achievement</small>
@@ -557,7 +568,7 @@
             'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'compute_anchor_exp_cap',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
-            'horizon_extrapolation_type',
+            'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_size_ooms',
             // Manual horizon fitting parameters
             'present_day', 'present_horizon', 'present_doubling_time', 'doubling_decay_rate'
         ];
@@ -718,11 +729,24 @@
                     computeModel();
                 }
             });
+
+            // Wire benchmarks & gaps toggle
+            $('#benchmarks_and_gaps_mode').on('change', function() {
+                updateBenchmarksAndGapsVisibility();
+                if ($('#autoUpdate').is(':checked')) {
+                    clearTimeout(window.updateTimer);
+                    window.updateTimer = setTimeout(computeModel, 300);
+                } else {
+                    computeModel();
+                }
+            });
             
             // Initialize display values
             $('input[type="range"]').each(function() {
                 updateDisplayValue(this);
             });
+            // Initialize benchmarks & gaps visibility
+            updateBenchmarksAndGapsVisibility();
             
             // Initialize anchor time display text
             updateAnchorTimeDisplay();
@@ -730,6 +754,15 @@
             updateHorizonExtrapolationVisibility();
             // Initialize SD/fraction visibility per schedule type
             updateTasteUnitsVisibility();
+        }
+
+        function updateBenchmarksAndGapsVisibility() {
+            const toggle = document.getElementById('benchmarks_and_gaps_mode');
+            const group = document.getElementById('gap_size_ooms_group');
+            const scGroup = document.getElementById('sc_time_horizon_group');
+            if (!toggle || !group) return;
+            group.style.display = toggle.checked ? '' : 'none';
+            if (scGroup) scGroup.style.display = toggle.checked ? 'none' : '';
         }
         
         function formatDecimalYearToDate(decimalYear) {
@@ -925,6 +958,8 @@
                             if (!usePreciseInputs) value = Math.pow(10, value);
                         } else if (id === 'sc_time_horizon_minutes') {
                             if (!usePreciseInputs) value = Math.pow(10, value);
+                        } else if (id === 'gap_size_ooms') {
+                            // plain numeric slider; already parsed
                         }
                         
                         // Special handling for optional parameters - set to null if auto-fit checkbox is checked
@@ -937,7 +972,7 @@
                     }
                     
                     // Validate numeric parameters only (allow null for optional parameters)
-                    if (id !== 'taste_schedule_type' && id !== 'horizon_extrapolation_type' && value !== null && !isFinite(value)) {
+                    if (id !== 'taste_schedule_type' && id !== 'horizon_extrapolation_type' && id !== 'benchmarks_and_gaps_mode' && value !== null && !isFinite(value)) {
                         console.warn(`Invalid value for ${id}: ${element.val()}, using fallback`);
                         // Use fallback from parameter config or hardcoded value
                         if (parameterConfig && parameterConfig.defaults && parameterConfig.defaults[id] !== undefined) {
@@ -971,7 +1006,17 @@
                         }
                     }
                     
-                    params[id] = value;
+                    // Handle boolean checkbox for benchmarks & gaps mode
+                    if (id === 'benchmarks_and_gaps_mode') {
+                        const enabled = document.getElementById('benchmarks_and_gaps_mode')?.checked || false;
+                        params[id] = enabled;
+                        // When enabled, force sc_time_horizon_minutes to saturation horizon from server config
+                        if (enabled && parameterConfig && parameterConfig.saturation_horizon_minutes) {
+                            params['sc_time_horizon_minutes'] = parameterConfig.saturation_horizon_minutes;
+                        }
+                    } else {
+                        params[id] = value;
+                    }
                 } else {
                     console.warn(`Parameter element not found: ${id}`);
                 }
@@ -1751,6 +1796,21 @@
                     }
                 });
             }
+
+            // Initialize Benchmarks & Gaps controls from defaults where appropriate
+            try {
+                const gapSlider = document.getElementById('gap_size_ooms');
+                if (gapSlider && parameterConfig.defaults && parameterConfig.defaults.gap_size_ooms !== undefined) {
+                    gapSlider.value = parameterConfig.defaults.gap_size_ooms;
+                    updateDisplayValue(gapSlider);
+                }
+                // Default the toggle to OFF regardless of server default
+                const benchToggle = document.getElementById('benchmarks_and_gaps_mode');
+                if (benchToggle) {
+                    benchToggle.checked = false;
+                    updateBenchmarksAndGapsVisibility();
+                }
+            } catch (e) { console.warn('Failed to initialize benchmarks & gaps controls', e); }
             
             // Initialize dropdown controls
             if (parameterConfig.taste_schedule_types && parameterConfig.defaults) {
