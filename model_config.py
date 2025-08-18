@@ -201,7 +201,7 @@ DEFAULT_PARAMETERS = {
     'labor_anchor_exp_cap': 1.6,
     'compute_anchor_exp_cap': 0.4,
     # benchmarks and gaps mode
-    'benchmarks_and_gaps_mode': True,
+    'benchmarks_and_gaps_mode': False,
     'gap_size_ooms': 2.0,
 }
 
