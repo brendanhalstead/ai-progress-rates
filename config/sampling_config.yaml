@@ -85,7 +85,7 @@ parameters:
     shift: 1.0
   automation_interp_type:
     dist: fixed
-    value: "linear
+    value: "linear"
 
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
