@@ -158,7 +158,7 @@
                     </div>
                     <div class="card-body" style="max-height: 70vh; overflow: auto;">
                         <div class="text-muted small mb-2">
-                            Clicking the ✕ on a row reverts it to the default behavior defined in sampling_config.yaml. 
+                            Clicking the ✕ on a row omits that parameter from sampling. All rollouts will use the default value defined in the model config. 
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle" id="distTable">
@@ -222,6 +222,17 @@
             // Render a compact spec editor row based on dist type
             const s = spec || {};
             if (dist === 'fixed') {
+                // Preserve type: support boolean, string, and numeric fixed values
+                if (typeof s.value === 'boolean') {
+                    const checked = s.value ? 'checked' : '';
+                    return `<div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input dist-field" data-key="value" data-kind="boolean" ${checked}>
+                    </div>`;
+                }
+                if (typeof s.value === 'string') {
+                    const esc = String(s.value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    return `<input type="text" class="form-control form-control-sm dist-field" data-key="value" data-kind="string" placeholder="value" value="${esc}">`;
+                }
                 return `${numberField('value', 'value', s.value ?? '')}`;
             }
             if (dist === 'uniform') {
@@ -348,8 +359,16 @@
                         if (arr.length > 0) spec.p = arr;
                     }
                 } else {
-                    // numeric fields
-                    if (v !== '') spec[k] = parseFloat(v);
+                    // preserve explicit types when provided
+                    const kind = el.getAttribute('data-kind');
+                    if (kind === 'string') {
+                        spec[k] = String(v);
+                    } else if (kind === 'boolean') {
+                        spec[k] = !!el.checked;
+                    } else {
+                        // numeric fields (default)
+                        if (v !== '') spec[k] = parseFloat(v);
+                    }
                 }
             });
             // Prefer ci80 array syntax for normal/lognormal/shifted_lognormal if low/high present

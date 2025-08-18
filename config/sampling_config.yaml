@@ -79,10 +79,6 @@ parameters:
     max: 1
     clip_to_bounds: true
 
-  # Automation
-  automation_fraction_at_superhuman_coder:
-    dist: fixed
-    value: 1.00
   swe_multiplier_at_present_day:
     dist: shifted_lognormal
     ci80: [0.08, 1.5]
