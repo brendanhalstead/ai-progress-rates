@@ -213,7 +213,7 @@
         }
 
         function selectDist(name, value) {
-            const opts = ['fixed','uniform','normal','lognormal','beta','choice'];
+            const opts = ['fixed','uniform','normal','lognormal','shifted_lognormal','beta','choice'];
             return `<select class="form-select form-select-sm dist-select" data-key="${name}">` +
                 opts.map(o => `<option value="${o}" ${o===value?'selected':''}>${o}</option>`).join('') + `</select>`;
         }
@@ -286,6 +286,35 @@
                     ${hiddenNumberField('max', s.max ?? '')}
                 </div>`;
             }
+            if (dist === 'shifted_lognormal') {
+                const sigmaVal = (s.sigma ?? s.sd);
+                let defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
+                let defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present (pre-shift)
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
+                return `<div class="row g-1">
+                    <div class="col-12 mt-1">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
+                    <div class="col-12 mb-1">${numberField('shift', 'shift', s.shift ?? '')}</div>
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
+                    ${hiddenNumberField('mu', s.mu ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
+                </div>`;
+            }
             if (dist === 'beta') {
                 return `<div class="row g-1">
                     <div class="col-3">${numberField('alpha','alpha', s.alpha ?? '')}</div>
@@ -323,8 +352,8 @@
                     if (v !== '') spec[k] = parseFloat(v);
                 }
             });
-            // Prefer ci80 array syntax for normal/lognormal if low/high present
-            if (dist === 'normal' || dist === 'lognormal') {
+            // Prefer ci80 array syntax for normal/lognormal/shifted_lognormal if low/high present
+            if (dist === 'normal' || dist === 'lognormal' || dist === 'shifted_lognormal') {
                 const low = spec.ci80_low;
                 const high = spec.ci80_high;
                 if (Number.isFinite(low) && Number.isFinite(high)) {
@@ -335,7 +364,7 @@
                         delete spec.mean;
                         delete spec.sd;
                         delete spec.sigma;
-                    } else if (dist === 'lognormal') {
+                    } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
                         delete spec.mu;
                         delete spec.sigma;
                         delete spec.sd;
@@ -390,6 +419,13 @@
                         if (lowVal > 0 && highVal > 0) {
                             median = Math.sqrt(lowVal * highVal);
                         }
+                    } else if (dist === 'shifted_lognormal') {
+                        if (lowVal > 0 && highVal > 0) {
+                            const shiftField = specCell.querySelector('.dist-field[data-key="shift"]');
+                            const shift = parseNum(shiftField?.value);
+                            const baseMedian = Math.sqrt(lowVal * highVal);
+                            median = isFiniteNumber(baseMedian) ? baseMedian + (isFiniteNumber(shift) ? shift : 0) : null;
+                        }
                     }
                 }
                 medSpan.textContent = isFiniteNumber(median) ? formatNumber(median) : '';
@@ -419,7 +455,7 @@
 
         function bindRowInteractions(tr) {
             const dist = tr.querySelector('.dist-select')?.value;
-            if (dist !== 'normal' && dist !== 'lognormal') return;
+            if (dist !== 'normal' && dist !== 'lognormal' && dist !== 'shifted_lognormal') return;
             const specCell = tr.querySelector('.spec-cell');
             const sliderDiv = specCell.querySelector('.ci80-interval-slider');
             const lowField = specCell.querySelector('.dist-field[data-key="ci80_low"]');
@@ -430,6 +466,7 @@
             const sdField = specCell.querySelector('.dist-field[data-key="sd"]');
             const muField = specCell.querySelector('.dist-field[data-key="mu"]');
             const sigmaField = specCell.querySelector('.dist-field[data-key="sigma"]');
+            const shiftField = specCell.querySelector('.dist-field[data-key="shift"]');
 
             if (!sliderDiv || !lowField || !highField) return;
 
@@ -489,7 +526,7 @@
                         const [dl, dh] = computeNormalCI(mean, sd);
                         lowVal = (isFiniteNumber(lowVal) ? lowVal : dl);
                         highVal = (isFiniteNumber(highVal) ? highVal : dh);
-                    } else if (dist === 'lognormal') {
+                    } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
                         const mu = parseNum(muField?.value);
                         const sigma = parseNum(sigmaField?.value) ?? parseNum(sdField?.value);
                         const [dl, dh] = computeLognormalCI(mu, sigma);
@@ -557,7 +594,7 @@
                 sigmaField?.addEventListener('input', () => {
                     if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
-            } else if (dist === 'lognormal') {
+            } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
                 muField?.addEventListener('input', () => {
                     if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
                 });
@@ -566,6 +603,11 @@
                 });
                 sdField?.addEventListener('input', () => {
                     if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                shiftField?.addEventListener('input', () => {
+                    const low = parseNum(lowField.value);
+                    const high = parseNum(highField.value);
+                    updateSliderLabels(specCell, low, high);
                 });
             }
 

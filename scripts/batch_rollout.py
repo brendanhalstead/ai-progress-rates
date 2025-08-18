@@ -275,6 +275,54 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator, param
             x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
         return x
 
+    if kind == "shifted_lognormal":
+        # Shifted lognormal: x = shift + LogNormal(mu, sigma)
+        # The ci80 (or ci80_low/ci80_high) refers to the lognormal part ONLY (pre-shift).
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            # Warn once per parameter if both CI and mu/sigma are provided
+            if (
+                ("mu" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
+                    f"using 80% CI and ignoring mu/sigma.",
+                )
+                _ci_first_warned_params.add(param_name)
+            if has_array:
+                ci = dist_spec["ci80"]
+                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
+                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
+                q10 = float(ci[0])  # 10th percentile in original units (pre-shift)
+                q90 = float(ci[1])  # 90th percentile in original units (pre-shift)
+            else:
+                q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units (pre-shift)
+                q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units (pre-shift)
+            if not np.isfinite(q10) or not np.isfinite(q90) or q10 <= 0 or q90 <= 0:
+                raise ValueError("ci80_low/ci80_high for shifted_lognormal must be positive finite numbers (pre-shift)")
+            if q10 > q90:
+                q10, q90 = q90, q10
+            # Convert to log-space and solve for mu, sigma using the symmetric quantiles
+            z = 1.2815515655446004
+            ln_q10 = float(np.log(q10))
+            ln_q90 = float(np.log(q90))
+            mu = 0.5 * (ln_q10 + ln_q90)
+            sigma = (ln_q90 - ln_q10) / (2.0 * z)
+        else:
+            # parameterization using mu, sigma in log-space (pre-shift)
+            mu = float(dist_spec["mu"])  # log-space mean
+            sigma = float(dist_spec["sigma"])  # log-space sd
+
+        x_core = rng.lognormal(mean=mu, sigma=sigma)
+        shift = float(dist_spec.get("shift", 0.0))
+        x = float(shift + x_core)
+        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
+            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
+        return x
+
     if kind == "beta":
         a = float(dist_spec["alpha"])  # shape alpha
         b = float(dist_spec["beta"])   # shape beta

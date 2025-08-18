@@ -5,7 +5,7 @@
 #     --num-samples 2000 --input-data input_data.csv --time-range 2015 2035 --seed 123
 #
 # Notes:
-# - Distributions supported: fixed, uniform, normal, lognormal, beta, choice
+# - Distributions supported: fixed, uniform, normal, lognormal, shifted_lognormal, beta, choice
 # - normal supports optional min/max with clip_to_bounds: true
 # - lognormal uses parameters in log space: mu, sigma; supports min/max with clip_to_bounds
 # - beta draws in [0,1] then scales to [min,max]
@@ -80,11 +80,11 @@ parameters:
     dist: fixed
     value: 1.00
   swe_multiplier_at_present_day:
-    dist: lognormal
-    ci80: [1.08, 2.5]
-    min: 1.0
-    max: 10.0
-    clip_to_bounds: true
+    dist: shifted_lognormal
+    ci80: [0.08, 1.5]
+    shift: 1.0
+
+
 
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
