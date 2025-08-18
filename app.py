@@ -1788,6 +1788,7 @@ def params_to_dict(params: Parameters):
         'alpha_experiment_capacity': params.alpha_experiment_capacity,
         'r_software': params.r_software,
         'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
+        'automation_interp_type': getattr(params, 'automation_interp_type', 'exponential'),
 
         'coding_labor_normalization': params.coding_labor_normalization,
         'experiment_compute_exponent': params.experiment_compute_exponent,
@@ -1928,6 +1929,7 @@ def get_parameter_config():
             'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
+            'automation_interp_types': ['exponential', 'linear'],
             'saturation_horizon_minutes': cfg.SATURATION_HORIZON_MINUTES,
             'descriptions': {
                 'rho_coding_labor': {
@@ -1954,6 +1956,11 @@ def get_parameter_config():
                     'name': 'Max Automation',
                     'description': 'Automation fraction when AI reaches superhuman coding ability',
                     'units': 'fraction'
+                },
+                'automation_interp_type': {
+                    'name': 'Automation Interpolation Type',
+                    'description': 'Method for interpolating automation between anchors',
+                    'units': 'categorical'
                 },
                 
                 'swe_multiplier_at_present_day': {

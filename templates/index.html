@@ -165,6 +165,14 @@
                                 </div>
                                 <div class="collapse" id="codingAutomationParams">
                                     <div class="mb-3">
+                                        <label class="param-label">Automation Interpolation Type:</label>
+                                        <select class="form-select form-select-sm" id="automation_interp_type">
+                                            <option value="exponential">Exponential (log-space)</option>
+                                            <option value="linear">Linear</option>
+                                        </select>
+                                        <small class="text-muted">Method for interpolating automation between anchors</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="param-label">SWE Multiplier at Anchor Time: <span id="swe_multiplier_at_present_day_val">Loading...</span></label>
                                         <input type="range" class="range-input form-range" id="swe_multiplier_at_present_day" step="0.01">
                                         <small class="text-muted" id="swe_multiplier_present_day_text">Coding labor multiplier at present day</small>
@@ -563,6 +571,7 @@
         const PARAMETER_IDS = [
             'rho_coding_labor', 'rho_experiment_capacity', 'alpha_experiment_capacity', 'r_software',
             'automation_fraction_at_superhuman_coder', 'swe_multiplier_at_present_day',
+            'automation_interp_type',
             'coding_labor_normalization', 'coding_labor_exponent', 'experiment_compute_exponent',
             // exp capacity pseudoparameters
             'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'compute_anchor_exp_cap',
@@ -947,7 +956,7 @@
                     let value;
                     
                     // Special handling for string parameters
-                    if (id === 'taste_schedule_type' || id === 'horizon_extrapolation_type') {
+                    if (id === 'taste_schedule_type' || id === 'horizon_extrapolation_type' || id === 'automation_interp_type') {
                         value = element.val(); // Keep as string
                     } else {
                         value = parseFloat(element.val());
@@ -972,7 +981,7 @@
                     }
                     
                     // Validate numeric parameters only (allow null for optional parameters)
-                    if (id !== 'taste_schedule_type' && id !== 'horizon_extrapolation_type' && id !== 'benchmarks_and_gaps_mode' && value !== null && !isFinite(value)) {
+                    if (id !== 'taste_schedule_type' && id !== 'horizon_extrapolation_type' && id !== 'automation_interp_type' && id !== 'benchmarks_and_gaps_mode' && value !== null && !isFinite(value)) {
                         console.warn(`Invalid value for ${id}: ${element.val()}, using fallback`);
                         // Use fallback from parameter config or hardcoded value
                         if (parameterConfig && parameterConfig.defaults && parameterConfig.defaults[id] !== undefined) {
@@ -1003,6 +1012,12 @@
                         if (!allowedTypes.includes(value)) {
                             console.warn(`Invalid horizon_extrapolation_type: ${value}, using default`);
                             value = parameterConfig?.defaults?.horizon_extrapolation_type || 'exponential';
+                        }
+                    } else if (id === 'automation_interp_type') {
+                        const allowedTypes = parameterConfig?.automation_interp_types || ['exponential', 'linear'];
+                        if (!allowedTypes.includes(value)) {
+                            console.warn(`Invalid automation_interp_type: ${value}, using default`);
+                            value = parameterConfig?.defaults?.automation_interp_type || 'exponential';
                         }
                     }
                     
@@ -1813,7 +1828,7 @@
             } catch (e) { console.warn('Failed to initialize benchmarks & gaps controls', e); }
             
             // Initialize dropdown controls
-            if (parameterConfig.taste_schedule_types && parameterConfig.defaults) {
+            if (parameterConfig?.taste_schedule_types && parameterConfig?.defaults) {
                 const tasteScheduleSelect = document.getElementById('taste_schedule_type');
                 if (tasteScheduleSelect) {
                     // Clear existing options
@@ -1835,7 +1850,23 @@
                 }
             }
             
-            if (parameterConfig.horizon_extrapolation_types && parameterConfig.defaults) {
+            if (parameterConfig?.automation_interp_types && parameterConfig?.defaults) {
+                const automationInterpSelect = document.getElementById('automation_interp_type');
+                if (automationInterpSelect) {
+                    automationInterpSelect.innerHTML = '';
+                    parameterConfig.automation_interp_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                        automationInterpSelect.appendChild(option);
+                    });
+                    const defaultType = parameterConfig.defaults.automation_interp_type || 'exponential';
+                    automationInterpSelect.value = defaultType;
+                    console.log(`Initialized automation_interp_type dropdown with options: ${parameterConfig.automation_interp_types.join(', ')}, default: ${defaultType}`);
+                }
+            }
+
+            if (parameterConfig?.horizon_extrapolation_types && parameterConfig?.defaults) {
                 const horizonExtrapolationSelect = document.getElementById('horizon_extrapolation_type');
                 if (horizonExtrapolationSelect) {
                     // Clear existing options

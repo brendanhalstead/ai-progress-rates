@@ -259,6 +259,7 @@ class Parameters:
     # Automation parameters
     automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
     automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
+    automation_interp_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
@@ -338,6 +339,9 @@ class Parameters:
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
             logger.warning(f"Invalid horizon_extrapolation_type: {self.horizon_extrapolation_type}, setting to default")
             self.horizon_extrapolation_type = cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE
+        if self.automation_interp_type not in ["linear", "exponential"]:
+            logger.warning(f"Invalid automation_interp_type: {self.automation_interp_type}, setting to default 'exponential'")
+            self.automation_interp_type = cfg.DEFAULT_PARAMETERS['automation_interp_type']
         
         # Sanitize manual horizon fitting parameters
         if not np.isfinite(self.present_day):
@@ -1092,15 +1096,17 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
 
 def compute_automation_fraction(cumulative_progress: float, params: Parameters) -> float:
     """
-    Exponential (log-space) interpolation for automation fraction based on cumulative progress.
-    
-    Uses log-space interpolation between two anchor points in automation_anchors.
-    Extrapolates beyond these points but clips at 1.0.
-    
+    Interpolate automation fraction based on cumulative progress.
+
+    - If params.automation_interp_type == "exponential": perform log-space interpolation between two anchors.
+    - If params.automation_interp_type == "linear": perform linear interpolation between two anchors.
+
+    Extrapolates beyond the anchors and clips the result to [0, 1].
+
     Args:
         cumulative_progress: Current cumulative progress.
-        params: Model parameters containing automation_anchors.
-    
+        params: Model parameters containing automation_anchors and automation_interp_type.
+
     Returns:
         Automation fraction in [0, 1].
     """
@@ -1136,36 +1142,36 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
         logger.error(f"Progress values must be distinct and ordered: {progress_1} >= {progress_2}")
         assert False, "Progress anchor points must be distinct"
     
-    try:
-        # Log-space interpolation: log(automation) = a * progress + b
-        # Solve for a and b using the two anchor points
-        log_automation_1 = np.log(automation_1)
-        log_automation_2 = np.log(automation_2)
-        
-        # Linear interpolation in log space: log(y) = a*x + b
-        a = (log_automation_2 - log_automation_1) / (progress_2 - progress_1)
-        b = log_automation_1 - a * progress_1
-        
-        # Calculate log(automation) at current progress
-        log_automation = a * cumulative_progress + b
-        
-        # Convert back from log space
-        automation_fraction = np.exp(log_automation)
-        
-    except (ValueError, OverflowError) as e:
-        logger.warning(f"Numerical error in log-space interpolation: {e}")
-        # Fallback: linear interpolation
+    interp_type = getattr(params, 'automation_interp_type', 'exponential')
+    if interp_type == "exponential":
+        try:
+            # Log-space interpolation: log(automation) = a * progress + b
+            log_automation_1 = np.log(automation_1)
+            log_automation_2 = np.log(automation_2)
+
+            a = (log_automation_2 - log_automation_1) / (progress_2 - progress_1)
+            b = log_automation_1 - a * progress_1
+
+            log_automation = a * cumulative_progress + b
+            automation_fraction = np.exp(log_automation)
+        except (ValueError, OverflowError) as e:
+            logger.warning(f"Numerical error in log-space interpolation: {e}")
+            # Fallback to linear behavior if log-space fails
+            slope = (automation_2 - automation_1) / (progress_2 - progress_1)
+            automation_fraction = (
+                automation_1 + slope * (cumulative_progress - progress_1)
+                if cumulative_progress <= progress_2
+                else automation_2 + slope * (cumulative_progress - progress_2)
+            )
+    else:
+        # Linear interpolation/extrapolation between anchors
+        slope = (automation_2 - automation_1) / (progress_2 - progress_1)
         if progress_1 <= cumulative_progress <= progress_2:
-            # Linear interpolation between anchor points
             t = (cumulative_progress - progress_1) / (progress_2 - progress_1)
             automation_fraction = automation_1 + t * (automation_2 - automation_1)
         elif cumulative_progress < progress_1:
-            # Extrapolate below first anchor
-            slope = (automation_2 - automation_1) / (progress_2 - progress_1)
             automation_fraction = automation_1 + slope * (cumulative_progress - progress_1)
-        else:  # cumulative_progress > progress_2
-            # Extrapolate above second anchor
-            slope = (automation_2 - automation_1) / (progress_2 - progress_1)
+        else:
             automation_fraction = automation_2 + slope * (cumulative_progress - progress_2)
     
     # Clip to [0, 1] as required

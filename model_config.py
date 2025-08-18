@@ -175,6 +175,7 @@ DEFAULT_PARAMETERS = {
     'r_software': 2.40,
     'automation_fraction_at_superhuman_coder': 1.0,
     'swe_multiplier_at_present_day': 1.05,
+    'automation_interp_type': "linear",
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
