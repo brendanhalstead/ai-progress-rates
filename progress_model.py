@@ -1147,7 +1147,7 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
         logger.error(f"Progress values must be distinct and ordered: {progress_1} >= {progress_2}")
         assert False, "Progress anchor points must be distinct"
     
-    interp_type = getattr(params, 'automation_interp_type', 'exponential')
+    interp_type = getattr(params, 'automation_interp_type', cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     if interp_type == "exponential":
         try:
             # Log-space interpolation: log(automation) = a * progress + b
