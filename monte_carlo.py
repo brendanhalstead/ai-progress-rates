@@ -701,6 +701,7 @@ def live_sc_histogram(job_id: str):
         return jsonify({"success": False, "error": "rollouts.jsonl not found yet"}), 404
 
     sc_times: List[float] = []
+    num_no_sc: int = 0
     try:
         with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -714,13 +715,14 @@ def live_sc_histogram(job_id: str):
                 res = obj.get("results") if isinstance(obj, dict) else None
                 if isinstance(res, dict):
                     val = res.get("sc_time")
-                    if val is not None:
-                        try:
-                            v = float(val)
-                            if np.isfinite(v):
-                                sc_times.append(v)
-                        except Exception:
-                            pass
+                    try:
+                        v = float(val) if val is not None else np.nan
+                    except Exception:
+                        v = np.nan
+                    if np.isfinite(v):
+                        sc_times.append(v)
+                    else:
+                        num_no_sc += 1
     except Exception as e:
         return jsonify({"success": False, "error": f"Failed to read rollouts: {e}"}), 500
 
@@ -739,48 +741,75 @@ def live_sc_histogram(job_id: str):
     fig, ax = plt.subplots(figsize=(6, 3.2), dpi=150)
     try:
         ax.set_title("Live SC-time Distribution", fontsize=10)
-        if len(sc_times) >= 2:
-            data = np.asarray(sc_times, dtype=float)
-            bins = min(50, max(10, int(np.sqrt(len(data)))))
-            counts, bin_edges, _ = ax.hist(
-                data,
-                bins=bins,
-                edgecolor="black",
-                alpha=0.6,
-                label="Histogram",
-                color="#4E79A7",
-            )
+        total_n = len(sc_times) + num_no_sc
+        if total_n > 0:
+            data = np.asarray(sc_times, dtype=float) if len(sc_times) > 0 else np.asarray([], dtype=float)
+            kde_counts = np.array([])
+            bin_edges = np.array([0.0, 1.0])
+            counts = np.array([])
+            bin_width = 1.0
+            nosc_x = 1.0
 
-            # KDE overlay if available and data is not degenerate
-            if gaussian_kde is not None and len(data) >= 3 and np.std(data) > 0:
-                try:
-                    xs = np.linspace(float(data.min()), float(data.max()), 512)
-                    kde = gaussian_kde(data)
-                    bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
-                    kde_counts = kde(xs) * len(data) * bin_width
-                    ax.plot(xs, kde_counts, color="tab:orange", linewidth=2.0, label="Gaussian KDE")
-                except Exception:
-                    kde_counts = np.array([])
-            else:
-                kde_counts = np.array([])
+            if len(data) > 0:
+                bins = min(50, max(10, int(np.sqrt(len(data)))))
+                counts, bin_edges, _ = ax.hist(
+                    data,
+                    bins=bins,
+                    edgecolor="black",
+                    alpha=0.6,
+                    label="Histogram",
+                    color="#4E79A7",
+                )
+                bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
+                # KDE overlay if available and data is not degenerate
+                if gaussian_kde is not None and len(data) >= 3 and np.std(data) > 0:
+                    try:
+                        xs = np.linspace(float(data.min()), float(data.max()), 512)
+                        kde = gaussian_kde(data)
+                        kde_counts = kde(xs) * len(data) * bin_width
+                        ax.plot(xs, kde_counts, color="tab:orange", linewidth=2.0, label="Gaussian KDE")
+                    except Exception:
+                        kde_counts = np.array([])
+                nosc_x = float(bin_edges[-1] + bin_width / 2.0)
 
-            # Percentiles and annotations
+            # Draw No SC bar if needed and adjust ticks/limits
+            if num_no_sc > 0:
+                ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, label="No SC")
+                left = float(bin_edges[0]) if len(sc_times) > 0 else 0.0
+                right = float(nosc_x + bin_width)
+                ax.set_xlim(left, right)
+
+            # Percentiles and annotations including No SC as +inf
             try:
-                q10, q50, q90 = np.quantile(data, [0.1, 0.5, 0.9])
+                if num_no_sc > 0:
+                    with_inf = np.concatenate([data, np.full(int(num_no_sc), np.inf)])
+                else:
+                    with_inf = data
+                q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
                 ymax_hist = float(np.max(counts) if counts.size else 0.0)
                 ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
-                ymax = max(ymax_hist, ymax_kde, 1.0)
+                ymax = max(ymax_hist, ymax_kde, float(num_no_sc), 1.0)
                 y_annot = ymax * 0.95
-                ax.axvline(q10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
-                ax.axvline(q50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
-                ax.axvline(q90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
-                ax.text(q10, y_annot, f"P10: {_decimal_year_to_date_string(q10)}", rotation=90,
+
+                def _pos_and_label(qv: float) -> Tuple[float, str]:
+                    if np.isfinite(qv):
+                        return float(qv), _decimal_year_to_date_string(float(qv))
+                    return float(nosc_x), "No SC"
+
+                x10, lbl10 = _pos_and_label(q10)
+                x50, lbl50 = _pos_and_label(q50)
+                x90, lbl90 = _pos_and_label(q90)
+
+                ax.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+                ax.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+                ax.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+                ax.text(x10, y_annot, f"P10: {lbl10}", rotation=90,
                         va="top", ha="right", color="tab:gray", fontsize=8,
                         bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
-                ax.text(q50, y_annot, f"Median: {_decimal_year_to_date_string(q50)}", rotation=90,
+                ax.text(x50, y_annot, f"Median: {lbl50}", rotation=90,
                         va="top", ha="right", color="tab:green", fontsize=8,
                         bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
-                ax.text(q90, y_annot, f"P90: {_decimal_year_to_date_string(q90)}", rotation=90,
+                ax.text(x90, y_annot, f"P90: {lbl90}", rotation=90,
                         va="top", ha="right", color="tab:gray", fontsize=8,
                         bbox=dict(facecolor=(1,1,1,0.6), edgecolor='none', pad=1.5))
             except Exception:

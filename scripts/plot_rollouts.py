@@ -46,8 +46,9 @@ def _resolve_rollouts_path(run_dir: Optional[str], rollouts_path: Optional[str])
     return p
 
 
-def _read_sc_times(rollouts_file: Path) -> List[float]:
+def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int]:
     sc_times: List[float] = []
+    num_no_sc: int = 0
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -61,15 +62,16 @@ def _read_sc_times(rollouts_file: Path) -> List[float]:
             if not isinstance(results, dict):
                 continue
             sc_time = results.get("sc_time")
-            if sc_time is None:
-                continue
+            # Count rollouts with missing/non-finite sc_time as "No SC"
             try:
-                x = float(sc_time)
+                x = float(sc_time) if sc_time is not None else np.nan
             except (TypeError, ValueError):
-                continue
+                x = np.nan
             if np.isfinite(x):
                 sc_times.append(x)
-    return sc_times
+            else:
+                num_no_sc += 1
+    return sc_times, num_no_sc
 
 
 def _decimal_year_to_date_string(decimal_year: float) -> str:
@@ -444,46 +446,81 @@ def plot_horizon_at_sc_histogram(values: List[float], out_path: Path, bins: int 
     plt.close()
 
 
-def plot_sc_time_histogram(sc_times: List[float], out_path: Path, bins: int = 50, title: Optional[str] = None) -> None:
-    if len(sc_times) == 0:
-        raise ValueError("No finite SC times found to plot")
-    data = np.asarray(sc_times, dtype=float)
+def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path, bins: int = 50, title: Optional[str] = None) -> None:
+    total_n = int(len(sc_times) + max(0, num_no_sc))
+    if total_n == 0:
+        raise ValueError("No rollouts found to plot")
+    data = np.asarray(sc_times, dtype=float) if len(sc_times) > 0 else np.asarray([], dtype=float)
 
     plt.figure(figsize=(10, 6))
+    ax = plt.gca()
 
-    counts, bin_edges, _ = plt.hist(
-        data,
-        bins=bins,
-        edgecolor="black",
-        alpha=0.6,
-        label="Histogram",
-    )
+    kde_counts = np.asarray([], dtype=float)
+    bin_edges = np.asarray([0.0, 1.0], dtype=float)
+    counts = np.asarray([], dtype=float)
+    bin_width = 1.0
+    nosc_x = None
 
-    # KDE overlay, scaled to count space
-    xs = np.linspace(data.min(), data.max(), 512)
-    kde = gaussian_kde(data)
-    # Assume uniform bins when bins is an int
-    bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
-    kde_counts = kde(xs) * len(data) * bin_width
-    plt.plot(xs, kde_counts, color="tab:orange", linewidth=2.25, label="Gaussian KDE")
+    if len(data) > 0:
+        counts, bin_edges, _ = plt.hist(
+            data,
+            bins=bins,
+            edgecolor="black",
+            alpha=0.6,
+            label="Histogram",
+        )
+        bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
+        # KDE overlay on finite data only
+        if len(data) >= 2:
+            xs = np.linspace(data.min(), data.max(), 512)
+            try:
+                kde = gaussian_kde(data)
+                kde_counts = kde(xs) * max(len(data), 1) * bin_width
+                plt.plot(xs, kde_counts, color="tab:orange", linewidth=2.25, label="Gaussian KDE")
+            except Exception:
+                kde_counts = np.asarray([], dtype=float)
 
-    # Percentiles and annotations
-    q10, q50, q90 = np.quantile(data, [0.1, 0.5, 0.9])
-    ymax = float(max(np.max(counts) if counts.size else 0.0, np.max(kde_counts) if kde_counts.size else 0.0))
-    y_annot = ymax * 0.95 if ymax > 0 else 1.0
+        # Place the No SC bar just to the right of the last numeric bin
+        nosc_x = float(bin_edges[-1] + bin_width / 2.0)
+    else:
+        # Only No SC data: choose an arbitrary position for the single bar
+        nosc_x = 1.0
 
-    # Vertical lines
-    plt.axvline(q10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
-    plt.axvline(q50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
-    plt.axvline(q90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+    # Draw the No SC bar if needed
+    if num_no_sc > 0:
+        ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, label="No SC")
+        # Ensure x-limits include the No SC bar, but keep default tick locator/formatter
+        left = float(bin_edges[0]) if len(data) > 0 else 0.0
+        right = float(nosc_x + bin_width)
+        ax.set_xlim(left, right)
 
-    # Text labels showing arrival dates
-    plt.text(q10, y_annot, f"P10: {_decimal_year_to_date_string(q10)}", rotation=90,
-             va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
-    plt.text(q50, y_annot, f"Median: {_decimal_year_to_date_string(q50)}", rotation=90,
-             va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
-    plt.text(q90, y_annot, f"P90: {_decimal_year_to_date_string(q90)}", rotation=90,
-             va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+    # Percentiles and annotations (including No SC as +inf)
+    if total_n > 0:
+        with_inf = data
+        if num_no_sc > 0:
+            with_inf = np.concatenate([data, np.full(int(num_no_sc), np.inf)])
+        q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
+        ymax_hist = float(np.max(counts) if counts.size else 0.0)
+        ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
+        ymax = max(ymax_hist, ymax_kde, float(num_no_sc), 1.0)
+        y_annot = ymax * 0.95
+
+        def _pos_and_label(qv: float) -> Tuple[float, str]:
+            if np.isfinite(qv):
+                return float(qv), _decimal_year_to_date_string(float(qv))
+            return float(nosc_x), "No SC"
+
+        x10, lbl10 = _pos_and_label(q10)
+        x50, lbl50 = _pos_and_label(q50)
+        x90, lbl90 = _pos_and_label(q90)
+
+        plt.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+        plt.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+        plt.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+
+        plt.text(x10, y_annot, f"P10: {lbl10}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+        plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
+        plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
 
     plt.xlabel("SC Time (decimal year)")
     plt.ylabel("Count")
@@ -530,14 +567,19 @@ def main() -> None:
             out_path = default_dir / ("horizon_trajectories_stop_at_sc.png" if args.stop_at_sc else "horizon_trajectories.png")
 
     if args.mode == "sc_hist":
-        sc_times = _read_sc_times(rollouts_path)
-        if len(sc_times) > 0:
+        sc_times, num_no_sc = _read_sc_times(rollouts_path)
+        if (len(sc_times) + num_no_sc) > 0 and len(sc_times) > 0:
             arr = np.asarray(sc_times, dtype=float)
-            q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
-            print(f"Loaded {len(arr)} SC times from {rollouts_path}")
-            print(f"Min/Median/Max: {arr.min():.3f} / {q50:.3f} / {arr.max():.3f}")
-            print(f"P10/P90: {q10:.3f} / {q90:.3f}")
-        plot_sc_time_histogram(sc_times, out_path=out_path, bins=int(args.bins))
+            print(f"Loaded {len(arr)} finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
+            print(f"Finite Min/Median/Max: {arr.min():.3f} / {np.median(arr):.3f} / {arr.max():.3f}")
+            with_inf = np.concatenate([arr, np.full(int(num_no_sc), np.inf)]) if num_no_sc > 0 else arr
+            q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
+            def _fmt_q(qv: float) -> str:
+                return f"{qv:.3f}" if np.isfinite(qv) else "No SC"
+            print(f"P10/Median/P90 (incl. No SC): {_fmt_q(q10)} / {_fmt_q(q50)} / {_fmt_q(q90)}")
+        elif (len(sc_times) + num_no_sc) > 0:
+            print(f"Loaded 0 finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
+        plot_sc_time_histogram(sc_times, num_no_sc=num_no_sc, out_path=out_path, bins=int(args.bins))
         print(f"Saved histogram to: {out_path}")
         return
 
