@@ -2148,6 +2148,8 @@ def select_data():
 
         dataset_to_file = {
             'default': 'input_data.csv',
+            'updated_default': 'updated_default.csv',
+            'truncated_default': 'truncated_default.csv',
             'pretrain_russia': 'pretrain_russia.csv',
             'pretrain_us_black_site': 'pretrain_us_black_site.csv',
             'pretrain_cn_black_site': 'pretrain_cn_black_site.csv',
