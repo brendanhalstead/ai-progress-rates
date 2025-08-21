@@ -205,7 +205,7 @@ DEFAULT_PARAMETERS = {
     'inv_compute_anchor_exp_cap': 2.5,
     # benchmarks and gaps mode
     'benchmarks_and_gaps_mode': False,
-    'gap_size_ooms': 2.0,
+    'gap_years': 2.0,
     'saturation_horizon_minutes': 10380.0,
 }
 

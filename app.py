@@ -1811,7 +1811,7 @@ def params_to_dict(params: Parameters):
         'coding_labor_exponent': params.coding_labor_exponent,
         # Benchmarks & gaps mode
         'benchmarks_and_gaps_mode': bool(getattr(params, 'benchmarks_and_gaps_mode', False)),
-        'gap_size_ooms': float(getattr(params, 'gap_size_ooms', 0.0))
+        'gap_years': float(getattr(params, 'gap_years', 0.0))
     }
     
     # Add calculated SC information if available from the current session
@@ -1893,6 +1893,10 @@ def compute_model():
     # Add anchor progress rate if available
     if model.results.get('anchor_progress_rate') is not None:
         summary['anchor_progress_rate'] = float(model.results['anchor_progress_rate'])
+
+    # Add instantaneous anchor doubling time (years) if available
+    if model.results.get('instantaneous_anchor_doubling_time_years') is not None:
+        summary['instantaneous_anchor_doubling_time_years'] = float(model.results['instantaneous_anchor_doubling_time_years'])
 
     # Add SC timing information if available
     if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
@@ -2016,10 +2020,10 @@ def get_parameter_config():
                     'description': 'Compute SC progress at saturation horizon plus specified gap',
                     'units': 'boolean'
                 },
-                'gap_size_ooms': {
-                    'name': 'Gap Size (OOMs)',
-                    'description': 'Additional effective OOMs after saturation horizon to reach SC',
-                    'units': 'OOMs'
+                'gap_years': {
+                    'name': 'Gap Size (YEAR-progress-years)',
+                    'description': 'Additional gap after saturation horizon to reach SC, measured in YEAR-progress-years (converted using anchor_progress_rate). UI displays YEAR based on Anchor Time.',
+                    'units': 'YEAR-progress-years'
                 },
                 'horizon_extrapolation_type': {
                     'name': 'Horizon Extrapolation Type',

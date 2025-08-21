@@ -96,10 +96,10 @@
                                             <input class="form-check-input" type="checkbox" id="benchmarks_and_gaps_mode">
                                             <label class="form-check-label" for="benchmarks_and_gaps_mode">Saturation + Gap mode</label>
                                         </div>
-                                        <div class="mb-2" id="gap_size_ooms_group" style="display:none;">
-                                            <label class="param-label">Gap Size: <span id="gap_size_ooms_val">Loading...</span> OOMs</label>
-                                            <input type="range" class="range-input form-range" id="gap_size_ooms" step="0.1" min="0" max="10">
-                                            <small class="text-muted">Additional effective OOMs required for SC after reaching the saturation time horizon</small>
+                                        <div class="mb-2" id="gap_years_group" style="display:none;">
+                                            <label class="param-label">Gap Size: <span id="gap_years_val">Loading...</span> <span id="gap_years_units">anchor-progress-years</span></label>
+                                            <input type="range" class="range-input form-range" id="gap_years" step="0.1" min="0" max="10">
+                                            <small class="text-muted">Additional gap after saturation horizon to reach SC, measured in <span id="gap_years_units_help">anchor-progress-years</span> (≈ <span id="gap_years_converted_val">—</span> OOMs of effective compute)</small>
                                         </div>
                                         <div class="mb-3" id="saturation_horizon_group" style="display:none;">
                                             <label class="param-label">Saturation Time Horizon: <span id="saturation_horizon_minutes_val">Loading...</span> work months</label>
@@ -146,6 +146,9 @@
                                             <label class="param-label">Anchor Doubling Time: <span id="present_doubling_time_val">Loading...</span> months</label>
                                             <input type="range" class="range-input form-range" id="present_doubling_time" step="0.01" disabled>
                                             <small class="text-muted">Months required to double time horizon from present value. The time horizon is extrapolated as a function of effective compute, so this value is converted to effective OOMs using the human-only effective compute growth rate at present day.</small>
+                                            <div class="mt-1">
+                                                <small class="text-muted">Instantaneous doubling time at anchor: <span id="instantaneous_anchor_doubling_time_val">—</span> months</small>
+                                            </div>
                                         </div>
                                         <div class="mb-2" id="doubling_decay_rate_group">
                                             <div class="form-check form-switch">
@@ -587,7 +590,7 @@
             'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'inv_compute_anchor_exp_cap',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
-            'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_size_ooms', 'saturation_horizon_minutes',
+            'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_years', 'saturation_horizon_minutes',
             // Manual horizon fitting parameters
             'present_day', 'present_horizon', 'present_doubling_time', 'doubling_decay_rate'
         ];
@@ -766,6 +769,8 @@
             });
             // Initialize benchmarks & gaps visibility
             updateBenchmarksAndGapsVisibility();
+            // Initialize converted gap display
+            updateGapConvertedDisplay();
             
             // Initialize anchor time display text
             updateAnchorTimeDisplay();
@@ -777,7 +782,7 @@
 
         function updateBenchmarksAndGapsVisibility() {
             const toggle = document.getElementById('benchmarks_and_gaps_mode');
-            const group = document.getElementById('gap_size_ooms_group');
+            const group = document.getElementById('gap_years_group');
             const scGroup = document.getElementById('sc_time_horizon_group');
             const satGroup = document.getElementById('saturation_horizon_group');
             if (!toggle || !group) return;
@@ -804,11 +809,42 @@
             // Update the dynamic anchor time text in the SWE Multiplier section
             const anchorTimeSlider = document.getElementById('present_day');
             const anchorTimeText = document.getElementById('swe_multiplier_present_day_text');
+            const gapUnitsSpan = document.getElementById('gap_years_units');
+            const gapUnitsHelpSpan = document.getElementById('gap_years_units_help');
+            const gapConvertedSpan = document.getElementById('gap_years_converted_val');
             
             if (anchorTimeSlider && anchorTimeText) {
                 const anchorTimeValue = parseFloat(anchorTimeSlider.value);
                 const formattedDate = formatDecimalYearToDate(anchorTimeValue);
                 anchorTimeText.textContent = `Coding labor multiplier at present day (${formattedDate})`;
+                // Update gap units to '<YEAR>-progress-years'
+                const anchorYear = isFinite(anchorTimeValue) ? Math.floor(anchorTimeValue) : null;
+                const unitsLabel = anchorYear !== null ? `${anchorYear}-progress-years` : 'anchor-progress-years';
+                if (gapUnitsSpan) gapUnitsSpan.textContent = unitsLabel;
+                if (gapUnitsHelpSpan) gapUnitsHelpSpan.textContent = unitsLabel;
+                if (gapConvertedSpan) updateGapConvertedDisplay();
+            }
+        }
+
+        function updateGapConvertedDisplay() {
+            try {
+                const gapSlider = document.getElementById('gap_years');
+                const convertedEl = document.getElementById('gap_years_converted_val');
+                if (!gapSlider || !convertedEl) return;
+                const gapVal = parseFloat(gapSlider.value);
+                let rate = window.summary?.anchor_progress_rate;
+                let converted;
+                if (rate !== undefined && rate !== null && isFinite(rate)) {
+                    converted = gapVal * Number(rate);
+                } else {
+                    // Fallback: use plain value if rate is not yet available
+                    converted = gapVal;
+                }
+                // Display with minimal trailing zeros
+                const fmt = (n) => Number(n).toFixed(3).replace(/\.0+$/,'').replace(/\.([1-9])0+$/,'.$1');
+                convertedEl.textContent = isFinite(converted) ? fmt(converted) : '—';
+            } catch (e) {
+                // best-effort; keep silent in UI
             }
         }
 
@@ -954,6 +990,10 @@
             if (input.id === 'present_day') {
                 updateAnchorTimeDisplay();
             }
+            // Update converted gap display if the gap slider changed
+            if (input.id === 'gap_years') {
+                updateGapConvertedDisplay();
+            }
         }
         
         function collectParameters() {
@@ -980,7 +1020,7 @@
                             if (!usePreciseInputs) value = Math.pow(10, value);
                         } else if (id === 'sc_time_horizon_minutes' || id === 'saturation_horizon_minutes') {
                             if (!usePreciseInputs) value = Math.pow(10, value);
-                        } else if (id === 'gap_size_ooms') {
+                        } else if (id === 'gap_years') {
                             // plain numeric slider; already parsed
                         }
                         
@@ -1834,9 +1874,9 @@
 
             // Initialize Benchmarks & Gaps controls from defaults where appropriate
             try {
-                const gapSlider = document.getElementById('gap_size_ooms');
-                if (gapSlider && parameterConfig.defaults && parameterConfig.defaults.gap_size_ooms !== undefined) {
-                    gapSlider.value = parameterConfig.defaults.gap_size_ooms;
+                const gapSlider = document.getElementById('gap_years');
+                if (gapSlider && parameterConfig.defaults && parameterConfig.defaults.gap_years !== undefined) {
+                    gapSlider.value = parameterConfig.defaults.gap_years;
                     updateDisplayValue(gapSlider);
                 }
                 // Default the toggle to OFF regardless of server default
@@ -2344,6 +2384,12 @@
                 // Progress rate at anchor time
                 $('#summary_anchor_progress_rate').text(summary.anchor_progress_rate != null ? fmt(summary.anchor_progress_rate, 3) : '—');
 
+                // Make summary globally available for converted gap display
+                window.summary = window.summary || {};
+                window.summary.anchor_progress_rate = summary.anchor_progress_rate;
+                // Refresh converted gap display now that we have fresh rate
+                updateGapConvertedDisplay();
+
                 // Update AI Research Taste Slope info text under the slider
                 const slopeInfoEl = document.getElementById('ai_research_taste_slope_info');
                 if (slopeInfoEl) {
@@ -2354,6 +2400,16 @@
                         slopeInfoEl.textContent = 'Steepness of research taste curve';
                     }
                 }
+
+                // Update instantaneous anchor doubling time (convert years -> months)
+                try {
+                    const instYears = summary.instantaneous_anchor_doubling_time_years;
+                    const instMonths = (instYears !== undefined && instYears !== null && isFinite(instYears)) ? instYears * 12.0 : null;
+                    const el = document.getElementById('instantaneous_anchor_doubling_time_val');
+                    if (el) {
+                        el.textContent = (instMonths !== null && isFinite(instMonths)) ? fmt(instMonths, 2) : '—';
+                    }
+                } catch (e) { /* no-op */ }
             } catch (e) {
                 console.warn('Failed to update summary', e);
             }

@@ -297,7 +297,7 @@ class Parameters:
     
     # Benchmarks and gaps mode
     benchmarks_and_gaps_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode'])
-    gap_size_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_size_ooms'])
+    gap_years: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_years'])
     
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
@@ -375,9 +375,9 @@ class Parameters:
         if not isinstance(self.benchmarks_and_gaps_mode, (bool, np.bool_)):
             logger.warning(f"Invalid benchmarks_and_gaps_mode: {self.benchmarks_and_gaps_mode}, setting to False")
             self.benchmarks_and_gaps_mode = cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode']
-        if not np.isfinite(self.gap_size_ooms) or self.gap_size_ooms < 0:
-            logger.warning(f"Invalid gap_size_ooms: {self.gap_size_ooms}, setting to default")
-            self.gap_size_ooms = cfg.DEFAULT_PARAMETERS['gap_size_ooms']
+        if not np.isfinite(self.gap_years) or self.gap_years < 0:
+            logger.warning(f"Invalid gap_years: {self.gap_years}, setting to default")
+            self.gap_years = cfg.DEFAULT_PARAMETERS['gap_years']
 
         # Sanitize normalization parameters
         if not np.isfinite(self.coding_labor_normalization) or self.coding_labor_normalization <= 0:
@@ -1943,10 +1943,23 @@ class ProgressModel:
                         # Solve: target_horizon = exp(slope * progress + intercept)
                         # Therefore: progress = (log(target_horizon) - intercept) / slope
                         calculated_progress_at_sc = (np.log(target_horizon) - intercept) / slope
-                        # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
+                        # If in benchmarks & gaps mode, add the gap (specified in anchor-progress-years)
+                        # Convert anchor-progress-years to progress units using anchor_progress_rate
                         if getattr(self.params, 'benchmarks_and_gaps_mode', False):
-                            calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
-                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and adding gap {self.params.gap_size_ooms} OOMs")
+                            try:
+                                gap_anchor_years = float(self.params.gap_years)
+                                gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
+                            except Exception:
+                                gap_progress_units = float(self.params.gap_years)
+                            calculated_progress_at_sc = calculated_progress_at_sc + gap_progress_units
+                            try:
+                                year_label = int(self.params.present_day) if getattr(self.params, 'present_day', None) is not None else 'anchor'
+                            except Exception:
+                                year_label = 'anchor'
+                            logger.info(
+                                f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and "
+                                f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
+                            )
                         self.params.progress_at_sc = calculated_progress_at_sc
                         logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
@@ -2244,10 +2257,23 @@ class ProgressModel:
                                             # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
-                                        # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
+                                        # If in benchmarks & gaps mode, add the gap (specified in anchor-progress-years)
+                                        # Convert anchor-progress-years to progress units using anchor_progress_rate
                                         if getattr(self.params, 'benchmarks_and_gaps_mode', False):
-                                            calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
-                                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and adding gap {self.params.gap_size_ooms} OOMs")
+                                            try:
+                                                gap_anchor_years = float(self.params.gap_years)
+                                                gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
+                                            except Exception:
+                                                gap_progress_units = float(self.params.gap_years)
+                                            calculated_progress_at_sc = calculated_progress_at_sc + gap_progress_units
+                                            try:
+                                                year_label = int(self.params.present_day) if getattr(self.params, 'present_day', None) is not None else 'anchor'
+                                            except Exception:
+                                                year_label = 'anchor'
+                                            logger.info(
+                                                f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and "
+                                                f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
+                                            )
                                         
                                         if not np.isfinite(calculated_progress_at_sc):
                                             logger.warning("Invalid progress_at_sc result")
@@ -2734,6 +2760,26 @@ class ProgressModel:
             else:
                 logger.warning(f"Anchor time {present_day:.3f} is outside trajectory range [{times[0]:.3f}, {times[-1]:.3f}]")
 
+        # Compute instantaneous doubling time at the anchor (years)
+        instantaneous_anchor_doubling_time_years = None
+        try:
+            if (self.horizon_trajectory is not None and
+                anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0):
+                anchor_progress_value = self.human_only_results['anchor_stats']['progress']
+                p = float(anchor_progress_value)
+                # Numerical derivative of ln(horizon) with respect to progress at anchor
+                eps = 1e-6 * max(1.0, abs(p))
+                if eps == 0:
+                    eps = 1e-6
+                H_p = self.horizon_trajectory(p)
+                H_p_eps = self.horizon_trajectory(p + eps)
+                if (np.isfinite(H_p) and np.isfinite(H_p_eps) and H_p > 0 and H_p_eps > 0):
+                    dlnH_dprogress = (np.log(H_p_eps) - np.log(H_p)) / eps
+                    if np.isfinite(dlnH_dprogress) and dlnH_dprogress > 0:
+                        instantaneous_anchor_doubling_time_years = float(np.log(2) / (dlnH_dprogress * anchor_progress_rate))
+        except Exception as e:
+            logger.warning(f"Failed computing instantaneous doubling time at anchor: {e}")
+
         # Compute AI research taste slope in SD per anchor-progress-year (SD/year at anchor)
         ai_taste_slope_per_anchor_progress_year = None
         try:
@@ -2774,6 +2820,7 @@ class ProgressModel:
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
             'present_day': present_day,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
+            'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
             'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
             'input_time_series': {
                 'time': self.data.time,

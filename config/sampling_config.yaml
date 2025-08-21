@@ -101,6 +101,6 @@ parameters:
   benchmarks_and_gaps_mode:
     dist: fixed
     value: false
-  gap_size_ooms:
+  gap_years:
     dist: fixed
     value: 2.0
