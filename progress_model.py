@@ -269,6 +269,8 @@ class Parameters:
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
+    # Saturation horizon minutes (used when benchmarks & gaps mode is enabled)
+    saturation_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['saturation_horizon_minutes'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Manual horizon fitting parameters
@@ -1935,7 +1937,7 @@ class ProgressModel:
                 
                 # Calculate progress level where horizon reaches the target horizon
                 # Target depends on benchmarks_and_gaps_mode
-                target_horizon = cfg.SATURATION_HORIZON_MINUTES if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.saturation_horizon_minutes if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Solve: target_horizon = exp(slope * progress + intercept)
@@ -1944,7 +1946,7 @@ class ProgressModel:
                         # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
                         if getattr(self.params, 'benchmarks_and_gaps_mode', False):
                             calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
-                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {cfg.SATURATION_HORIZON_MINUTES} and adding gap {self.params.gap_size_ooms} OOMs")
+                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and adding gap {self.params.gap_size_ooms} OOMs")
                         self.params.progress_at_sc = calculated_progress_at_sc
                         logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
@@ -2205,7 +2207,7 @@ class ProgressModel:
                 
                 # Calculate progress level where horizon reaches the target horizon
                 # Target depends on benchmarks_and_gaps_mode
-                target_horizon = cfg.SATURATION_HORIZON_MINUTES if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.saturation_horizon_minutes if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Add numerical safeguards
@@ -2245,7 +2247,7 @@ class ProgressModel:
                                         # If in benchmarks & gaps mode, add the gap in OOMs to the progress level
                                         if getattr(self.params, 'benchmarks_and_gaps_mode', False):
                                             calculated_progress_at_sc = calculated_progress_at_sc + float(self.params.gap_size_ooms)
-                                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {cfg.SATURATION_HORIZON_MINUTES} and adding gap {self.params.gap_size_ooms} OOMs")
+                                            logger.info(f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and adding gap {self.params.gap_size_ooms} OOMs")
                                         
                                         if not np.isfinite(calculated_progress_at_sc):
                                             logger.warning("Invalid progress_at_sc result")

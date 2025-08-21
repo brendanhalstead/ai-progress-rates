@@ -94,12 +94,17 @@
                                     <div class="mb-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="benchmarks_and_gaps_mode">
-                                            <label class="form-check-label" for="benchmarks_and_gaps_mode">Benchmarks & Gaps mode</label>
+                                            <label class="form-check-label" for="benchmarks_and_gaps_mode">Saturation + Gap mode</label>
                                         </div>
                                         <div class="mb-2" id="gap_size_ooms_group" style="display:none;">
                                             <label class="param-label">Gap Size: <span id="gap_size_ooms_val">Loading...</span> OOMs</label>
                                             <input type="range" class="range-input form-range" id="gap_size_ooms" step="0.1" min="0" max="10">
-                                            <small class="text-muted">Additional effective OOMs required for SC after reaching 1 month time horizon</small>
+                                            <small class="text-muted">Additional effective OOMs required for SC after reaching the saturation time horizon</small>
+                                        </div>
+                                        <div class="mb-3" id="saturation_horizon_group" style="display:none;">
+                                            <label class="param-label">Saturation Time Horizon: <span id="saturation_horizon_minutes_val">Loading...</span> work months</label>
+                                            <input type="range" class="range-input form-range" id="saturation_horizon_minutes" step="0.1">
+                                            <small class="text-muted">Task length beyond which the time horizon is no longer meaningful.</small>
                                         </div>
                                     </div>
                                     <div class="mb-3" id="sc_time_horizon_group">
@@ -582,7 +587,7 @@
             'inf_labor_asymptote', 'inf_compute_asymptote', 'labor_anchor_exp_cap', 'inv_compute_anchor_exp_cap',
             'ai_research_taste_at_superhuman_coder_sd',
             'ai_research_taste_slope', 'taste_schedule_type', 'sc_time_horizon_minutes',
-            'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_size_ooms',
+            'horizon_extrapolation_type', 'benchmarks_and_gaps_mode', 'gap_size_ooms', 'saturation_horizon_minutes',
             // Manual horizon fitting parameters
             'present_day', 'present_horizon', 'present_doubling_time', 'doubling_decay_rate'
         ];
@@ -774,9 +779,11 @@
             const toggle = document.getElementById('benchmarks_and_gaps_mode');
             const group = document.getElementById('gap_size_ooms_group');
             const scGroup = document.getElementById('sc_time_horizon_group');
+            const satGroup = document.getElementById('saturation_horizon_group');
             if (!toggle || !group) return;
             group.style.display = toggle.checked ? '' : 'none';
             if (scGroup) scGroup.style.display = toggle.checked ? 'none' : '';
+            if (satGroup) satGroup.style.display = toggle.checked ? '' : 'none';
         }
         
         function formatDecimalYearToDate(decimalYear) {
@@ -896,17 +903,18 @@
                 // Show actual value; respect precise mode
                 const actualValue = usePreciseInputs ? value : Math.pow(10, value);
                 displayValue = actualValue < 0.001 ? actualValue.toExponential(2) : actualValue.toExponential(2);
-            } else if (input.id === 'sc_time_horizon_minutes') {
+            } else if (input.id === 'sc_time_horizon_minutes' || input.id === 'saturation_horizon_minutes') {
                 // Convert minutes to work months/years; respect precise mode
                 const actualValueMinutes = usePreciseInputs ? value : Math.pow(10, value);
                 const workMonths = actualValueMinutes / 10380; // 173 hours * 60 mins = 10380 minutes per work month
                 const workYears = actualValueMinutes / 124560; // 124560 minutes per work year
                 
                 // Update the label unit based on the value
-                const labelElement = document.querySelector('#sc_time_horizon_minutes').closest('.mb-3').querySelector('label.param-label');
+                const labelElement = document.querySelector('#' + input.id).closest('.mb-3').querySelector('label.param-label');
                 if (labelElement) {
+                    const isSC = input.id === 'sc_time_horizon_minutes';
                     if (workMonths > 12) {
-                        labelElement.innerHTML = '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work years';
+                        labelElement.innerHTML = (isSC ? '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work years' : 'Saturation Time Horizon: <span id="saturation_horizon_minutes_val">Loading...</span> work years');
                         if (workYears >= 10) {
                             displayValue = workYears.toFixed(0);
                         } else if (workYears >= 1) {
@@ -915,7 +923,7 @@
                             displayValue = workYears.toFixed(2);
                         }
                     } else {
-                        labelElement.innerHTML = '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months';
+                        labelElement.innerHTML = (isSC ? '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months' : 'Saturation Time Horizon: <span id="saturation_horizon_minutes_val">Loading...</span> work months');
                         if (workMonths >= 10) {
                             displayValue = workMonths.toFixed(0);
                         } else if (workMonths >= 1) {
@@ -970,7 +978,7 @@
                         if (id === 'coding_labor_normalization') {
                             // In precise mode, numeric input is actual value; otherwise transform from log slider value
                             if (!usePreciseInputs) value = Math.pow(10, value);
-                        } else if (id === 'sc_time_horizon_minutes') {
+                        } else if (id === 'sc_time_horizon_minutes' || id === 'saturation_horizon_minutes') {
                             if (!usePreciseInputs) value = Math.pow(10, value);
                         } else if (id === 'gap_size_ooms') {
                             // plain numeric slider; already parsed
@@ -1030,9 +1038,16 @@
                     if (id === 'benchmarks_and_gaps_mode') {
                         const enabled = document.getElementById('benchmarks_and_gaps_mode')?.checked || false;
                         params[id] = enabled;
-                        // When enabled, force sc_time_horizon_minutes to saturation horizon from server config
-                        if (enabled && parameterConfig && parameterConfig.saturation_horizon_minutes) {
-                            params['sc_time_horizon_minutes'] = parameterConfig.saturation_horizon_minutes;
+                        // When enabled, force sc_time_horizon_minutes to current saturation horizon selection
+                        if (enabled) {
+                            const satEl = document.getElementById('saturation_horizon_minutes');
+                            if (satEl) {
+                                let satVal = parseFloat(satEl.value);
+                                if (!usePreciseInputs) satVal = Math.pow(10, satVal);
+                                params['sc_time_horizon_minutes'] = satVal;
+                            } else if (parameterConfig && parameterConfig.saturation_horizon_minutes) {
+                                params['sc_time_horizon_minutes'] = parameterConfig.saturation_horizon_minutes;
+                            }
                         }
                     } else {
                         params[id] = value;
@@ -1792,7 +1807,7 @@
                             slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
                             slider.max = Math.log10(max);
                             slider.value = Math.log10(Math.max(defaultValue, 1e-5));
-                        } else if (paramName === 'sc_time_horizon_minutes') {
+                        } else if (paramName === 'sc_time_horizon_minutes' || paramName === 'saturation_horizon_minutes') {
                             // This slider uses log scale for better usability with large range
                             slider.min = Math.log10(Math.max(min, 1));
                             slider.max = Math.log10(max);
@@ -2000,7 +2015,7 @@
             if (!usePreciseInputs) {
                 if (key === 'coding_labor_normalization') {
                     newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
-                } else if (key === 'sc_time_horizon_minutes') {
+                } else if (key === 'sc_time_horizon_minutes' || key === 'saturation_horizon_minutes') {
                     newValue = Math.log10(Math.max(value, 1));
                 }
             }
@@ -2017,7 +2032,7 @@
                     if (key === 'coding_labor_normalization') {
                         minVal = Math.log10(Math.max(bounds[0], 1e-5));
                         maxVal = Math.log10(bounds[1]);
-                    } else if (key === 'sc_time_horizon_minutes') {
+                    } else if (key === 'sc_time_horizon_minutes' || key === 'saturation_horizon_minutes') {
                         minVal = Math.log10(Math.max(bounds[0], 1));
                         maxVal = Math.log10(bounds[1]);
                     }
@@ -2044,6 +2059,7 @@
                         'experiment_compute_exponent': [0.1, 1.0],
                         'ai_research_taste_slope': [0.1, 10],
                         'sc_time_horizon_minutes': [3, 6],  // Log scale bounds
+                        'saturation_horizon_minutes': [3, 6],
                         // exp capacity pseudoparameters
                         'inf_labor_asymptote': [0, 1000000],
                         'inf_compute_asymptote': [0, 1000000],
@@ -2088,7 +2104,7 @@
                 if (precise) {
                     // Switching to precise numeric inputs
                     let newVal = current;
-                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes') {
+                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes' || id === 'saturation_horizon_minutes') {
                         // Convert from log slider value to actual value
                         newVal = Math.pow(10, current);
                     }
@@ -2113,7 +2129,7 @@
                 } else {
                     // Switching back to slider inputs
                     let newVal = current;
-                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes') {
+                    if (id === 'coding_labor_normalization' || id === 'sc_time_horizon_minutes' || id === 'saturation_horizon_minutes') {
                         // Convert from actual value back to log slider value
                         newVal = Math.log10(Math.max(current, id === 'coding_labor_normalization' ? 1e-5 : 1));
                     }
@@ -2150,6 +2166,7 @@
                 'ai_research_taste_at_superhuman_coder': { min: 0.1, max: 5, value: 0.95 },
                 'ai_research_taste_slope': { min: 0.1, max: 10, value: 1.2 },
                 'sc_time_horizon_minutes': { min: 3, max: 6, value: 4.7 },  // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
+                'saturation_horizon_minutes': { min: 3, max: 6, value: 4.016 },
                 // Manual horizon fitting parameters
                 'present_day': { min: 2020.0, max: 2030.0, value: 2025.25 },
                 'present_horizon': { min: 0.01, max: 10000.0, value: 1000.0 },  // Default to reasonable value

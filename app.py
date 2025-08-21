@@ -1798,6 +1798,7 @@ def params_to_dict(params: Parameters):
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
         'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
+        'saturation_horizon_minutes': params.saturation_horizon_minutes,
         'horizon_extrapolation_type': params.horizon_extrapolation_type,
         # Manual horizon fitting parameters
         'present_day': params.present_day,
@@ -1930,7 +1931,7 @@ def get_parameter_config():
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'automation_interp_types': ['exponential', 'linear'],
-            'saturation_horizon_minutes': cfg.SATURATION_HORIZON_MINUTES,
+            'saturation_horizon_minutes': cfg.DEFAULT_PARAMETERS['saturation_horizon_minutes'],
             'descriptions': {
                 'rho_coding_labor': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -2144,28 +2145,29 @@ def select_data():
         dataset = data.get('dataset', 'default')
 
         import os
-        base_dir = os.path.join(os.path.dirname(__file__), 'inputs')
+        base_dir = os.path.dirname(__file__)
+        inputs_dir = os.path.join(base_dir, 'inputs')
 
+        # Map datasets to absolute file paths. Note: the "default" CSV lives at project root.
         dataset_to_file = {
-            'default': 'input_data.csv',
-            'updated_default': 'updated_default.csv',
-            'truncated_default': 'truncated_default.csv',
-            'pretrain_russia': 'pretrain_russia.csv',
-            'pretrain_us_black_site': 'pretrain_us_black_site.csv',
-            'pretrain_cn_black_site': 'pretrain_cn_black_site.csv',
-            'rl_russia': 'rl_russia.csv',
-            'rl_us_black_site': 'rl_us_black_site.csv',
-            'rl_cn_black_site': 'rl_cn_black_site.csv'
+            'default': os.path.join(base_dir, 'input_data.csv'),
+            'updated_default': os.path.join(inputs_dir, 'updated_default.csv'),
+            'truncated_default': os.path.join(inputs_dir, 'truncated_default.csv'),
+            'pretrain_russia': os.path.join(inputs_dir, 'pretrain_russia.csv'),
+            'pretrain_us_black_site': os.path.join(inputs_dir, 'pretrain_us_black_site.csv'),
+            'pretrain_cn_black_site': os.path.join(inputs_dir, 'pretrain_cn_black_site.csv'),
+            'rl_russia': os.path.join(inputs_dir, 'rl_russia.csv'),
+            'rl_us_black_site': os.path.join(inputs_dir, 'rl_us_black_site.csv'),
+            'rl_cn_black_site': os.path.join(inputs_dir, 'rl_cn_black_site.csv')
         }
 
         if dataset not in dataset_to_file:
             return jsonify({'success': False, 'error': f"Unknown dataset: {dataset}"}), 400
 
-        csv_filename = dataset_to_file[dataset]
-        csv_path = os.path.join(base_dir, csv_filename)
+        csv_path = dataset_to_file[dataset]
 
         if not os.path.exists(csv_path):
-            return jsonify({'success': False, 'error': f"Dataset file not found: {csv_filename}"}), 400
+            return jsonify({'success': False, 'error': f"Dataset file not found: {os.path.basename(csv_path)}"}), 400
 
         time_series = load_time_series_from_csv_path(csv_path)
         session_data['time_series'] = time_series

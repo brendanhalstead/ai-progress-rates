@@ -65,7 +65,6 @@ REFERENCE_LABOR_CHANGE = 30.0
 REFERENCE_COMPUTE_CHANGE = 0.1
 
 # benchmarks and gaps mode
-SATURATION_HORIZON_MINUTES = 10380.0
 
 # =============================================================================
 # MODEL RATE & VALUE CAPS
@@ -109,6 +108,7 @@ PARAMETER_BOUNDS = {
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
     'sc_time_horizon_minutes': (1000, 100000000000),
+    'saturation_horizon_minutes': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
@@ -206,6 +206,7 @@ DEFAULT_PARAMETERS = {
     # benchmarks and gaps mode
     'benchmarks_and_gaps_mode': False,
     'gap_size_ooms': 2.0,
+    'saturation_horizon_minutes': 10380.0,
 }
 
 # =============================================================================
