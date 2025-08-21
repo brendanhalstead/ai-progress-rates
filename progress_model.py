@@ -471,7 +471,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
         return w1 * X1 + w2 * X2
 
 
-def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, coding_labor_exponent: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
+def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, coding_labor_exponent: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
     """
     CES combination of AI and human labor using an alternative formulation inspired by
     the structure in FORMULAS.md: Y = ( (A^(1-rho) * L_AI^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
@@ -492,11 +492,11 @@ def compute_cognitive_output(automation_fraction: float, L_AI: float, L_HUMAN: f
         Cognitive output
     """
     if human_only:
-        return L_HUMAN ** coding_labor_exponent * cognitive_normalization 
+        return (L_HUMAN ** coding_labor_exponent) * cognitive_normalization 
     
     # Input validation
     if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, coding_labor_exponent, cognitive_normalization])):
-        logger.warning("Non-finite inputs to compute_cognitive_output")
+        logger.warning("Non-finite inputs to compute_coding_labor")
         return 0.0
     
     if L_AI < 0 or L_HUMAN < 0:
@@ -661,14 +661,14 @@ def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_com
     alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, coding_labor_exponent, current_exp_compute, current_coding_labor, rho)
     return rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent
 
-def compute_research_stock_rate(experiment_compute: float, cognitive_output: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
+def compute_research_stock_rate(experiment_compute: float, coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
     
     Args:
         experiment_compute: Experiment compute budget
-        cognitive_output: Output from cognitive work
+        coding_labor: Output from cognitive work
         alpha_experiment_capacity: Weight on experiment compute [0,1]
         rho: Standard substitution parameter in (-inf, 1].
              rho -> 1: perfect substitutes
@@ -681,11 +681,11 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
         Research stock growth rate RS'(t)
     """
     # Input validation
-    if not all(np.isfinite([experiment_compute, cognitive_output, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
+    if not all(np.isfinite([experiment_compute, coding_labor, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
         logger.warning("Non-finite inputs to compute_research_stock_rate")
         return 0.0
     
-    if experiment_compute < 0 or cognitive_output < 0:
+    if experiment_compute < 0 or coding_labor < 0:
         logger.warning("Negative inputs to compute_research_stock_rate")
         return 0.0
     
@@ -704,7 +704,7 @@ def compute_research_stock_rate(experiment_compute: float, cognitive_output: flo
     discounted_experiment_compute = np.power(experiment_compute, experiment_compute_exponent)
     
     # Use the generic CES function for computation
-    rate = _ces_function(discounted_experiment_compute, cognitive_output, alpha_experiment_capacity, rho)
+    rate = _ces_function(discounted_experiment_compute, coding_labor, alpha_experiment_capacity, rho)
     
     # Cap extremely large rates to prevent numerical issues
     if rate > cfg.MAX_RESEARCH_STOCK_RATE:
@@ -845,22 +845,22 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            cognitive_output_0 = compute_cognitive_output(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
-            logger.info(f"HUMAN-ONLY::: cognitive_output_0: {cognitive_output_0}")
+            coding_labor_0 = compute_coding_labor(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+            logger.info(f"HUMAN-ONLY::: coding_labor_0: {coding_labor_0}")
             initial_aggregate_research_taste = 1.0
         else:
             initial_automation = compute_automation_fraction(initial_progress, params)
             initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
             initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
-            cognitive_output_0 = compute_cognitive_output(
+            coding_labor_0 = compute_coding_labor(
                 initial_automation, L_AI_0, L_HUMAN_0, 
                 params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
             )
-            logger.info(f"ACTUAL::: cognitive_output_0: {cognitive_output_0}")
+            logger.info(f"ACTUAL::: coding_labor_0: {coding_labor_0}")
         
         # Calculate RS'(0)
         rs_rate_0 = compute_research_stock_rate(
-            experiment_compute_0, cognitive_output_0, 
+            experiment_compute_0, coding_labor_0, 
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
         
@@ -872,16 +872,16 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            cognitive_output_dt = compute_cognitive_output(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
-            logger.info(f"HUMAN-ONLY::: cognitive_output_dt: {cognitive_output_dt}")
+            coding_labor_dt = compute_coding_labor(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+            logger.info(f"HUMAN-ONLY::: coding_labor_dt: {coding_labor_dt}")
         else:
-            cognitive_output_dt = compute_cognitive_output(
+            coding_labor_dt = compute_coding_labor(
                 initial_automation, L_AI_dt, L_HUMAN_dt,
                 params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
             )
         
         rs_rate_dt = compute_research_stock_rate(
-            experiment_compute_dt, cognitive_output_dt,
+            experiment_compute_dt, coding_labor_dt,
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
         # logger.info(f"rs_rate_dt: {rs_rate_dt}, rs_rate_0: {rs_rate_0}, dt: {dt}")
@@ -928,7 +928,7 @@ class InitialConditions:
     L_AI: float
     experiment_compute: float
     training_compute_growth_rate: float
-    cognitive_output: float
+    coding_labor: float
     research_stock_rate: float
     research_stock: float
 
@@ -959,19 +959,19 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
-        research_stock_rate = compute_research_stock_rate(experiment_compute, cognitive_output, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
+        coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+        research_stock_rate = compute_research_stock_rate(experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
         initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
         initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
-        cognitive_output = compute_cognitive_output(
+        coding_labor = compute_coding_labor(
             initial_automation, L_AI, L_HUMAN, 
             params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
         )
     
         research_stock_rate = compute_research_stock_rate(
-            experiment_compute, cognitive_output, 
+            experiment_compute, coding_labor, 
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
     
@@ -991,7 +991,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         L_AI=L_AI,
         experiment_compute=experiment_compute,
         training_compute_growth_rate=training_compute_growth_rate,
-        cognitive_output=cognitive_output,
+        coding_labor=coding_labor,
         research_stock_rate=research_stock_rate,
         research_stock=research_stock
     )
@@ -1022,7 +1022,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      (swe_multiplier)**params.coding_labor_exponent * compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True) = compute_cognitive_output(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization)
+      (swe_multiplier)**params.coding_labor_exponent * compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True) = compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization)
     where p = params.rho_coding_labor.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
@@ -1037,13 +1037,13 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier**params.coding_labor_exponent * compute_cognitive_output(0, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+    target_output = swe_multiplier**params.coding_labor_exponent * compute_coding_labor(0, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
         """Return the difference between target and actual cognitive output"""
         try:
-            actual_output = compute_cognitive_output(
+            actual_output = compute_coding_labor(
                 A_candidate, L_AI, L_HUMAN, 
                 params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
             )
@@ -1505,7 +1505,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            cognitive_output = compute_cognitive_output(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)  
+            coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -1518,17 +1518,17 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
             
             # Compute cognitive output with validation
-            cognitive_output = compute_cognitive_output(
+            coding_labor = compute_coding_labor(
                 automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
             )
         
-        if not np.isfinite(cognitive_output) or cognitive_output < 0:
-            logger.warning(f"Invalid cognitive output: {cognitive_output}")
+        if not np.isfinite(coding_labor) or coding_labor < 0:
+            logger.warning(f"Invalid cognitive output: {coding_labor}")
             return [0.0, 0.0]
         
-        # Compute research stock rate (dRS/dt) with validation
+        # Compute research stock rate (dRS/dt) with validation, now named research effort
         research_stock_rate = compute_research_stock_rate(
-            experiment_compute, cognitive_output, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, aggregate_research_taste
+            experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, aggregate_research_taste
         )
         
         if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
@@ -1593,7 +1593,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     Returns:
         Tuple of (times, cumulative_progress_values, research_stock_values)
     """
-    # Use utility function to compute initial conditions
+    # Use helper function to get initial research stock
     initial_conditions = compute_initial_conditions(time_series_data, params, initial_progress)
     initial_research_stock_rate = initial_conditions.research_stock_rate
     initial_research_stock = initial_conditions.research_stock
@@ -1754,6 +1754,9 @@ class ProgressModel:
     """Main class for AI progress modeling"""
     
     def __init__(self, params: Parameters, time_series_data: TimeSeriesData):
+        """
+        Time series data is from the capabilities input spreadsheet.
+        """
         self.params = params
         self.data = time_series_data
         self.human_only_results = {}
@@ -2473,6 +2476,8 @@ class ProgressModel:
             self.params.horizon_extrapolation_type = "exponential"
 
         # next compute human-only trajectory
+        # Need to do this for various reasons, e.g. to auto-fit the METR trajectory you need to the (effective compute, horizon) pairs (we assume no automation)
+        # Also if we want to specify current doubling time or gap size in years rather than progress units, need to know how much EC was increased in present day
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
         
         # estimate horizon trajectory from METR data using human-only trajectory
@@ -2498,6 +2503,8 @@ class ProgressModel:
         }
         logger.info(f"Automation anchors: {automation_anchors}")
         self.params.automation_anchors = automation_anchors
+        # Below gives you at each time what is the effectige compute value and what is the research stock value. It runs the whole model.
+        # With just time -> effective compute and research stock, you can compute all the other metrics.
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
@@ -2527,7 +2534,7 @@ class ProgressModel:
         ai_research_taste_sds = []
         ai_research_taste_quantiles = []
         aggregate_research_tastes = []
-        cognitive_outputs = []
+        coding_labors = []
         software_progress_rates = []
         software_efficiency = []  # Integral of software_progress_rate
         human_only_research_stock_rates = []
@@ -2535,7 +2542,7 @@ class ProgressModel:
         human_only_progress_rates = []
         ai_labor_contributions = []
         human_labor_contributions = []
-        ai_cognitive_output_multipliers = []
+        ai_coding_labor_multipliers = []
         ai_research_stock_multipliers = []
         ai_software_progress_multipliers = []
         ai_overall_progress_multipliers = []
@@ -2584,11 +2591,11 @@ class ProgressModel:
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute cognitive output
-                cognitive_output = compute_cognitive_output(
+                coding_labor = compute_coding_labor(
                     automation_fraction, L_AI, L_HUMAN, 
                     self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization
                 )
-                cognitive_outputs.append(cognitive_output if np.isfinite(cognitive_output) else 0.0)
+                coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 
                 # Compute software progress rate
                 current_research_stock_rate = research_stock_rates[i]
@@ -2613,10 +2620,10 @@ class ProgressModel:
                 software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_cognitive_output = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
+                human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_stock_rate = compute_research_stock_rate(
-                    experiment_compute, human_only_cognitive_output, 
+                    experiment_compute, human_only_coding_labor, 
                     self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste
                 )
                 human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
@@ -2636,14 +2643,14 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = compute_cognitive_output(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
-                ai_contrib = max(0.0, cognitive_output - human_contrib)  # Ensure non-negative
+                human_contrib = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
+                ai_contrib = max(0.0, coding_labor - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
                 ai_labor_contributions.append(ai_contrib)
 
                 # Calculate automation multipliers on various quantities
-                ai_cognitive_output_multipliers.append((cognitive_output / human_contrib)**(1.0/self.params.coding_labor_exponent) if ai_contrib > 0 else 0.0)
+                ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.coding_labor_exponent) if ai_contrib > 0 else 0.0)
                 ai_research_stock_multipliers.append(research_stock_rates[i] / human_only_research_stock_rate if human_only_research_stock_rate > 0 else 0.0)
                 ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
@@ -2700,7 +2707,7 @@ class ProgressModel:
                 ai_research_taste_sds.append(0.0)
                 ai_research_taste_quantiles.append(0.0)
                 aggregate_research_tastes.append(cfg.AGGREGATE_RESEARCH_TASTE_FALLBACK)  # Default to no enhancement
-                cognitive_outputs.append(0.0)
+                coding_labors.append(0.0)
                 software_progress_rates.append(0.0)
                 software_efficiency.append(0.0)
                 human_only_progress_rates.append(0.0)
@@ -2708,7 +2715,7 @@ class ProgressModel:
                 human_only_software_progress_rates.append(0.0)
                 human_labor_contributions.append(0.0)
                 ai_labor_contributions.append(0.0)
-                ai_cognitive_output_multipliers.append(0.0)
+                ai_coding_labor_multipliers.append(0.0)
                 ai_research_stock_multipliers.append(0.0)
                 ai_software_progress_multipliers.append(0.0)
                 ai_overall_progress_multipliers.append(0.0)
@@ -2800,13 +2807,13 @@ class ProgressModel:
             'aggregate_research_taste': aggregate_research_tastes,
             'progress_rates': progress_rates,
             'research_stock_rates': research_stock_rates,
-            'cognitive_outputs': cognitive_outputs,
+            'coding_labors': coding_labors,
             'software_progress_rates': software_progress_rates,
             'software_efficiency': software_efficiency,
             'human_only_progress_rates': human_only_progress_rates,
             'ai_labor_contributions': ai_labor_contributions,
             'human_labor_contributions': human_labor_contributions,
-            'ai_cognitive_output_multipliers': ai_cognitive_output_multipliers,
+            'ai_coding_labor_multipliers': ai_coding_labor_multipliers,
             'ai_research_stock_multipliers': ai_research_stock_multipliers,
             'ai_software_progress_multipliers': ai_software_progress_multipliers,
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
@@ -2906,8 +2913,8 @@ class ProgressModel:
             model_value = self.results['progress_rates'][time_idx]
         elif target_key == 'automation_fraction':
             model_value = self.results['automation_fraction'][time_idx]
-        elif target_key == 'cognitive_output':
-            model_value = self.results['cognitive_outputs'][time_idx]
+        elif target_key == 'coding_labor':
+            model_value = self.results['coding_labors'][time_idx]
         else:
             raise ValueError(f"Unknown target variable: {target_key}")
         

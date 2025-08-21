@@ -16,7 +16,7 @@ The model consists of several key components:
    - `AnchorConstraint`: Constraints for parameter estimation
 
 2. **Production Functions**:
-   - `compute_cognitive_output()`: CES combination of AI and human labor
+   - `compute_coding_labor()`: CES combination of AI and human labor
    - `compute_software_progress_rate()`: CES combination of compute and cognitive work
    - `compute_overall_progress_rate()`: Weighted average of software and training progress
 

@@ -93,7 +93,7 @@ ODE_STEP_VARIATION_THRESHOLD = 100.0  # Threshold for warning about step size va
 # =============================================================================
 RELATIVE_ERROR_CLIP = 100.0
 
-# Parameter bounds for optimization
+# Parameter bounds for optimization, determines bounds for website sliders
 PARAMETER_BOUNDS = {
     'rho_coding_labor': (-10, 0),
     'rho_experiment_capacity': (-1, 1),
@@ -166,7 +166,7 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 }
 
 # =============================================================================
-# DEFAULT MODEL PARAMETERS
+# DEFAULT MODEL PARAMETERS (FOR BOTH WEBSITE AND MONTE CARLO)
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_coding_labor': -2,
@@ -210,7 +210,7 @@ DEFAULT_PARAMETERS = {
 }
 
 # =============================================================================
-# PLOT CONFIGURATION - SINGLE SOURCE OF TRUTH
+# WEBSITE PLOT CONFIGURATION - SINGLE SOURCE OF TRUTH
 # =============================================================================
 
 PLOT_METADATA = {
@@ -319,23 +319,23 @@ PLOT_METADATA = {
     },
     
     # Cognitive Output plots
-    'plot_cognitive_output_with_compute': {
+    'plot_coding_labor_with_compute': {
         'title': 'Inputs to Experiment Capacity',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
-        'data_keys': ['times', 'cognitive_outputs']
+        'data_keys': ['times', 'coding_labors']
     },
     'plot_cognitive_components': {
         'title': 'Normalized Coding Labor, Humans and AIs',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
-        'data_keys': ['times', 'cognitive_outputs', 'human_labor_contributions']
+        'data_keys': ['times', 'coding_labors', 'human_labor_contributions']
     },
-    'plot_ai_cognitive_output_multiplier': {
+    'plot_ai_coding_labor_multiplier': {
         'title': 'AI Parallel Coding Labor Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Coding labor per human', 'type': 'log'},
-        'data_keys': ['times', 'ai_cognitive_output_multipliers']
+        'data_keys': ['times', 'ai_coding_labor_multipliers']
     },
     
     # Software R&D plots
@@ -407,7 +407,7 @@ PLOT_METADATA = {
         'title': 'All AI Multipliers',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
-        'data_keys': ['times', 'ai_cognitive_output_multipliers', 'ai_research_stock_multipliers', 
+        'data_keys': ['times', 'ai_coding_labor_multipliers', 'ai_research_stock_multipliers', 
                      'ai_software_progress_multipliers', 'ai_overall_progress_multipliers']
     },
     'plot_human_only_progress_rate': {
@@ -498,14 +498,14 @@ We assume that research taste (in these units) is lognormally distributed among 
 Average of the research taste distribution, after replacing sub-AI human researchers with AI researchers.
         """
     },
-    'cognitive_output': {
+    'coding_labor': {
         'id': 'cognitive-output',
         'name': 'Coding Labor',
         'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_labor_comparison', 'position': (1, 1)},
             {'function': 'plot_automation_fraction', 'position': (1, 2)},
-            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (2, 1)},
+            {'function': 'plot_ai_coding_labor_multiplier', 'position': (2, 1)},
             {'function': 'plot_cognitive_components', 'position': (2, 2)}
         ],
         'explanation': """
@@ -530,7 +530,7 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
         'name': 'Research Effort',
         'rows': 2, 'cols': 2,
         'plots': [
-            {'function': 'plot_cognitive_output_with_compute', 'position': (1, 1)},
+            {'function': 'plot_coding_labor_with_compute', 'position': (1, 1)},
             
             {'function': 'plot_experiment_capacity', 'position': (1, 2)},
             {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
@@ -581,7 +581,7 @@ The cumulative OOMs of effective compute feeds back into the functions that dete
         'name': 'Other Metrics',
         'rows': 3, 'cols': 2,
         'plots': [
-            {'function': 'plot_ai_cognitive_output_multiplier', 'position': (1, 1)},
+            {'function': 'plot_ai_coding_labor_multiplier', 'position': (1, 1)},
             {'function': 'plot_ai_software_progress_multiplier', 'position': (1, 2)},
             {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
             {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},

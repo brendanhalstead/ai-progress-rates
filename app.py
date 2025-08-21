@@ -26,7 +26,7 @@ import yaml
 from progress_model import (
     ProgressModel, Parameters, TimeSeriesData, 
     AnchorConstraint,
-    progress_rate_at_time, compute_cognitive_output,
+    progress_rate_at_time, compute_coding_labor,
     compute_software_progress_rate, compute_automation_fraction,
     compute_research_stock_rate, compute_overall_progress_rate,
     calculate_initial_research_stock, setup_model, compute_initial_conditions
@@ -349,10 +349,10 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                 row=row, col=col
             )
 
-def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, secondary_y=False):
+def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondary_y=False):
     """Plot cognitive output with discounted experiment compute"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
+        go.Scatter(x=times.tolist(), y=coding_labors.tolist(),
                   name='Normalized Coding Labor',
                   line=dict(color='#9467bd', width=3),
                   mode='lines+markers', marker=dict(size=4),
@@ -379,8 +379,8 @@ def plot_cognitive_output_with_compute(fig, times, cognitive_outputs, row, col, 
         sc_time = results['sc_time']
         sc_progress = results.get('sc_progress_level')
         if sc_time >= times.min() and sc_time <= times.max():
-            y_min = min(cognitive_outputs.min(), min(results.get('discounted_exp_compute', [cognitive_outputs.min()])))
-            y_max = max(cognitive_outputs.max(), max(results.get('discounted_exp_compute', [cognitive_outputs.max()])))
+            y_min = min(coding_labors.min(), min(results.get('discounted_exp_compute', [coding_labors.min()])))
+            y_max = max(coding_labors.max(), max(results.get('discounted_exp_compute', [coding_labors.max()])))
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
@@ -422,10 +422,10 @@ def plot_rate_components(fig, times, progress_rates, training_compute_growth_rat
         row=row, col=col
     )
 
-def plot_cognitive_components(fig, times, cognitive_outputs, human_labor_contributions, row, col):
+def plot_cognitive_components(fig, times, coding_labors, human_labor_contributions, row, col):
     """Plot cognitive output components (AI vs Human)"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=cognitive_outputs.tolist(),
+        go.Scatter(x=times.tolist(), y=coding_labors.tolist(),
                   name='Humans and AIs',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines',
@@ -449,8 +449,8 @@ def plot_cognitive_components(fig, times, cognitive_outputs, human_labor_contrib
         sc_time = results['sc_time']
         sc_progress = results.get('sc_progress_level')
         if sc_time >= times.min() and sc_time <= times.max():
-            y_min = min(cognitive_outputs.min(), human_labor_contributions.min())
-            y_max = max(cognitive_outputs.max(), human_labor_contributions.max())
+            y_min = min(coding_labors.min(), human_labor_contributions.min())
+            y_max = max(coding_labors.max(), human_labor_contributions.max())
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
@@ -571,10 +571,10 @@ def plot_automation_multiplier(fig, times, automation_multipliers, row, col):
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
 
-def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipliers, row, col):
+def plot_ai_coding_labor_multiplier(fig, times, ai_coding_labor_multipliers, row, col):
     """Plot AI cognitive output multiplier over time"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
+        go.Scatter(x=times.tolist(), y=ai_coding_labor_multipliers.tolist(),
                   name='AI Cognitive Output Multiplier',
                   line=dict(color='#9467bd', width=3),
                   mode='lines+markers', marker=dict(size=4),
@@ -593,7 +593,7 @@ def plot_ai_cognitive_output_multiplier(fig, times, ai_cognitive_output_multipli
         if sc_time >= times.min() and sc_time <= times.max():
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
-                          y=[ai_cognitive_output_multipliers.min(), ai_cognitive_output_multipliers.max()],
+                          y=[ai_coding_labor_multipliers.min(), ai_coding_labor_multipliers.max()],
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
@@ -691,11 +691,11 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
                 row=row, col=col
             )
 
-def plot_all_ai_multipliers(fig, times, ai_cognitive_output_multipliers, ai_research_stock_multipliers, 
+def plot_all_ai_multipliers(fig, times, ai_coding_labor_multipliers, ai_research_stock_multipliers, 
                            ai_software_progress_multipliers, ai_overall_progress_multipliers, row, col):
     """Plot all AI multipliers on the same chart for comparison"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=ai_cognitive_output_multipliers.tolist(),
+        go.Scatter(x=times.tolist(), y=ai_coding_labor_multipliers.tolist(),
                   name='Cognitive Output',
                   line=dict(color='#9467bd', width=2),
                   mode='lines',
@@ -1379,9 +1379,9 @@ def get_tab_configurations():
         'plot_ai_research_taste_quantile': lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c),
         'plot_aggregate_research_taste': lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c),
         'plot_ai_vs_aggregate_research_taste': lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c),
-        'plot_cognitive_output_with_compute': lambda fig, data, r, c: plot_cognitive_output_with_compute(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], r, c),
-        'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['cognitive_outputs'], data['metrics']['human_labor_contributions'], r, c),
-        'plot_ai_cognitive_output_multiplier': lambda fig, data, r, c: plot_ai_cognitive_output_multiplier(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], r, c),
+        'plot_coding_labor_with_compute': lambda fig, data, r, c: plot_coding_labor_with_compute(fig, data['metrics']['times'], data['metrics']['coding_labors'], r, c),
+        'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['coding_labors'], data['metrics']['human_labor_contributions'], r, c),
+        'plot_ai_coding_labor_multiplier': lambda fig, data, r, c: plot_ai_coding_labor_multiplier(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], r, c),
         'plot_research_stock': lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c),
         'plot_research_stock_rate': lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c),
         'plot_experiment_capacity': lambda fig, data, r, c: plot_experiment_capacity(fig, data['metrics']['times'], data['metrics']['experiment_capacity'], r, c),
@@ -1392,7 +1392,7 @@ def get_tab_configurations():
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
         'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
         'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),
-        'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_cognitive_output_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
+        'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
         'plot_human_only_progress_rate': lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c),
         'plot_automation_multiplier': lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c),
     }
@@ -1677,7 +1677,7 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any], time_range: List[float] 
     
     # Special handling for AI multipliers - default to 1.0 instead of 0
     ai_multiplier_keys = [
-        'ai_cognitive_output_multipliers',
+        'ai_coding_labor_multipliers',
         'ai_research_stock_multipliers', 
         'ai_software_progress_multipliers',
         'ai_overall_progress_multipliers'
@@ -2203,7 +2203,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'cognitive_output', 'research_stock', 'research_stock_rate', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'coding_labor', 'research_stock', 'research_stock_rate', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
         
         # Write metadata header with SC information if available
         if results.get('sc_time') is not None:
@@ -2225,8 +2225,8 @@ def export_csv():
                 row.append(0.0)
             
             # Add cognitive output if available
-            if 'cognitive_outputs' in results and i < len(results['cognitive_outputs']):
-                row.append(results['cognitive_outputs'][i])
+            if 'coding_labors' in results and i < len(results['coding_labors']):
+                row.append(results['coding_labors'][i])
             else:
                 row.append(0.0)
 
