@@ -661,7 +661,7 @@ def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_com
     alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, coding_labor_exponent, current_exp_compute, current_coding_labor, rho)
     return rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent
 
-def compute_research_stock_rate(experiment_compute: float, coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
+def compute_research_effort(experiment_compute: float, coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
@@ -682,11 +682,11 @@ def compute_research_stock_rate(experiment_compute: float, coding_labor: float, 
     """
     # Input validation
     if not all(np.isfinite([experiment_compute, coding_labor, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
-        logger.warning("Non-finite inputs to compute_research_stock_rate")
+        logger.warning("Non-finite inputs to compute_research_effort")
         return 0.0
     
     if experiment_compute < 0 or coding_labor < 0:
-        logger.warning("Negative inputs to compute_research_stock_rate")
+        logger.warning("Negative inputs to compute_research_effort")
         return 0.0
     
     if aggregate_research_taste < 0:
@@ -707,38 +707,38 @@ def compute_research_stock_rate(experiment_compute: float, coding_labor: float, 
     rate = _ces_function(discounted_experiment_compute, coding_labor, alpha_experiment_capacity, rho)
     
     # Cap extremely large rates to prevent numerical issues
-    if rate > cfg.MAX_RESEARCH_STOCK_RATE:
-        logger.warning(f"Very large research stock rate {rate}, capping to {cfg.MAX_RESEARCH_STOCK_RATE}")
-        rate = cfg.MAX_RESEARCH_STOCK_RATE
+    if rate > cfg.MAX_RESEARCH_EFFORT:
+        logger.warning(f"Very large research stock rate {rate}, capping to {cfg.MAX_RESEARCH_EFFORT}")
+        rate = cfg.MAX_RESEARCH_EFFORT
     
     # Apply aggregate research taste multiplier
     final_rate = rate * aggregate_research_taste
     
     # Apply final cap to prevent numerical issues with the multiplied result
-    if final_rate > cfg.MAX_RESEARCH_STOCK_RATE:
-        logger.warning(f"Very large final research stock rate {final_rate}, capping to {cfg.MAX_RESEARCH_STOCK_RATE}")
-        final_rate = cfg.MAX_RESEARCH_STOCK_RATE
+    if final_rate > cfg.MAX_RESEARCH_EFFORT:
+        logger.warning(f"Very large final research stock rate {final_rate}, capping to {cfg.MAX_RESEARCH_EFFORT}")
+        final_rate = cfg.MAX_RESEARCH_EFFORT
         
     return final_rate
 
 
-def compute_software_progress_rate(research_stock: float, research_stock_rate: float, 
-                                 initial_research_stock: float, initial_research_stock_rate: float,
+def compute_software_progress_rate(research_stock: float, research_effort: float, 
+                                 initial_research_stock: float, initial_research_effort: float,
                                  r_software: float) -> float:
     """
     Compute software progress rate using research stock formulation:
-    S(t) = RS'(t) / RS(t) * s
+    S(t) = RS'(t) / RS(t) * r_software
     
     Args:
         research_stock: Current research stock RS(t)
-        research_stock_rate: Current research stock rate RS'(t)
+        research_effort: Current research stock rate RS'(t)
         r_software: Software progress share parameter s [0.1,10]
     
     Returns:
-        Software progress rate multiplied by s
+        Software progress rate multiplied by r_software
     """
     # Input validation
-    if not all(np.isfinite([research_stock, research_stock_rate, initial_research_stock, initial_research_stock_rate, r_software])):
+    if not all(np.isfinite([research_stock, research_effort, initial_research_stock, initial_research_effort, r_software])):
         logger.warning("Non-finite inputs to compute_software_progress_rate")
         return 0.0
     
@@ -746,7 +746,7 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
         logger.warning("Non-positive research stock values")
         return 0.0
     
-    if initial_research_stock_rate <= 0:
+    if initial_research_effort <= 0:
         logger.warning("Non-positive initial research stock rate")
         return 0.0
     
@@ -756,7 +756,7 @@ def compute_software_progress_rate(research_stock: float, research_stock_rate: f
     
     # Compute software progress rate using research stock ratio formula
     try:
-        numerator = research_stock_rate
+        numerator = research_effort
         denominator = research_stock
         
         if denominator == 0:
@@ -859,7 +859,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             logger.info(f"ACTUAL::: coding_labor_0: {coding_labor_0}")
         
         # Calculate RS'(0)
-        rs_rate_0 = compute_research_stock_rate(
+        rs_rate_0 = compute_research_effort(
             experiment_compute_0, coding_labor_0, 
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
@@ -880,7 +880,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
                 params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
             )
         
-        rs_rate_dt = compute_research_stock_rate(
+        rs_rate_dt = compute_research_effort(
             experiment_compute_dt, coding_labor_dt,
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
@@ -929,7 +929,7 @@ class InitialConditions:
     experiment_compute: float
     training_compute_growth_rate: float
     coding_labor: float
-    research_stock_rate: float
+    research_effort: float
     research_stock: float
 
 def compute_initial_conditions(time_series_data: TimeSeriesData, params: Parameters, 
@@ -960,7 +960,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
         coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
-        research_stock_rate = compute_research_stock_rate(experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
+        research_effort = compute_research_effort(experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
         initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
@@ -970,15 +970,15 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
             params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
         )
     
-        research_stock_rate = compute_research_stock_rate(
+        research_effort = compute_research_effort(
             experiment_compute, coding_labor, 
             params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste
         )
     
     # Validate and fallback for research stock rate
-    if not np.isfinite(research_stock_rate) or research_stock_rate <= 0:
-        logger.warning(f"Invalid initial research stock rate ({research_stock_rate}), using fallback 1.0")
-        research_stock_rate = 1.0
+    if not np.isfinite(research_effort) or research_effort <= 0:
+        logger.warning(f"Invalid initial research stock rate ({research_effort}), using fallback 1.0")
+        research_effort = 1.0
     
     # Calculate initial research stock
     research_stock = calculate_initial_research_stock(time_series_data, params, initial_progress)
@@ -992,7 +992,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         experiment_compute=experiment_compute,
         training_compute_growth_rate=training_compute_growth_rate,
         coding_labor=coding_labor,
-        research_stock_rate=research_stock_rate,
+        research_effort=research_effort,
         research_stock=research_stock
     )
 
@@ -1422,7 +1422,7 @@ def compute_aggregate_research_taste(ai_research_taste: float,
 
 
 def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSeriesData, params: Parameters, 
-                         initial_research_stock_rate: Optional[float] = None, 
+                         initial_research_effort: Optional[float] = None, 
                          initial_research_stock: Optional[float] = None) -> List[float]:
     """
     Compute instantaneous rates for both progress and research stock.
@@ -1433,7 +1433,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         state: [cumulative_progress, research_stock]
         time_series_data: Input time series
         params: Model parameters
-        initial_research_stock_rate: RS'(0) needed for software progress calculation
+        initial_research_effort: RS'(0) needed for software progress calculation
         initial_research_stock: RS(0) calculated initial research stock value
     
     Returns:
@@ -1527,23 +1527,23 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             return [0.0, 0.0]
         
         # Compute research stock rate (dRS/dt) with validation, now named research effort
-        research_stock_rate = compute_research_stock_rate(
+        research_effort = compute_research_effort(
             experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, aggregate_research_taste
         )
         
-        if not np.isfinite(research_stock_rate) or research_stock_rate < 0:
-            logger.warning(f"Invalid research stock rate: {research_stock_rate}")
+        if not np.isfinite(research_effort) or research_effort < 0:
+            logger.warning(f"Invalid research stock rate: {research_effort}")
             return [0.0, 0.0]
         
         # Compute software progress rate using research stock formulation
-        if initial_research_stock_rate is None or initial_research_stock_rate <= 0:
+        if initial_research_effort is None or initial_research_effort <= 0:
             logger.warning("No valid initial research stock rate provided, using fallback")
             # Fallback: use current rate as approximation
-            software_progress_rate = research_stock_rate
+            software_progress_rate = research_effort
         else:
             software_progress_rate = compute_software_progress_rate(
-                research_stock, research_stock_rate, 
-                initial_research_stock, initial_research_stock_rate,
+                research_stock, research_effort, 
+                initial_research_stock, initial_research_effort,
                 params.r_software
             )
         
@@ -1567,9 +1567,9 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             overall_rate = cfg.MAX_NORMALIZED_PROGRESS_RATE
         
         logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
-                    f"automation={automation_fraction:.3f}, dP/dt={overall_rate:.3f}, dRS/dt={research_stock_rate:.3f}")
+                    f"automation={automation_fraction:.3f}, dP/dt={overall_rate:.3f}, dRS/dt={research_effort:.3f}")
         
-        return [overall_rate, research_stock_rate]
+        return [overall_rate, research_effort]
         
     except Exception as e:
         logger.error(f"Error computing rates at t={t}, state={state}: {e}")
@@ -1581,7 +1581,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     """
     Solve the coupled differential equation system with robust fallback methods:
     d(progress)/dt = progress_rate(t, progress, research_stock)
-    d(research_stock)/dt = research_stock_rate(t, progress, research_stock)
+    d(research_stock)/dt = research_effort(t, progress, research_stock)
     
     Args:
         time_range: [start_time, end_time]
@@ -1595,12 +1595,12 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
     """
     # Use helper function to get initial research stock
     initial_conditions = compute_initial_conditions(time_series_data, params, initial_progress)
-    initial_research_stock_rate = initial_conditions.research_stock_rate
+    initial_research_effort = initial_conditions.research_effort
     initial_research_stock = initial_conditions.research_stock
     
     def ode_func(t, y):
         try:
-            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate, initial_research_stock)
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_effort, initial_research_stock)
             # Validate the rates
             if len(rates) != 2 or not all(np.isfinite(rate) and rate >= 0 for rate in rates):
                 logger.warning(f"Invalid rates {rates} at time {t}, state {y}")
@@ -1625,7 +1625,7 @@ def integrate_progress(time_range: List[float], initial_progress: float, time_se
                 logger.warning(f"Research stock {y[1]} too large at time {t}, clamping")
                 y[1] = cfg.RESEARCH_STOCK_ODE_CLAMP_MAX
             
-            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_stock_rate, initial_research_stock)
+            rates = progress_rate_at_time(t, y, time_series_data, params, initial_research_effort, initial_research_stock)
             
             # Clamp rates to reasonable bounds
             for i in range(len(rates)):
@@ -2389,18 +2389,18 @@ class ProgressModel:
 
         # human-only initial conditions
         initial_conditions = compute_initial_conditions(self.data, human_only_params, initial_progress)
-        initial_research_stock_rate_val = initial_conditions.research_stock_rate
+        initial_research_effort_val = initial_conditions.research_effort
         initial_research_stock_val = initial_conditions.research_stock
-        logger.info(f"HUMAN-ONLY::: initial_research_stock_val: {initial_research_stock_val}, initial_research_stock_rate_val: {initial_research_stock_rate_val}")
+        logger.info(f"HUMAN-ONLY::: initial_research_stock_val: {initial_research_stock_val}, initial_research_effort_val: {initial_research_effort_val}")
         progress_rates = []
-        research_stock_rates = []
+        research_efforts = []
 
         # human-only metrics
         for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             state = [p, rs]
-            rates = progress_rate_at_time(t, state, self.data, human_only_params, initial_research_stock_rate_val, initial_research_stock_val)
+            rates = progress_rate_at_time(t, state, self.data, human_only_params, initial_research_effort_val, initial_research_stock_val)
             progress_rates.append(rates[0])
-            research_stock_rates.append(rates[1])
+            research_efforts.append(rates[1])
         
         # Anchor stats at params.present_day
         present_day = human_only_params.present_day
@@ -2421,7 +2421,7 @@ class ProgressModel:
             'progress': progress_values,
             'research_stock': research_stock_values,
             'progress_rates': progress_rates,
-            'research_stock_rates': research_stock_rates,
+            'research_efforts': research_efforts,
             'anchor_stats': {
                 'progress': anchor_progress,
                 'progress_rate': anchor_progress_rate,
@@ -2522,13 +2522,13 @@ class ProgressModel:
         
         # Use utility function to compute initial conditions with the correct parameters
         initial_conditions = compute_initial_conditions(self.data, self.params, initial_progress)
-        initial_research_stock_rate_val = initial_conditions.research_stock_rate
+        initial_research_effort_val = initial_conditions.research_effort
         initial_research_stock_val = initial_conditions.research_stock
-        logger.info(f"ACTUAL::: initial_research_stock_val: {initial_research_stock_val}, initial_research_stock_rate_val: {initial_research_stock_rate_val}")
+        logger.info(f"ACTUAL::: initial_research_stock_val: {initial_research_stock_val}, initial_research_effort_val: {initial_research_effort_val}")
 
         # Calculate all metrics in a single pass to avoid redundancy
         progress_rates = []
-        research_stock_rates = []
+        research_efforts = []
         automation_fractions = []
         ai_research_tastes = []
         ai_research_taste_sds = []
@@ -2537,7 +2537,7 @@ class ProgressModel:
         coding_labors = []
         software_progress_rates = []
         software_efficiency = []  # Integral of software_progress_rate
-        human_only_research_stock_rates = []
+        human_only_research_efforts = []
         human_only_software_progress_rates = []
         human_only_progress_rates = []
         ai_labor_contributions = []
@@ -2557,9 +2557,9 @@ class ProgressModel:
         for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
                 state = [p, rs]
-                rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_stock_rate_val, initial_research_stock_val)
+                rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_effort_val, initial_research_stock_val)
                 progress_rates.append(rates[0])
-                research_stock_rates.append(rates[1])
+                research_efforts.append(rates[1])
                 
                 # Compute automation fraction
                 automation_fraction = compute_automation_fraction(p, self.params)
@@ -2575,9 +2575,9 @@ class ProgressModel:
                 ai_research_taste_quantiles.append(ai_research_taste_quantile if np.isfinite(ai_research_taste_quantile) else 0.0)
                 aggregate_research_tastes.append(aggregate_research_taste)
                 
-                # Compute experiment capacity (research_stock_rate / aggregate_research_taste)
-                current_research_stock_rate = research_stock_rates[i]
-                exp_capacity = current_research_stock_rate / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
+                # Compute experiment capacity (research_effort / aggregate_research_taste)
+                current_research_effort = research_efforts[i]
+                exp_capacity = current_research_effort / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
                 experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
                 
                 # Interpolate input time series to current time
@@ -2598,11 +2598,11 @@ class ProgressModel:
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 
                 # Compute software progress rate
-                current_research_stock_rate = research_stock_rates[i]
+                current_research_effort = research_efforts[i]
                 software_rate = compute_software_progress_rate(
-                    rs, current_research_stock_rate, 
+                    rs, current_research_effort, 
                     initial_research_stock_val, 
-                    initial_research_stock_rate_val,
+                    initial_research_effort_val,
                     self.params.r_software
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
@@ -2622,15 +2622,15 @@ class ProgressModel:
                 # Calculate human-only progress rate (with automation fraction = 0)
                 human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
-                human_only_research_stock_rate = compute_research_stock_rate(
+                human_only_research_effort = compute_research_effort(
                     experiment_compute, human_only_coding_labor, 
                     self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste
                 )
-                human_only_research_stock_rates.append(human_only_research_stock_rate if np.isfinite(human_only_research_stock_rate) else 0.0)
+                human_only_research_efforts.append(human_only_research_effort if np.isfinite(human_only_research_effort) else 0.0)
                 human_only_software_rate = compute_software_progress_rate(
-                    rs, human_only_research_stock_rate,
+                    rs, human_only_research_effort,
                     initial_research_stock_val,
-                    initial_research_stock_rate_val,
+                    initial_research_effort_val,
                     self.params.r_software
                 )
                 human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
@@ -2651,7 +2651,7 @@ class ProgressModel:
 
                 # Calculate automation multipliers on various quantities
                 ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.coding_labor_exponent) if ai_contrib > 0 else 0.0)
-                ai_research_stock_multipliers.append(research_stock_rates[i] / human_only_research_stock_rate if human_only_research_stock_rate > 0 else 0.0)
+                ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
                 ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
 
@@ -2700,8 +2700,8 @@ class ProgressModel:
                 # Use safe fallback values
                 if len(progress_rates) <= i:
                     progress_rates.append(0.0)
-                if len(research_stock_rates) <= i:
-                    research_stock_rates.append(0.0)
+                if len(research_efforts) <= i:
+                    research_efforts.append(0.0)
                 automation_fractions.append(0.0)
                 ai_research_tastes.append(0.0)
                 ai_research_taste_sds.append(0.0)
@@ -2711,7 +2711,7 @@ class ProgressModel:
                 software_progress_rates.append(0.0)
                 software_efficiency.append(0.0)
                 human_only_progress_rates.append(0.0)
-                human_only_research_stock_rates.append(0.0)
+                human_only_research_efforts.append(0.0)
                 human_only_software_progress_rates.append(0.0)
                 human_labor_contributions.append(0.0)
                 ai_labor_contributions.append(0.0)
@@ -2806,7 +2806,7 @@ class ProgressModel:
             'ai_research_taste_quantile': ai_research_taste_quantiles,
             'aggregate_research_taste': aggregate_research_tastes,
             'progress_rates': progress_rates,
-            'research_stock_rates': research_stock_rates,
+            'research_efforts': research_efforts,
             'coding_labors': coding_labors,
             'software_progress_rates': software_progress_rates,
             'software_efficiency': software_efficiency,

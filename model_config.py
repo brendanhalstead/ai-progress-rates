@@ -69,7 +69,7 @@ REFERENCE_COMPUTE_CHANGE = 0.1
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
-MAX_RESEARCH_STOCK_RATE = 1000000000000000000000000.0
+MAX_RESEARCH_EFFORT = 1000000000000000000000000.0
 MAX_NORMALIZED_PROGRESS_RATE = 1000.0
 TIME_EXTRAPOLATION_WINDOW = 10.0
 
@@ -345,11 +345,11 @@ PLOT_METADATA = {
         'y_axis': {'title': 'mysterious unit (dollars??)', 'type': 'log'},
         'data_keys': ['times', 'research_stocks']
     },
-    'plot_research_stock_rate': {
+    'plot_research_effort': {
         'title': 'Research Effort',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'mysterious unit (dollars/year??)', 'type': 'log'},
-        'data_keys': ['times', 'research_stock_rates']
+        'data_keys': ['times', 'research_efforts']
     },
     'plot_experiment_capacity': {
         'title': 'Experiment Capacity',
@@ -534,7 +534,7 @@ Depicts the actual combined coding labor that gets passed into the next tab. The
             
             {'function': 'plot_experiment_capacity', 'position': (1, 2)},
             {'function': 'plot_aggregate_research_taste', 'position': (2, 1)},
-            {'function': 'plot_research_stock_rate', 'position': (2, 2)}
+            {'function': 'plot_research_effort', 'position': (2, 2)}
         ],
         'explanation': """
 ## Research Effort (from coding labor, experiment compute, and research taste)
@@ -547,7 +547,7 @@ Research effort is aggregate research taste times experiment capacity. Experimen
         'name': 'Software R&D',
         'rows': 2, 'cols': 2,
         'plots': [
-            {'function': 'plot_research_stock_rate', 'position': (1, 1)},
+            {'function': 'plot_research_effort', 'position': (1, 1)},
             {'function': 'plot_software_progress_rate', 'position': (1, 2)},
             {'function': 'plot_research_stock', 'position': (2,1)},
             {'function': 'plot_software_efficiency', 'position': (2, 2)}

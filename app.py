@@ -28,7 +28,7 @@ from progress_model import (
     AnchorConstraint,
     progress_rate_at_time, compute_coding_labor,
     compute_software_progress_rate, compute_automation_fraction,
-    compute_research_stock_rate, compute_overall_progress_rate,
+    compute_research_effort, compute_overall_progress_rate,
     calculate_initial_research_stock, setup_model, compute_initial_conditions
 )
 from model_config import PLOT_METADATA, TAB_CONFIGURATIONS, PARAMETER_BOUNDS
@@ -489,10 +489,10 @@ def plot_research_stock(fig, times, research_stocks, row, col):
                 row=row, col=col
             )
 
-def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
+def plot_research_effort(fig, times, research_efforts, row, col):
     """Plot research stock rate over time"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=research_stock_rates.tolist(),
+        go.Scatter(x=times.tolist(), y=research_efforts.tolist(),
                   name='Research Stock Rate',
                   line=dict(color='#e377c2', width=3),
                   mode='lines+markers', marker=dict(size=4),
@@ -509,7 +509,7 @@ def plot_research_stock_rate(fig, times, research_stock_rates, row, col):
         if sc_time >= times.min() and sc_time <= times.max():
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
-                          y=[research_stock_rates.min(), research_stock_rates.max()],
+                          y=[research_efforts.min(), research_efforts.max()],
                           name='Superhuman Coder Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
@@ -1383,7 +1383,7 @@ def get_tab_configurations():
         'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['coding_labors'], data['metrics']['human_labor_contributions'], r, c),
         'plot_ai_coding_labor_multiplier': lambda fig, data, r, c: plot_ai_coding_labor_multiplier(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], r, c),
         'plot_research_stock': lambda fig, data, r, c: plot_research_stock(fig, data['metrics']['times'], data['metrics']['research_stock'], r, c),
-        'plot_research_stock_rate': lambda fig, data, r, c: plot_research_stock_rate(fig, data['metrics']['times'], data['metrics']['research_stock_rates'], r, c),
+        'plot_research_effort': lambda fig, data, r, c: plot_research_effort(fig, data['metrics']['times'], data['metrics']['research_efforts'], r, c),
         'plot_experiment_capacity': lambda fig, data, r, c: plot_experiment_capacity(fig, data['metrics']['times'], data['metrics']['experiment_capacity'], r, c),
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
         'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c),
@@ -2203,7 +2203,7 @@ def export_csv():
         writer = csv.writer(output)
         
         # Write header
-        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'coding_labor', 'research_stock', 'research_stock_rate', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
+        writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'coding_labor', 'research_stock', 'research_effort', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
         
         # Write metadata header with SC information if available
         if results.get('sc_time') is not None:
@@ -2235,8 +2235,8 @@ def export_csv():
             else:
                 row.append(0.0)
 
-            if 'research_stock_rates' in results and i < len(results['research_stock_rates']):
-                row.append(results['research_stock_rates'][i])
+            if 'research_efforts' in results and i < len(results['research_efforts']):
+                row.append(results['research_efforts'][i])
             else:
                 row.append(0.0)
 
