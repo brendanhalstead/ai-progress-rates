@@ -726,7 +726,7 @@ def compute_software_progress_rate(research_stock: float, research_effort: float
                                  initial_research_stock: float, initial_research_effort: float,
                                  r_software: float) -> float:
     """
-    Compute software progress rate using research stock formulation:
+    Compute software progress rate using research stocding labor
     S(t) = RS'(t) / RS(t) * r_software
     
     Args:
@@ -2554,19 +2554,19 @@ class ProgressModel:
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
-        for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
+        for i, (t, progress, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
-                state = [p, rs]
+                state = [progress, rs]
                 rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_effort_val, initial_research_stock_val)
                 progress_rates.append(rates[0])
                 research_efforts.append(rates[1])
                 
                 # Compute automation fraction
-                automation_fraction = compute_automation_fraction(p, self.params)
+                automation_fraction = compute_automation_fraction(progress, self.params)
                 automation_fractions.append(automation_fraction)
                 
                 # Compute AI research taste and aggregate research taste
-                ai_research_taste = compute_ai_research_taste(p, self.params)
+                ai_research_taste = compute_ai_research_taste(progress, self.params)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
@@ -2590,7 +2590,7 @@ class ProgressModel:
                 discounted_exp_compute_val = experiment_compute ** self.params.experiment_compute_exponent
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
-                # Compute cognitive output
+                # Compute coding labor
                 coding_labor = compute_coding_labor(
                     automation_fraction, L_AI, L_HUMAN, 
                     self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization
@@ -2659,11 +2659,11 @@ class ProgressModel:
                 horizon_length = 0.0  # Default fallback
                 if self.horizon_trajectory is not None:
                     try:
-                        horizon_length = self.horizon_trajectory(p)
+                        horizon_length = self.horizon_trajectory(progress)
                         if not np.isfinite(horizon_length) or horizon_length < 0:
                             horizon_length = 0.0
                     except Exception as horizon_e:
-                        logger.warning(f"Error computing horizon at progress {p}: {horizon_e}")
+                        logger.warning(f"Error computing horizon at progress {progress}: {horizon_e}")
                         horizon_length = 0.0
                 
                 horizon_lengths.append(horizon_length)
@@ -2671,11 +2671,11 @@ class ProgressModel:
                 # Compute effective compute as baseline_annual_compute_multiplier^progress
                 effective_compute_val = 0.0  # Default fallback
                 try:
-                    effective_compute_val = self.params.baseline_annual_compute_multiplier ** p
+                    effective_compute_val = self.params.baseline_annual_compute_multiplier ** progress
                     if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
                         effective_compute_val = 0.0
                 except Exception as compute_e:
-                    logger.warning(f"Error computing effective compute at progress {p}: {compute_e}")
+                    logger.warning(f"Error computing effective compute at progress {progress}: {compute_e}")
                     effective_compute_val = 0.0
                 
                 effective_compute.append(effective_compute_val)
@@ -2773,13 +2773,13 @@ class ProgressModel:
             if (self.horizon_trajectory is not None and
                 anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0):
                 anchor_progress_value = self.human_only_results['anchor_stats']['progress']
-                p = float(anchor_progress_value)
+                progress = float(anchor_progress_value)
                 # Numerical derivative of ln(horizon) with respect to progress at anchor
-                eps = 1e-6 * max(1.0, abs(p))
+                eps = 1e-6 * max(1.0, abs(progress))
                 if eps == 0:
                     eps = 1e-6
-                H_p = self.horizon_trajectory(p)
-                H_p_eps = self.horizon_trajectory(p + eps)
+                H_p = self.horizon_trajectory(progress)
+                H_p_eps = self.horizon_trajectory(progress + eps)
                 if (np.isfinite(H_p) and np.isfinite(H_p_eps) and H_p > 0 and H_p_eps > 0):
                     dlnH_dprogress = (np.log(H_p_eps) - np.log(H_p)) / eps
                     if np.isfinite(dlnH_dprogress) and dlnH_dprogress > 0:

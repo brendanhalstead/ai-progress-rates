@@ -25,11 +25,6 @@ import yaml
 
 from progress_model import (
     ProgressModel, Parameters, TimeSeriesData, 
-    AnchorConstraint,
-    progress_rate_at_time, compute_coding_labor,
-    compute_software_progress_rate, compute_automation_fraction,
-    compute_research_effort, compute_overall_progress_rate,
-    calculate_initial_research_stock, setup_model, compute_initial_conditions
 )
 from model_config import PLOT_METADATA, TAB_CONFIGURATIONS, PARAMETER_BOUNDS
 
