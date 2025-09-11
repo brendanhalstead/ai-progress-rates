@@ -79,6 +79,9 @@ def main() -> None:
     # 2d) Histogram of horizon at SC
     _run([sys.executable, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "horizon_at_sc_hist"]) 
 
+    # 2e) SC-by-quarter probability table (CSV + HTML)
+    _run([sys.executable, str(SCRIPTS_DIR / "sc_by_quarter.py"), "--run-dir", str(run_dir)])
+
     # 3) Sensitivity analysis (+ plots)
     sens_cmd = [sys.executable, str(SCRIPTS_DIR / "sensitivity_analysis.py"), "--run-dir", str(run_dir), "--plot"]
     _run(sens_cmd)

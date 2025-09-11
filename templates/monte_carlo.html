@@ -128,6 +128,10 @@
                                 </div>
                             </div>
                             <div class="col-12">
+                                <label class="form-label small">SC-by-Quarter Probability</label>
+                                <div id="scByQuarter" class="rounded border p-2" style="background: var(--surface-1);"></div>
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label small">SC-time Distribution</label>
                                 <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
                             </div>
@@ -908,6 +912,20 @@
             const htWrap = document.getElementById('imgHorizonTraj').closest('.col-12');
             const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
             const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
+            const scqWrap = document.getElementById('scByQuarter').closest('.col-12');
+
+            // SC-by-quarter HTML fragment
+            const scqDiv = document.getElementById('scByQuarter');
+            if (hasAny('sc_by_quarter.html')) {
+                scqWrap.style.display = '';
+                fetch(base('sc_by_quarter.html'))
+                    .then(r => r.text())
+                    .then(html => { scqDiv.innerHTML = html; })
+                    .catch(() => { scqDiv.innerHTML = '<div class="text-muted small">Failed to load SC-by-quarter table.</div>'; });
+            } else {
+                scqWrap.style.display = 'none';
+                scqDiv.innerHTML = '';
+            }
 
             if (hasAny('sc_time_hist.png')) {
                 document.getElementById('imgScHist').src = base('sc_time_hist.png');

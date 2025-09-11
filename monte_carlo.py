@@ -252,6 +252,12 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                                 subprocess.run(sens_cmd, cwd=str(REPO_ROOT), stdout=lf_app, stderr=subprocess.STDOUT, check=False)
                             except Exception as _e:
                                 lf_app.write(f"\n[WARN] sensitivity_analysis failed: {_e}\n")
+                            # SC-by-quarter table artifacts
+                            try:
+                                scq_cmd = [sys.executable, str(SCRIPTS_DIR / "sc_by_quarter.py"), "--run-dir", str(out_dir)]
+                                subprocess.run(scq_cmd, cwd=str(REPO_ROOT), stdout=lf_app, stderr=subprocess.STDOUT, check=False)
+                            except Exception as _e:
+                                lf_app.write(f"\n[WARN] sc_by_quarter failed: {_e}\n")
                     except Exception:
                         pass
                     # Collect known artifact filenames if present
@@ -261,6 +267,8 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                             "horizon_trajectories.png",
                             "sensitivity_spearman_top.png",
                             "sensitivity_permutation_top.png",
+                            "sc_by_quarter.html",
+                            "sc_by_quarter.csv",
                         ]
                         for name in known:
                             p = Path(out_dir) / name
