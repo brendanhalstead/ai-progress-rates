@@ -112,7 +112,7 @@ PARAMETER_BOUNDS = {
     # Manual horizon fitting parameter bounds
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
-    'present_doubling_time': (0.01, 2),  # doubling time in progress units
+    'present_doubling_time': (0.01, 2),  # doubling time in present years
     'doubling_decay_rate': (-0.5, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
@@ -166,7 +166,7 @@ STRATEGIC_STARTING_POINTS_CONFIG = {
 }
 
 # =============================================================================
-# DEFAULT MODEL PARAMETERS (FOR BOTH WEBSITE AND MONTE CARLO)
+# DEFAULT MODEL PARAMETERS (FOR WEBSITE ONLY, MONTE CARLO USES CONFIG/SAMPLING_CONFIG.YAML)
 # =============================================================================
 DEFAULT_PARAMETERS = {
     'rho_coding_labor': -2,
