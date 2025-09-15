@@ -641,10 +641,11 @@ def compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote: float
 
     """
     k = (inf_compute_asymptote/inf_labor_asymptote)**rho
-    C = compute_anchor[0]
-    S = compute_anchor[1]
+    N = compute_anchor[0]
+    M = compute_anchor[1]
 
-    return (1/(rho*np.log(C))) * np.log(S**rho + k*(S**rho-1))
+    # return (1/(rho*np.log(N))) * np.log(M**rho + k*(M**rho-1))
+    return (1/(rho*np.log(N))) * np.log((1+k**rho)*M - k**rho)
 
 
 def compute_coding_labor_exponent_from_anchor(inf_compute_asymptote: float, inf_labor_asymptote: float, labor_anchor: tuple[float, float], rho: float) -> float:
