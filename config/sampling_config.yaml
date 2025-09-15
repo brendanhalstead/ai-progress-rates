@@ -32,6 +32,18 @@ parameters:
     values: ["exponential", "decaying doubling time"]
     p: [0.3, 0.7]
 
+  # Benchmarks & Gaps mode
+  pre_gap_sc_time_horizon:
+    dist: lognormal
+    ci80: [1000, 1000000] # Practical range used in UI (10^3 to 10^6 minutes)
+    clip_to_bounds: true
+  include_gap:
+    dist: choice
+    values: ["gap", "no gap"]
+  gap_years:
+    dist: fixed
+    value: 2.0
+
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
   present_day:
     dist: fixed
@@ -96,11 +108,3 @@ parameters:
   r_software:
     dist: lognormal
     ci80: [0.7, 9]
-
-  # Benchmarks & Gaps mode
-  benchmarks_and_gaps_mode:
-    dist: fixed
-    value: false
-  gap_years:
-    dist: fixed
-    value: 2.0

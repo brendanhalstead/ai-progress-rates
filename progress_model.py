@@ -269,8 +269,8 @@ class Parameters:
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
-    # Saturation horizon minutes (used when benchmarks & gaps mode is enabled)
-    saturation_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['saturation_horizon_minutes'])
+    # Pre-gap SC horizon minutes (formerly saturation_horizon_minutes)
+    pre_gap_sc_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Manual horizon fitting parameters
@@ -296,7 +296,7 @@ class Parameters:
     inv_compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inv_compute_anchor_exp_cap'])
     
     # Benchmarks and gaps mode
-    benchmarks_and_gaps_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode'])
+    include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
     gap_years: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_years'])
     
     def __post_init__(self):
@@ -337,6 +337,10 @@ class Parameters:
         if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
             logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
             self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
+        # Validate pre-gap SC horizon
+        if not np.isfinite(self.pre_gap_sc_time_horizon) or self.pre_gap_sc_time_horizon <= 0:
+            logger.warning(f"Invalid pre_gap_sc_time_horizon: {self.pre_gap_sc_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon']}")
+            self.pre_gap_sc_time_horizon = float(cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
         
         # Sanitize categorical parameters
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
@@ -371,10 +375,23 @@ class Parameters:
             logger.warning(f"inv_compute_anchor_exp_cap is not None, overriding compute_anchor_exp_cap to 1 / inv_compute_anchor_exp_cap")
             self.compute_anchor_exp_cap = 1 / self.inv_compute_anchor_exp_cap
 
-        # Sanitize benchmarks & gaps parameters
-        if not isinstance(self.benchmarks_and_gaps_mode, (bool, np.bool_)):
-            logger.warning(f"Invalid benchmarks_and_gaps_mode: {self.benchmarks_and_gaps_mode}, setting to False")
-            self.benchmarks_and_gaps_mode = cfg.DEFAULT_PARAMETERS['benchmarks_and_gaps_mode']
+        # Sanitize include_gap parameter (new API)
+        include_gap_bool = False
+        try:
+            if isinstance(self.include_gap, str):
+                val = self.include_gap.strip().lower()
+                if val in ("gap", "yes", "true", "1"):  # accept common truthy variants
+                    include_gap_bool = True
+                elif val in ("no gap", "no", "false", "0"):
+                    include_gap_bool = False
+                else:
+                    include_gap_bool = bool(cfg.DEFAULT_PARAMETERS['include_gap'] == 'gap')
+            else:
+                include_gap_bool = bool(self.include_gap)
+        except Exception:
+            include_gap_bool = bool(cfg.DEFAULT_PARAMETERS['include_gap'] == 'gap')
+        # Normalize include_gap to canonical string for consistency
+        self.include_gap = "gap" if include_gap_bool else "no gap"
         if not np.isfinite(self.gap_years) or self.gap_years < 0:
             logger.warning(f"Invalid gap_years: {self.gap_years}, setting to default")
             self.gap_years = cfg.DEFAULT_PARAMETERS['gap_years']
@@ -1939,16 +1956,25 @@ class ProgressModel:
                     return np.exp(slope * progress + intercept)
                 
                 # Calculate progress level where horizon reaches the target horizon
-                # Target depends on benchmarks_and_gaps_mode
-                target_horizon = self.params.saturation_horizon_minutes if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                # Target depends on include_gap (formerly benchmarks_and_gaps_mode)
+                _include_gap_flag = False
+                try:
+                    _inc = getattr(self.params, 'include_gap', 'no gap')
+                    if isinstance(_inc, str):
+                        _include_gap_flag = _inc.strip().lower() == 'gap'
+                    else:
+                        _include_gap_flag = bool(_inc)
+                except Exception:
+                    _include_gap_flag = False
+                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Solve: target_horizon = exp(slope * progress + intercept)
                         # Therefore: progress = (log(target_horizon) - intercept) / slope
                         calculated_progress_at_sc = (np.log(target_horizon) - intercept) / slope
-                        # If in benchmarks & gaps mode, add the gap (specified in anchor-progress-years)
+                        # If in gap-included mode, add the gap (specified in anchor-progress-years)
                         # Convert anchor-progress-years to progress units using anchor_progress_rate
-                        if getattr(self.params, 'benchmarks_and_gaps_mode', False):
+                        if _include_gap_flag:
                             try:
                                 gap_anchor_years = float(self.params.gap_years)
                                 gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
@@ -1960,7 +1986,7 @@ class ProgressModel:
                             except Exception:
                                 year_label = 'anchor'
                             logger.info(
-                                f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and "
+                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                             )
                         self.params.progress_at_sc = calculated_progress_at_sc
@@ -2222,8 +2248,17 @@ class ProgressModel:
                         return fallback[0] if np.isscalar(progress) else fallback
                 
                 # Calculate progress level where horizon reaches the target horizon
-                # Target depends on benchmarks_and_gaps_mode
-                target_horizon = self.params.saturation_horizon_minutes if getattr(self.params, 'benchmarks_and_gaps_mode', False) else self.params.sc_time_horizon_minutes
+                # Target depends on include_gap (formerly benchmarks_and_gaps_mode)
+                _include_gap_flag = False
+                try:
+                    _inc = getattr(self.params, 'include_gap', 'no gap')
+                    if isinstance(_inc, str):
+                        _include_gap_flag = _inc.strip().lower() == 'gap'
+                    else:
+                        _include_gap_flag = bool(_inc)
+                except Exception:
+                    _include_gap_flag = False
+                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Add numerical safeguards
@@ -2260,9 +2295,9 @@ class ProgressModel:
                                             # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
-                                        # If in benchmarks & gaps mode, add the gap (specified in anchor-progress-years)
+                                        # If in gap-included mode, add the gap (specified in anchor-progress-years)
                                         # Convert anchor-progress-years to progress units using anchor_progress_rate
-                                        if getattr(self.params, 'benchmarks_and_gaps_mode', False):
+                                        if _include_gap_flag:
                                             try:
                                                 gap_anchor_years = float(self.params.gap_years)
                                                 gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
@@ -2274,7 +2309,7 @@ class ProgressModel:
                                             except Exception:
                                                 year_label = 'anchor'
                                             logger.info(
-                                                f"Benchmarks & gaps mode: using saturation horizon {self.params.saturation_horizon_minutes} and "
+                                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
                                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                                             )
                                         

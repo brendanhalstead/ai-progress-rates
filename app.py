@@ -1793,7 +1793,7 @@ def params_to_dict(params: Parameters):
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
         'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
-        'saturation_horizon_minutes': params.saturation_horizon_minutes,
+        'pre_gap_sc_time_horizon': getattr(params, 'pre_gap_sc_time_horizon', None),
         'horizon_extrapolation_type': params.horizon_extrapolation_type,
         # Manual horizon fitting parameters
         'present_day': params.present_day,
@@ -1804,8 +1804,8 @@ def params_to_dict(params: Parameters):
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
         # Coding labor exponent
         'coding_labor_exponent': params.coding_labor_exponent,
-        # Benchmarks & gaps mode
-        'benchmarks_and_gaps_mode': bool(getattr(params, 'benchmarks_and_gaps_mode', False)),
+        # Gap mode selection
+        'include_gap': getattr(params, 'include_gap', 'no gap'),
         'gap_years': float(getattr(params, 'gap_years', 0.0))
     }
     
@@ -1930,7 +1930,7 @@ def get_parameter_config():
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'automation_interp_types': ['exponential', 'linear'],
-            'saturation_horizon_minutes': cfg.DEFAULT_PARAMETERS['saturation_horizon_minutes'],
+            'pre_gap_sc_time_horizon': cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'],
             'descriptions': {
                 'rho_coding_labor': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -2010,10 +2010,10 @@ def get_parameter_config():
                     'description': 'Time horizon length corresponding to superhuman coder achievement',
                     'units': 'minutes'
                 },
-                'benchmarks_and_gaps_mode': {
-                    'name': 'Benchmarks & Gaps Mode',
-                    'description': 'Compute SC progress at saturation horizon plus specified gap',
-                    'units': 'boolean'
+                'include_gap': {
+                    'name': 'Include Gap',
+                    'description': 'Choose whether to include a gap after pre-gap SC horizon',
+                    'units': 'choice (gap | no gap)'
                 },
                 'gap_years': {
                     'name': 'Gap Size (YEAR-progress-years)',

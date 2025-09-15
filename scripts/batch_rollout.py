@@ -484,6 +484,8 @@ def main() -> None:
     # Avoid holding everything in memory: stream as NDJSON
     param_dists: Dict[str, Any] = user_cfg.get("parameters", {})
 
+    # print(param_dists["saturation_horizon_minutes"])
+
     # Write minimal metadata
     _write_json(run_dir / "metadata.json", {
         "created_at": datetime.now().isoformat(),
@@ -505,7 +507,6 @@ def main() -> None:
                 sampled_params.setdefault("taste_schedule_type", cfg.DEFAULT_TASTE_SCHEDULE_TYPE)
 
                 # Prepare constructor kwargs
-
                 params_obj = Parameters(**sampled_params)
 
                 # Suppress stdout/stderr, warnings, and logging during simulation

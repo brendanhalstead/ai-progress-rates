@@ -108,7 +108,7 @@ PARAMETER_BOUNDS = {
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
     'sc_time_horizon_minutes': (1000, 100000000000),
-    'saturation_horizon_minutes': (1000, 100000000000),
+    'pre_gap_sc_time_horizon': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
@@ -204,9 +204,9 @@ DEFAULT_PARAMETERS = {
     'compute_anchor_exp_cap': None,
     'inv_compute_anchor_exp_cap': 2.5,
     # benchmarks and gaps mode
-    'benchmarks_and_gaps_mode': False,
+    'include_gap': 'no gap',
     'gap_years': 2.0,
-    'saturation_horizon_minutes': 10380.0,
+    'pre_gap_sc_time_horizon': 10380.0,
 }
 
 # =============================================================================
