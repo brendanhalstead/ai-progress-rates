@@ -35,15 +35,14 @@ parameters:
   # Gaps mode
   pre_gap_sc_time_horizon:
     dist: lognormal
-    ci80: [1000, 1000000] # Practical range used in UI (10^3 to 10^6 minutes)
-    clip_to_bounds: true
+    ci80: [23000, 14400000] # [0.2 work years, 125 work years]
   include_gap:
     dist: choice
     values: ["gap", "no gap"]
     p: [0.5, 0.5]
   gap_years:
-    dist: fixed
-    value: 2.0
+    dist: lognormal
+    ci80: [0.3, 7.5] 
 
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
   present_day:
