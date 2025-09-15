@@ -132,6 +132,10 @@
                                 <div id="scByQuarter" class="rounded border p-2" style="background: var(--surface-1);"></div>
                             </div>
                             <div class="col-12">
+                                <label class="form-label small">Quarterly Horizon Statistics (median and 90% CI)</label>
+                                <div id="quarterlyHorizonStats" class="table-responsive rounded border" style="background: var(--surface-1);"></div>
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label small">SC-time Distribution</label>
                                 <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
                             </div>
@@ -913,6 +917,7 @@
             const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
             const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
             const scqWrap = document.getElementById('scByQuarter').closest('.col-12');
+            const qhsWrap = document.getElementById('quarterlyHorizonStats').closest('.col-12');
 
             // SC-by-quarter HTML fragment
             const scqDiv = document.getElementById('scByQuarter');
@@ -926,6 +931,43 @@
                 scqWrap.style.display = 'none';
                 scqDiv.innerHTML = '';
             }
+
+            // Quarterly Horizon Stats table (fetched from backend)
+            const qhsDiv = document.getElementById('quarterlyHorizonStats');
+            qhsWrap.style.display = '';
+            fetch(`/api/monte-carlo/quarterly-horizon-stats/${jobId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'Failed');
+                    const rows = Array.isArray(data.rows) ? data.rows : [];
+                    if (rows.length === 0) {
+                        qhsDiv.innerHTML = '<div class="p-2 text-muted small">No data yet.</div>';
+                        return;
+                    }
+                    const fmt = (v) => (v === null || v === undefined || Number.isNaN(v)) ? '' : new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(v);
+                    const thead = `<thead><tr>
+                        <th>Quarter</th>
+                        <th>Date</th>
+                        <th>Median (min)</th>
+                        <th>CI5 (min)</th>
+                        <th>CI95 (min)</th>
+                        <th>n</th>
+                    </tr></thead>`;
+                    const tbody = '<tbody>' + rows.map(r => `
+                        <tr>
+                            <td>${r.quarter}</td>
+                            <td>${r.date}</td>
+                            <td>${fmt(r.median)}</td>
+                            <td>${fmt(r.ci5)}</td>
+                            <td>${fmt(r.ci95)}</td>
+                            <td>${r.n ?? ''}</td>
+                        </tr>
+                    `).join('') + '</tbody>';
+                    qhsDiv.innerHTML = `<table class="table table-sm align-middle mb-0">${thead}${tbody}</table>`;
+                })
+                .catch(() => {
+                    qhsDiv.innerHTML = '<div class="p-2 text-muted small">Failed to load quarterly horizon stats.</div>';
+                });
 
             if (hasAny('sc_time_hist.png')) {
                 document.getElementById('imgScHist').src = base('sc_time_hist.png');
