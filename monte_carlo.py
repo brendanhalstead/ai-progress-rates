@@ -1041,3 +1041,152 @@ def live_horizon_trajectories(job_id: str):
         return send_file(buf, mimetype="image/png")
     finally:
         plt.close(fig)
+
+
+@mc_bp.route("/api/monte-carlo/quarterly-horizon-stats/<job_id>", methods=["GET"])
+def quarterly_horizon_stats(job_id: str):
+    """Return a JSON table of median and 90% CI of horizon across trajectories
+    evaluated at the beginning of each calendar quarter spanned by the rollouts.
+
+    Output: { success: True, rows: [ { quarter: "YYYY-Qn", date: "YYYY-MM-DD",
+                                      decimal_year: float, n: int,
+                                      median: float, ci5: float, ci95: float }, ... ] }
+    Units for horizon statistics are minutes.
+    """
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+    out_dir = job.get("output_dir")
+    if not out_dir:
+        return jsonify({"success": False, "error": "Output directory not available yet"}), 404
+
+    rollouts_path = Path(out_dir) / "rollouts.jsonl"
+    if not rollouts_path.exists():
+        return jsonify({"success": False, "error": "rollouts.jsonl not found"}), 404
+
+    # Read times and per-trajectory horizon arrays
+    times_arr: Optional[np.ndarray] = None
+    trajectories: List[np.ndarray] = []
+    try:
+        with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                results = rec.get("results") if isinstance(rec, dict) else None
+                if not isinstance(results, dict):
+                    continue
+                t = results.get("times")
+                h = results.get("horizon_lengths")
+                if t is None or h is None:
+                    continue
+                try:
+                    t_np = np.asarray(t, dtype=float)
+                    h_np = np.asarray(h, dtype=float)
+                except Exception:
+                    continue
+                if t_np.ndim != 1 or h_np.ndim != 1 or t_np.size != h_np.size:
+                    continue
+                if times_arr is None:
+                    times_arr = t_np
+                trajectories.append(h_np)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to read rollouts: {e}"}), 500
+
+    if times_arr is None or len(trajectories) == 0:
+        return jsonify({"success": True, "rows": []})
+
+    # Clean trajectories similar to live plot
+    min_horizon_minutes = 0.001
+    max_work_year_minutes = float(120000 * 52 * 40 * 60)
+    cleaned: List[np.ndarray] = []
+    for t in trajectories:
+        arr = t.astype(float)
+        arr[~np.isfinite(arr)] = np.nan
+        arr[arr <= 0] = np.nan
+        arr = np.clip(arr, min_horizon_minutes, max_work_year_minutes)
+        cleaned.append(arr)
+
+    # Helper conversions for quarters
+    def _decimal_year_to_datetime(decimal_year: float) -> datetime:
+        year = int(np.floor(decimal_year))
+        frac = float(decimal_year - year)
+        start = datetime(year, 1, 1)
+        end = datetime(year + 1, 1, 1)
+        total_seconds = (end - start).total_seconds()
+        return start + timedelta(seconds=frac * total_seconds)
+
+    def _datetime_to_decimal_year(dt: datetime) -> float:
+        start = datetime(dt.year, 1, 1)
+        end = datetime(dt.year + 1, 1, 1)
+        frac = (dt - start).total_seconds() / (end - start).total_seconds()
+        return float(dt.year + frac)
+
+    # Determine quarter starts spanning the times range
+    t_min = float(np.min(times_arr))
+    t_max = float(np.max(times_arr))
+    dt_min = _decimal_year_to_datetime(t_min)
+    dt_max = _decimal_year_to_datetime(t_max)
+
+    def _quarter_start(dt: datetime) -> datetime:
+        month = ((dt.month - 1) // 3) * 3 + 1
+        return datetime(dt.year, month, 1)
+
+    start_q = _quarter_start(dt_min)
+    # If dt_min is not exactly at quarter start and earlier than start_q, ensure start_q >= dt_min
+    if start_q < dt_min.replace(day=1, hour=0, minute=0, second=0, microsecond=0):
+        start_q = _quarter_start(dt_min)
+
+    quarters: List[datetime] = []
+    cur = start_q
+    while cur <= dt_max:
+        quarters.append(cur)
+        # advance by 3 months
+        if cur.month <= 9:
+            cur = datetime(cur.year, cur.month + 3, 1)
+        else:
+            cur = datetime(cur.year + 1, 1, 1)
+
+    if not quarters:
+        return jsonify({"success": True, "rows": []})
+
+    # Pre-stack for fast column extraction
+    stacked = np.vstack(cleaned)  # shape: (num_traj, num_times)
+
+    # For each quarter time, pick nearest index in times_arr
+    rows: List[Dict[str, Any]] = []
+    for qdt in quarters:
+        q_dec = _datetime_to_decimal_year(qdt)
+        # nearest index
+        idx = int(np.argmin(np.abs(times_arr - q_dec)))
+        col = stacked[:, idx]
+        # drop NaNs
+        finite = col[np.isfinite(col)]
+        n = int(finite.size)
+        if n == 0:
+            median = None
+            low = None
+            high = None
+        else:
+            median = float(np.nanmedian(finite))
+            # 90% CI: 5th and 95th percentiles
+            low = float(np.nanpercentile(finite, 5))
+            high = float(np.nanpercentile(finite, 95))
+        # Quarter label
+        q_num = (qdt.month - 1) // 3 + 1
+        rows.append({
+            "quarter": f"{qdt.year}-Q{q_num}",
+            "date": qdt.date().isoformat(),
+            "decimal_year": q_dec,
+            "n": n,
+            "median": median,
+            "ci5": low,
+            "ci95": high,
+        })
+
+    return jsonify({"success": True, "rows": rows})
