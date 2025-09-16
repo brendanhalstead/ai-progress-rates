@@ -1802,8 +1802,6 @@ def params_to_dict(params: Parameters):
         'doubling_decay_rate': params.doubling_decay_rate,
         # Baseline Annual Compute Multiplier
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
-        # Coding labor exponent
-        'coding_labor_exponent': params.coding_labor_exponent,
         # Gap mode selection
         'include_gap': getattr(params, 'include_gap', 'no gap'),
         'gap_years': float(getattr(params, 'gap_years', 0.0))
@@ -1909,7 +1907,6 @@ def compute_model():
             'rho': float(all_metrics.get('exp_capacity_params', {}).get('rho')) if all_metrics.get('exp_capacity_params') else None,
             'alpha': float(all_metrics.get('exp_capacity_params', {}).get('alpha')) if all_metrics.get('exp_capacity_params') else None,
             'experiment_compute_exponent': float(all_metrics.get('exp_capacity_params', {}).get('experiment_compute_exponent')) if all_metrics.get('exp_capacity_params') else None,
-            'coding_labor_exponent': float(all_metrics.get('exp_capacity_params', {}).get('coding_labor_exponent')) if all_metrics.get('exp_capacity_params') else None,
         }
     })
         
@@ -2025,6 +2022,11 @@ def get_parameter_config():
                     'description': 'Method for extrapolating progress beyond the time horizon',
                     'units': 'categorical'
                 },
+                'parallel_penalty': {
+                    'name': 'Parallel Penalty',
+                    'description': 'Penalty applied to parallel coding labor contribution in experiment capacity calculations',
+                    'units': 'dimensionless'
+                },
                 # Manual horizon fitting parameters
                 'present_day': {
                     'name': 'Anchor Time',
@@ -2049,11 +2051,6 @@ def get_parameter_config():
                 'baseline_annual_compute_multiplier': {
                     'name': 'Baseline Annual Compute Multiplier',
                     'description': 'Annual multiplier for baseline compute growth (effective compute = multiplier^progress)',
-                    'units': 'dimensionless'
-                },
-                'coding_labor_exponent': {
-                    'name': 'Coding Labor Exponent',
-                    'description': 'Power transformation parameter applied to CES output before normalization',
                     'units': 'dimensionless'
                 },
                 # exp capacity pseudoparameters
@@ -2523,9 +2520,7 @@ def get_default_data():
             'present_doubling_time': params.present_doubling_time,
             'doubling_decay_rate': params.doubling_decay_rate,
             # Baseline Annual Compute Multiplier  
-            'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
-            # Coding labor exponent
-            'coding_labor_exponent': params.coding_labor_exponent
+            'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier
         }
     })
 

@@ -69,9 +69,6 @@ parameters:
     value: -2.0
 
   # experiment capacity
-  direct_input_exp_cap_ces_params:
-    dist: fixed
-    value: false
   inf_compute_asymptote:
     dist: shifted_lognormal
     ci80: [25, 1000000]
@@ -80,14 +77,15 @@ parameters:
     dist: shifted_lognormal
     ci80: [1, 200]
     shift: 1.0
-  labor_anchor_exp_cap:
-    dist: shifted_lognormal
-    ci80: [0.3, 1.2]
-    shift: 1.0
   inv_compute_anchor_exp_cap:
     dist: shifted_lognormal
-    ci80: [0.75, 3.0]
+    ci80: [1, 5.4]
     shift: 1.0
+# Below set to roughly match 10th percentile = 0.3, 90th = 0.8
+  parallel_penalty:
+    dist: beta
+    alpha: 3.3
+    beta: 2.8
 
   swe_multiplier_at_present_day:
     dist: shifted_lognormal

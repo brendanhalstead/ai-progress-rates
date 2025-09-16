@@ -22,6 +22,9 @@ RESEARCH_STOCK_START_MIN = 1e-10
 NORMALIZATION_MIN = 1e-10
 experiment_compute_exponent_CLIP_MIN = 0.001
 experiment_compute_exponent_CLIP_MAX = 10.0
+# Clipping for parallel penalty parameter
+PARALLEL_PENALTY_MIN = 0.0
+PARALLEL_PENALTY_MAX = 1.0
 
 # =============================================================================
 # OTHER RANDOM CONSTANTS
@@ -116,14 +119,15 @@ PARAMETER_BOUNDS = {
     'doubling_decay_rate': (-0.5, 0.5),  # decay rate
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
-    # Coding labor exponent bounds
-    'coding_labor_exponent': (0.0, 2.0),
+    # coding_labor_exponent deprecated in favor of parallel_penalty
     # exp capacity pseudoparameters
     'inf_labor_asymptote': (0, 100000),
     'inf_compute_asymptote': (0, 100000),
     'labor_anchor_exp_cap': (0, 1000),
     'compute_anchor_exp_cap': (0, 1000),
     'inv_compute_anchor_exp_cap': (0, 10),
+    # parallel penalty for experiment capacity CES
+    'parallel_penalty': (0.0, 1.0),
 }
 
 # Validation thresholds for parameter combinations
@@ -195,18 +199,19 @@ DEFAULT_PARAMETERS = {
     'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
-    # Coding labor exponent
-    'coding_labor_exponent': 0.481,
+    # coding_labor_exponent deprecated in favor of parallel_penalty
     # exp capacity pseudoparameters
     'inf_labor_asymptote': 15.0,
     'inf_compute_asymptote': 5000,
     'labor_anchor_exp_cap': 1.6,
     'compute_anchor_exp_cap': None,
-    'inv_compute_anchor_exp_cap': 2.5,
+    'inv_compute_anchor_exp_cap': 3.33,
     # benchmarks and gaps mode
     'include_gap': 'no gap',
     'gap_years': 2.0,
     'pre_gap_sc_time_horizon': 10380.0,
+    # penalty on parallel coding labor contribution in exp capacity
+    'parallel_penalty': 0.52,
 }
 
 # =============================================================================

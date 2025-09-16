@@ -618,26 +618,35 @@
                           parallel coding labor.</small
                         >
                       </div>
-                      <div id="codingLaborExponentGroup" class="mb-3">
-                        <label class="param-label"
-                          >Coding Labor Exponent:
-                          <span id="coding_labor_exponent_val"
-                            >Loading...</span
-                          ></label
-                        >
+                      <!-- coding_labor_exponent deprecated; use parallel_penalty toggle instead -->
+                    </div>
+                    <div id="expPseudoparamsGroup" style="display: none">
+                      <div class="mb-3 form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="enable_parallel_penalty"
+                        />
+                        <label class="form-check-label" for="enable_parallel_penalty"
+                          title="When enabled, applies the configured parallel penalty; when disabled, sets parallel_penalty=0.0"
+                          >Enable Parallel Penalty</label>
+                        <small class="text-muted d-block">Controls whether to apply a penalty to parallel coding labor contribution in exp. capacity.</small>
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label" for="parallel_penalty"
+                          >Parallel Penalty:
+                          <span id="parallel_penalty_val">Loading...</span>
+                        </label>
                         <input
                           type="range"
                           class="range-input form-range"
-                          id="coding_labor_exponent"
-                          step="0.05"
+                          id="parallel_penalty"
+                          step="0.01"
                         />
-                        <small class="text-muted"
-                          >Power transformation parameter applied to CES output
-                          before normalization</small
-                        >
+                        <small class="text-muted d-block">
+                          Penalty applied to parallel coding labor contribution in experiment capacity calculations.
+                        </small>
                       </div>
-                    </div>
-                    <div id="expPseudoparamsGroup" style="display: none">
                       <div class="mb-3">
                         <label class="param-label"
                           >Exp. Cap. with ∞ labor:
@@ -1224,13 +1233,15 @@
         "swe_multiplier_at_present_day",
         "automation_interp_type",
         "coding_labor_normalization",
-        "coding_labor_exponent",
+        
         "experiment_compute_exponent",
         // exp capacity pseudoparameters
         "inf_labor_asymptote",
         "inf_compute_asymptote",
         "labor_anchor_exp_cap",
         "inv_compute_anchor_exp_cap",
+        // parallel penalty (controlled by toggle)
+        "parallel_penalty",
         "ai_research_taste_at_superhuman_coder_sd",
         "ai_research_taste_slope",
         "taste_schedule_type",
@@ -1644,7 +1655,6 @@
         } else if (
           input.id === "rho_experiment_capacity" ||
           input.id === "rho_coding_labor" ||
-          input.id === "coding_labor_exponent" ||
           input.id === "swe_multiplier_at_present_day"
         ) {
           // Higher precision for substitutability parameters, coding labor exponent, and SWE multiplier
@@ -1738,6 +1748,29 @@
         const parameterIds = PARAMETER_IDS;
 
         parameterIds.forEach((id) => {
+          // Handle parallel_penalty even if no input element exists
+          if (id === "parallel_penalty") {
+            try {
+              // If toggle missing, treat as enabled (use default/slider)
+              const toggleEl = document.getElementById("enable_parallel_penalty");
+              const enabled = toggleEl ? !!toggleEl.checked : true;
+              if (!enabled) {
+                params[id] = 0.0;
+              } else {
+                const el = document.getElementById(id);
+                const pv = el ? parseFloat(el.value) : NaN;
+                if (isFinite(pv)) {
+                  params[id] = pv;
+                } else {
+                  params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                }
+              }
+            } catch (e) {
+              params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+            }
+            return; // done handling this id
+          }
+
           const element = $("#" + id);
           if (element.length) {
             let value;
@@ -1889,7 +1922,27 @@
                 }
               }
             } else {
-              params[id] = value;
+              // Special handling: parallel_penalty controlled by toggle
+              if (id === "parallel_penalty") {
+                const enabled = document.getElementById("enable_parallel_penalty")?.checked || false;
+                if (!enabled) {
+                  params[id] = 0.0;
+                } else {
+                  // Use slider/input if present, else default from server config
+                  if (element.length) {
+                    const pv = parseFloat(element.val());
+                    if (isFinite(pv)) {
+                      params[id] = pv;
+                    } else {
+                      params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                    }
+                  } else {
+                    params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                  }
+                }
+              } else {
+                params[id] = value;
+              }
             }
           } else {
             console.warn(`Parameter element not found: ${id}`);
@@ -2937,6 +2990,17 @@
           );
         }
 
+        // Initialize parallel penalty toggle state. Default: enabled iff default != 0
+        try {
+          const toggle = document.getElementById("enable_parallel_penalty");
+          if (toggle) {
+            const def = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+            toggle.checked = !!def && def !== 0.0;
+          }
+        } catch (e) {
+          console.warn("Failed to initialize parallel penalty toggle", e);
+        }
+
         // Initialize Benchmarks & Gaps controls from defaults where appropriate
         try {
           const gapSlider = document.getElementById("gap_years");
@@ -3178,7 +3242,7 @@
             p.rho
           )}, α: ${fmt(p.alpha)}, ζ: ${fmt(
             p.experiment_compute_exponent
-          )}, s: ${fmt(p.coding_labor_exponent)}`;
+          )}, penalty: ${fmt(parameters.parallel_penalty ?? parameterConfig?.defaults?.parallel_penalty ?? 0)}`;
           computedEl.style.display = "";
         } catch (e) {
           console.warn("Failed rendering computed params", e);

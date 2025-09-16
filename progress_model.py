@@ -285,15 +285,14 @@ class Parameters:
     # Baseline Annual Compute Multiplier
     baseline_annual_compute_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['baseline_annual_compute_multiplier'])
     
-    # Coding labor exponent for CES output transformation
-    coding_labor_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_exponent'])
-    
     # exp capacity pseudoparameters
     inf_labor_asymptote: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inf_labor_asymptote'])
     inf_compute_asymptote: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inf_compute_asymptote'])
     labor_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['labor_anchor_exp_cap'])
     compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['compute_anchor_exp_cap'])
     inv_compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inv_compute_anchor_exp_cap'])
+    # penalty on parallel coding labor in exp capacity CES
+    parallel_penalty: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['parallel_penalty'])
     
     # Benchmarks and gaps mode
     include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
@@ -337,6 +336,13 @@ class Parameters:
         if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
             logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
             self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
+
+        # Sanitize parallel_penalty
+        if not np.isfinite(self.parallel_penalty):
+            logger.warning(f"Non-finite parallel_penalty: {self.parallel_penalty}, setting to {cfg.DEFAULT_PARAMETERS['parallel_penalty']}")
+            self.parallel_penalty = cfg.DEFAULT_PARAMETERS['parallel_penalty']
+        else:
+            self.parallel_penalty = float(np.clip(self.parallel_penalty, cfg.PARALLEL_PENALTY_MIN, cfg.PARALLEL_PENALTY_MAX))
         # Validate pre-gap SC horizon
         if not np.isfinite(self.pre_gap_sc_time_horizon) or self.pre_gap_sc_time_horizon <= 0:
             logger.warning(f"Invalid pre_gap_sc_time_horizon: {self.pre_gap_sc_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon']}")
@@ -488,7 +494,7 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
         return w1 * X1 + w2 * X2
 
 
-def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, coding_labor_exponent: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
+def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, parallel_penalty: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
     """
     CES combination of AI and human labor using an alternative formulation inspired by
     the structure in FORMULAS.md: Y = ( (A^(1-rho) * L_AI^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
@@ -502,17 +508,17 @@ def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float
              rho -> 1: perfect substitutes (Y = L_AI + L_HUMAN)
              rho -> 0: Cobb-Douglas (Y = (L_AI/A)^A * (L_HUMAN/(1-A))^(1-A))
              rho -> -inf: perfect complements (Y = min(L_AI/A, L_HUMAN/(1-A)))
-        coding_labor_exponent: Power transformation parameter applied to CES output before normalization
+        parallel_penalty: Power transformation parameter applied to CES output before normalization
         cognitive_normalization: Normalization constant for cognitive output
     
     Returns:
         Cognitive output
     """
     if human_only:
-        return (L_HUMAN ** coding_labor_exponent) * cognitive_normalization 
+        return (L_HUMAN ** parallel_penalty) * cognitive_normalization 
     
     # Input validation
-    if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, coding_labor_exponent, cognitive_normalization])):
+    if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, parallel_penalty, cognitive_normalization])):
         logger.warning("Non-finite inputs to compute_coding_labor")
         return 0.0
     
@@ -567,14 +573,14 @@ def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float
             logger.warning(f"Numerical error in Alternative CES (rho={rho}): {e}, using linear fallback.")
             result = a * L_AI + (1-a) * L_HUMAN
             
-    # Apply coding_labor_exponent transformation before normalization
+    # Apply parallel_penalty transformation before normalization
     try:
-        result_with_lambda = np.power(result, coding_labor_exponent)
+        result_with_lambda = np.power(result, parallel_penalty)
         if not np.isfinite(result_with_lambda):
-            logger.warning(f"Non-finite result after coding_labor_exponent transformation (coding_labor_exponent={coding_labor_exponent}), using original result")
+            logger.warning(f"Non-finite result after parallel_penalty transformation (parallel_penalty={parallel_penalty}), using original result")
             result_with_lambda = result
     except (OverflowError, ValueError) as e:
-        logger.warning(f"Error applying coding_labor_exponent transformation (coding_labor_exponent={coding_labor_exponent}): {e}, using original result")
+        logger.warning(f"Error applying parallel_penalty transformation (parallel_penalty={parallel_penalty}): {e}, using original result")
         result_with_lambda = result
     
     return result_with_lambda * cognitive_normalization
@@ -645,39 +651,42 @@ def compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote: float
     M = compute_anchor[1]
 
     # return (1/(rho*np.log(N))) * np.log(M**rho + k*(M**rho-1))
-    return (1/(rho*np.log(N))) * np.log((1+k**rho)*M - k**rho)
+    res = (1/(rho*np.log(N))) * np.log((1+k)*(M**rho) - k)
+    return res
 
 
-def compute_coding_labor_exponent_from_anchor(inf_compute_asymptote: float, inf_labor_asymptote: float, labor_anchor: tuple[float, float], rho: float) -> float:
-    """
-    Compute the experiment compute exponent from the asymptotes and anchor.
-    """
-    k = (inf_compute_asymptote/inf_labor_asymptote)**rho
-    L = labor_anchor[0]
-    S = labor_anchor[1]
+# def compute_coding_labor_exponent_from_anchor(inf_compute_asymptote: float, inf_labor_asymptote: float, labor_anchor: tuple[float, float], rho: float) -> float:
+#     """
+#     Compute the experiment compute exponent from the asymptotes and anchor.
+#     Currently unused.
+#     """
+#     k = (inf_compute_asymptote/inf_labor_asymptote)**rho
+#     L = labor_anchor[0]
+#     S = labor_anchor[1]
 
-    return (1/(rho*np.log(L))) * np.log(S**rho + (S**rho-1)/k)
+#     return (1/(rho*np.log(L))) * np.log(S**rho + (S**rho-1)/k)
     
-def compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote: float, inf_compute_asymptote: float, experiment_compute_exponent, coding_labor_exponent, current_exp_compute:float, current_coding_labor:float, rho: float) -> float:
+def compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote: float, inf_compute_asymptote: float, experiment_compute_exponent, current_exp_compute:float, current_serial_coding_labor:float, rho: float) -> float:
     """
     Compute the alpha parameter for the experiment capacity CES from the asymptotes and anchors.
     """
-    k = (inf_compute_asymptote/inf_labor_asymptote)**rho
-    d = experiment_compute_exponent
-    s = coding_labor_exponent
+    zeta = experiment_compute_exponent
     C = current_exp_compute
-    L = current_coding_labor
-    return 1/(1 + k * (C**d / L**s)**rho)
+    L = current_serial_coding_labor
+    # return 1/(1 + k * (C**d / L)**rho)
+    res =  1/(1 + ((C**zeta / L)*(inf_compute_asymptote/inf_labor_asymptote))**rho)
+    return res
 
-def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_compute_asymptote: float, compute_anchor: tuple[float, float], labor_anchor: tuple[float, float], current_exp_compute:float, current_coding_labor:float) -> tuple[float, float, float, float]:
+def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_compute_asymptote: float, compute_anchor: tuple[float, float], labor_anchor: tuple[float, float], current_exp_compute:float, current_coding_labor:float, parallel_penalty: float = 0.0) -> tuple[float, float, float, float]:
     """
     Compute the parameters for the experiment capacity CES from the asymptotes and anchors.
     """
     rho = compute_rho_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote)
     experiment_compute_exponent = compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote, inf_labor_asymptote, compute_anchor, rho)
-    coding_labor_exponent = compute_coding_labor_exponent_from_anchor(inf_compute_asymptote, inf_labor_asymptote, labor_anchor, rho)
-    alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, coding_labor_exponent, current_exp_compute, current_coding_labor, rho)
-    return rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent
+    serial_coding_labor = current_coding_labor ** parallel_penalty
+    alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, current_exp_compute, serial_coding_labor, rho)
+    # import pdb; pdb.set_trace()
+    return rho, alpha_experiment_capacity, experiment_compute_exponent
 
 def compute_research_effort(experiment_compute: float, coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
@@ -863,7 +872,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            coding_labor_0 = compute_coding_labor(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+            coding_labor_0 = compute_coding_labor(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: coding_labor_0: {coding_labor_0}")
             initial_aggregate_research_taste = 1.0
         else:
@@ -872,7 +881,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
             coding_labor_0 = compute_coding_labor(
                 initial_automation, L_AI_0, L_HUMAN_0, 
-                params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
+                params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
             logger.info(f"ACTUAL::: coding_labor_0: {coding_labor_0}")
         
@@ -890,12 +899,12 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            coding_labor_dt = compute_coding_labor(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+            coding_labor_dt = compute_coding_labor(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: coding_labor_dt: {coding_labor_dt}")
         else:
             coding_labor_dt = compute_coding_labor(
                 initial_automation, L_AI_dt, L_HUMAN_dt,
-                params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
+                params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
         
         rs_rate_dt = compute_research_effort(
@@ -977,7 +986,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+        coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
         research_effort = compute_research_effort(experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
@@ -985,7 +994,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
         coding_labor = compute_coding_labor(
             initial_automation, L_AI, L_HUMAN, 
-            params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
+            params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
         )
     
         research_effort = compute_research_effort(
@@ -1040,7 +1049,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      (swe_multiplier)**params.coding_labor_exponent * compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True) = compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization)
+      (swe_multiplier)**params.parallel_penalty * compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True) = compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
     where p = params.rho_coding_labor.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
@@ -1055,7 +1064,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier**params.coding_labor_exponent * compute_coding_labor(0, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)
+    target_output = swe_multiplier**params.parallel_penalty * compute_coding_labor(0, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
@@ -1063,7 +1072,7 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
         try:
             actual_output = compute_coding_labor(
                 A_candidate, L_AI, L_HUMAN, 
-                params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
+                params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
             return actual_output - target_output
         except Exception as e:
@@ -1523,7 +1532,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization, human_only=True)  
+            coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -1537,7 +1546,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             
             # Compute cognitive output with validation
             coding_labor = compute_coding_labor(
-                automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.coding_labor_exponent, params.coding_labor_normalization
+                automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
         
         if not np.isfinite(coding_labor) or coding_labor < 0:
@@ -2491,20 +2500,20 @@ class ProgressModel:
             ref_exp_compute = _log_interp(cfg.REFERENCE_YEAR, self.data.time, self.data.experiment_compute)
             ref_coding_labor = _log_interp(cfg.REFERENCE_YEAR, self.data.time, self.data.L_HUMAN)
             logger.info(f"ref_exp_compute: {ref_exp_compute}, ref_coding_labor: {ref_coding_labor}")
-            rho, alpha_experiment_capacity, experiment_compute_exponent, coding_labor_exponent = compute_exp_capacity_params_from_anchors(
+            rho, alpha_experiment_capacity, experiment_compute_exponent = compute_exp_capacity_params_from_anchors(
                 self.params.inf_labor_asymptote, 
                 self.params.inf_compute_asymptote, 
                 (cfg.REFERENCE_COMPUTE_CHANGE, self.params.compute_anchor_exp_cap), 
                 (cfg.REFERENCE_LABOR_CHANGE, self.params.labor_anchor_exp_cap), 
-                ref_exp_compute, ref_coding_labor
+                ref_exp_compute, ref_coding_labor,
+                self.params.parallel_penalty
             )
             self.params.rho_experiment_capacity = rho
             self.params.alpha_experiment_capacity = alpha_experiment_capacity
             self.params.experiment_compute_exponent = experiment_compute_exponent
-            self.params.coding_labor_exponent = coding_labor_exponent
-            logger.info(f"computed exp capacity params: rho: {rho}, alpha: {alpha_experiment_capacity}, experiment_compute_exponent: {experiment_compute_exponent}, coding_labor_exponent: {coding_labor_exponent}")
+            logger.info(f"computed exp capacity params: rho: {rho}, alpha: {alpha_experiment_capacity}, experiment_compute_exponent: {experiment_compute_exponent}")
         else:
-            logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}, coding_labor_exponent: {self.params.coding_labor_exponent}")
+            logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}")
         
         # hackily handle doubling_decay_rate = 0 case
         if self.params.doubling_decay_rate == 0:
@@ -2629,7 +2638,7 @@ class ProgressModel:
                 # Compute coding labor
                 coding_labor = compute_coding_labor(
                     automation_fraction, L_AI, L_HUMAN, 
-                    self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization
+                    self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                 )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 
@@ -2656,7 +2665,7 @@ class ProgressModel:
                 software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
+                human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
                 human_only_research_effort = compute_research_effort(
                     experiment_compute, human_only_coding_labor, 
@@ -2679,14 +2688,18 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.coding_labor_exponent, self.params.coding_labor_normalization, human_only=True)
+                human_contrib = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
                 ai_contrib = max(0.0, coding_labor - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
                 ai_labor_contributions.append(ai_contrib)
 
                 # Calculate automation multipliers on various quantities
-                ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.coding_labor_exponent) if ai_contrib > 0 else 0.0)
+                # Avoid division by zero when parallel_penalty is 0
+                if self.params.parallel_penalty and self.params.parallel_penalty != 0:
+                    ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.parallel_penalty) if ai_contrib > 0 else 0.0)
+                else:
+                    ai_coding_labor_multipliers.append(0.0)
                 ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
                 ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
@@ -2876,7 +2889,6 @@ class ProgressModel:
                 'rho': self.params.rho_experiment_capacity,
                 'alpha': self.params.alpha_experiment_capacity,
                 'experiment_compute_exponent': self.params.experiment_compute_exponent,
-                'coding_labor_exponent': self.params.coding_labor_exponent
             }
         }
         
