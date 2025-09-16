@@ -17,7 +17,7 @@ Usage:
     --config config/sampling_config.yaml \
     --num-samples 5000 \
     --input-data input_data.csv \
-    --time-range 2015 2035 \
+    --time-range 2015 2045 \
     --seed 123
 
 If --config is omitted, a default independent distribution is derived from

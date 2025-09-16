@@ -189,7 +189,7 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
-    'sc_time_horizon_minutes': 124560.0, # 124560 minutes = 1 work year
+    'sc_time_horizon_minutes': 1223000000,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
@@ -208,8 +208,8 @@ DEFAULT_PARAMETERS = {
     'inv_compute_anchor_exp_cap': 3.33,
     # benchmarks and gaps mode
     'include_gap': 'no gap',
-    'gap_years': 2.0,
-    'pre_gap_sc_time_horizon': 10380.0,
+    'gap_years': 1.5,
+    'pre_gap_sc_time_horizon': 575500.0,
     # penalty on parallel coding labor contribution in exp capacity
     'parallel_penalty': 0.52,
 }
