@@ -49,7 +49,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 # Manual Horizon Fitting Parameters
 DEFAULT_present_day = 2025.25
 DEFAULT_present_horizon = 15  # Will be optimized if None
-DEFAULT_present_doubling_time = 0.460  # Will be optimized if None
+DEFAULT_present_doubling_time = 0.408  # Will be optimized if None
 DEFAULT_DOUBLING_DECAY_RATE = 0.080  # Will be optimized if None
 
 # AI Research Taste clipping bounds
