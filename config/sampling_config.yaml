@@ -28,9 +28,8 @@ parameters:
     dist: lognormal
     ci80: [62280, 2.4e13] # [6 work months, 200,000 work years]
   horizon_extrapolation_type:
-    dist: choice
-    values: ["exponential", "decaying doubling time"]
-    p: [0.3, 0.7]
+    dist: fixed
+    value: decaying doubling time
 
   # Gaps mode
   pre_gap_sc_time_horizon:
@@ -55,12 +54,10 @@ parameters:
     dist: lognormal
     ci80: [0.25, 0.667]
   doubling_decay_rate:
-    dist: beta
-    alpha: 1.5
-    beta: 20.0
-    min: 0.000001
-    max: 0.5
-    clip_to_bounds: true
+    dist: normal
+    ci80:
+    - -0.04
+    - 0.2
 
   
   # coding labor
