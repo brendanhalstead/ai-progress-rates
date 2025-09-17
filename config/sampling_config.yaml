@@ -46,10 +46,10 @@ parameters:
   # Manual horizon fitting (used when horizon_extrapolation_type="decaying doubling time")
   present_day:
     dist: fixed
-    value: 2025.25
+    value: 2025.6
   present_horizon:
     dist: fixed
-    value: 15.0
+    value: 26.0
   present_doubling_time:
     dist: lognormal
     ci80: [0.25, 0.667]
