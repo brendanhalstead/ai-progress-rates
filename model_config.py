@@ -179,13 +179,13 @@ DEFAULT_PARAMETERS = {
     'alpha_experiment_capacity': 0.701,
     'r_software': 2.40,
     'automation_fraction_at_superhuman_coder': 1.0,
-    'swe_multiplier_at_present_day': 1.6,
+    'swe_multiplier_at_present_day': 1.35,
     'automation_interp_type': "linear",
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
-    'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
+    'ai_research_taste_at_superhuman_coder_sd': 1,  # Optional: specify SC taste in SD-within-human-range
     'ai_research_taste_slope': 2.0,
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,

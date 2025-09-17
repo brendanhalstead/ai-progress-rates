@@ -1365,7 +1365,6 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         current_sd = slope * penalty * cumulative_progress + offset
         current_sd_clamped = min(current_sd, cfg.AI_RESEARCH_TASTE_MAX_SD)
 
-
         ai_research_taste = taste_distribution.get_taste_at_sd(current_sd_clamped)
         
     except Exception as e:
