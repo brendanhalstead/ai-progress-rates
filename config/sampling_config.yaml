@@ -59,11 +59,11 @@ parameters:
     - -0.04
     - 0.2
 
-  
   # coding labor
   rho_coding_labor:
-    dist: fixed
-    value: -2.0
+    dist: choice
+    values: [-5, -2, -1]
+    p: [0.25, 0.5, 0.25]
 
   # experiment capacity
   inf_compute_asymptote:
