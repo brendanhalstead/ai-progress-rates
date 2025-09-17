@@ -179,7 +179,7 @@ DEFAULT_PARAMETERS = {
     'alpha_experiment_capacity': 0.701,
     'r_software': 2.40,
     'automation_fraction_at_superhuman_coder': 1.0,
-    'swe_multiplier_at_present_day': 1.35,
+    'swe_multiplier_at_present_day': 1.6,
     'automation_interp_type': "linear",
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,

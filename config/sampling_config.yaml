@@ -86,7 +86,7 @@ parameters:
 
   swe_multiplier_at_present_day:
     dist: shifted_lognormal
-    ci80: [0.08, 1.5]
+    ci80: [0.15, 2.4]
     shift: 1.0
   automation_interp_type:
     dist: fixed
