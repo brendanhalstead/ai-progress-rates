@@ -277,7 +277,7 @@ class Parameters:
     present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_day'])
     present_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_horizon'])
     present_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_doubling_time'])
-    doubling_decay_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_decay_rate'])
+    doubling_difficulty_growth_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_difficulty_growth_rate'])
     
     # Normalization
     coding_labor_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_normalization'])
@@ -375,10 +375,10 @@ class Parameters:
                 logger.warning(f"Invalid present_doubling_time: {self.present_doubling_time}, setting to None for optimization")
                 self.present_doubling_time = None
         
-        if self.doubling_decay_rate is not None:
-            if not np.isfinite(self.doubling_decay_rate):
-                logger.warning(f"Invalid doubling_decay_rate: {self.doubling_decay_rate}, setting to None for optimization")
-                self.doubling_decay_rate = None
+        if self.doubling_difficulty_growth_rate is not None:
+            if not np.isfinite(self.doubling_difficulty_growth_rate):
+                logger.warning(f"Invalid doubling_difficulty_growth_rate: {self.doubling_difficulty_growth_rate}, setting to None for optimization")
+                self.doubling_difficulty_growth_rate = None
 
         if self.inv_compute_anchor_exp_cap is not None:
             logger.warning(f"inv_compute_anchor_exp_cap is not None, overriding compute_anchor_exp_cap to 1 / inv_compute_anchor_exp_cap")
@@ -2036,9 +2036,9 @@ class ProgressModel:
                     else:
                         params_to_optimize.append('T_0')
                     
-                    # Handle A_0 (doubling_decay_rate)
-                    if self.params.doubling_decay_rate is not None:
-                        fixed_params['A_0'] = self.params.doubling_decay_rate
+                    # Handle A_0 (doubling_difficulty_growth_rate converted to decay_rate)
+                    if self.params.doubling_difficulty_growth_rate is not None:
+                        fixed_params['A_0'] = 1.0 - self.params.doubling_difficulty_growth_rate
                     else:
                         params_to_optimize.append('A_0')
                     
@@ -2046,7 +2046,7 @@ class ProgressModel:
                         # All parameters specified (Case 8)
                         H_0 = self.params.present_horizon
                         T_0 = doubling_time_in_progress_units
-                        A_0 = self.params.doubling_decay_rate
+                        A_0 = 1.0 - self.params.doubling_difficulty_growth_rate
                         logger.info(f"Manual decaying doubling time: All parameters specified")
                     elif len(params_to_optimize) == 1:
                         # Optimize one parameter
@@ -2517,9 +2517,9 @@ class ProgressModel:
         else:
             logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}")
         
-        # hackily handle doubling_decay_rate = 0 case
-        if self.params.doubling_decay_rate == 0:
-            logger.info(f"doubling_decay_rate is 0, setting to exponential")
+        # hackily handle doubling_difficulty_growth_rate = 1 case (equivalent to decay_rate = 0)
+        if self.params.doubling_difficulty_growth_rate == 1.0:
+            logger.info(f"doubling_difficulty_growth_rate is 1.0 (decay_rate = 0), setting to exponential")
             self.params.horizon_extrapolation_type = "exponential"
 
         # next compute human-only trajectory

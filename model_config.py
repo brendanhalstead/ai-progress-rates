@@ -56,7 +56,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 DEFAULT_present_day = 2025.6
 DEFAULT_present_horizon = 26  # Will be optimized if None
 DEFAULT_present_doubling_time = 0.408  # Will be optimized if None
-DEFAULT_DOUBLING_DECAY_RATE = 0.080  # Will be optimized if None
+DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE = 0.920  # Will be optimized if None (1 - 0.080)
 
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
@@ -122,7 +122,7 @@ PARAMETER_BOUNDS = {
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
     'present_doubling_time': (0.01, 2),  # doubling time in present years
-    'doubling_decay_rate': (-0.5, 0.5),  # decay rate
+    'doubling_difficulty_growth_rate': (0.5, 1.5),  # difficulty growth rate (1 - decay rate)
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
     # coding_labor_exponent deprecated in favor of parallel_penalty
@@ -204,7 +204,7 @@ DEFAULT_PARAMETERS = {
     'present_day': DEFAULT_present_day,
     'present_horizon': DEFAULT_present_horizon,
     'present_doubling_time': DEFAULT_present_doubling_time,
-    'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
+    'doubling_difficulty_growth_rate': DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # coding_labor_exponent deprecated in favor of parallel_penalty
