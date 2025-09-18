@@ -265,7 +265,7 @@ class Parameters:
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
     ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
-    ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
+    ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
@@ -2535,6 +2535,25 @@ class ProgressModel:
             logger.warning(f"Failed to estimate horizon trajectory: {e}")
             self.horizon_trajectory = None
 
+        # Convert AI research taste slope if using "SDs per progress-year" mode
+        # This must be done after computing anchor_progress_rate but before the main trajectory
+        # Store original slope for display purposes
+        self._original_taste_slope = self.params.ai_research_taste_slope
+        if self.params.taste_schedule_type == "SDs per progress-year":
+            try:
+                anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
+                if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0:
+                    # Convert from SD/progress-year to SD/progress-unit by multiplying by (1 year / anchor_progress_rate progress-units)
+                    # which simplifies to dividing by anchor_progress_rate
+                    original_slope = self.params.ai_research_taste_slope
+                    converted_slope = original_slope / anchor_progress_rate
+                    logger.info(f"Converting taste slope from {original_slope:.6f} SD/progress-year to {converted_slope:.6f} SD/progress-unit (anchor rate: {anchor_progress_rate:.6f})")
+                    self.params.ai_research_taste_slope = converted_slope
+                else:
+                    logger.warning(f"Invalid anchor_progress_rate for taste slope conversion: {anchor_progress_rate}")
+            except Exception as e:
+                logger.warning(f"Failed to convert taste slope for progress-year mode: {e}")
+
         # compute automation fraction at anchor time
         present_day = self.params.present_day
         anchor_progress = self.human_only_results['anchor_stats']['progress']
@@ -2840,11 +2859,20 @@ class ProgressModel:
 
         # Compute AI research taste slope in SD per anchor-progress-year (SD/year at anchor)
         ai_taste_slope_per_anchor_progress_year = None
+        ai_taste_slope_per_effective_oom = None
         try:
             if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate):
-                ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
+                if self.params.taste_schedule_type == "SDs per progress-year":
+                    # For progress-year mode, use original input value for progress-year display
+                    ai_taste_slope_per_anchor_progress_year = float(self._original_taste_slope)
+                    # And compute effective OOM value using converted slope
+                    ai_taste_slope_per_effective_oom = float(self.params.ai_research_taste_slope)
+                else:
+                    # For effective OOM mode, compute progress-year display from effective OOM input
+                    ai_taste_slope_per_effective_oom = float(self.params.ai_research_taste_slope)
+                    ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
         except Exception as e:
-            logger.warning(f"Failed computing taste slope per anchor-progress-year: {e}")
+            logger.warning(f"Failed computing taste slope conversions: {e}")
         
         # Store comprehensive results
         self.results = {
@@ -2880,6 +2908,7 @@ class ProgressModel:
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
             'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
+            'ai_research_taste_slope_per_effective_oom': ai_taste_slope_per_effective_oom,  # SD per effective OOM
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

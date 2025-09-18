@@ -40,7 +40,13 @@ MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.25           # threshold taste ÷ median tast
 # Research Taste Schedule Configuration (UI-level options)
 # Internally, both SD-based options map to 'sd_per_progress' logic; units differ in UI only
 TASTE_SCHEDULE_TYPES = ["SDs per effective OOM", "SDs per progress-year"]
-DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per effective OOM"
+DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per progress-year"
+
+# Default AI research taste slope values for different modes
+TASTE_SLOPE_DEFAULTS = {
+    "SDs per effective OOM": 1.18,
+    "SDs per progress-year": 1.8
+}
 
 # Horizon Extrapolation Configuration
 HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
@@ -188,7 +194,7 @@ DEFAULT_PARAMETERS = {
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 1,  # Optional: specify SC taste in SD-within-human-range
-    'ai_research_taste_slope': 2.0,
+    'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
     'sc_time_horizon_minutes': 1223000000,

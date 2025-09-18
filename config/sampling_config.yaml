@@ -98,11 +98,12 @@ parameters:
     ci80: [-2.5, 4.5]
   ai_research_taste_slope:
     dist: lognormal
-    ci80: [0.45, 7.65]
+    ci80: [0.5, 6.5]
   median_to_top_taste_multiplier:
     dist: shifted_lognormal
     ci80: [0.4, 12.7]
     shift: 1.0
+
   # Software scale / normalization
   r_software:
     dist: lognormal

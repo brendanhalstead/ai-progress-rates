@@ -1881,9 +1881,11 @@ def compute_model():
         'time_range': time_range
     }
     
-    # Add anchor taste slope metric if available
+    # Add anchor taste slope metrics if available
     if model.results.get('ai_research_taste_slope_per_anchor_progress_year') is not None:
         summary['ai_research_taste_slope_per_anchor_progress_year'] = float(model.results['ai_research_taste_slope_per_anchor_progress_year'])
+    if model.results.get('ai_research_taste_slope_per_effective_oom') is not None:
+        summary['ai_research_taste_slope_per_effective_oom'] = float(model.results['ai_research_taste_slope_per_effective_oom'])
 
     # Add anchor progress rate if available
     if model.results.get('anchor_progress_rate') is not None:
@@ -1927,6 +1929,7 @@ def get_parameter_config():
             'defaults': cfg.DEFAULT_PARAMETERS,
             'validation_thresholds': cfg.PARAM_VALIDATION_THRESHOLDS,
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
+            'taste_slope_defaults': cfg.TASTE_SLOPE_DEFAULTS,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'automation_interp_types': ['exponential', 'linear'],
             'pre_gap_sc_time_horizon': cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'],

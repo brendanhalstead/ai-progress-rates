@@ -1622,7 +1622,45 @@
           if (selected === "SDs per effective OOM") {
             slopeInfoEl.textContent = "Slope: SD per effective OOM";
           } else if (selected === "SDs per progress-year") {
-            slopeInfoEl.textContent = "Slope: SD per present-progress-year";
+            slopeInfoEl.textContent = "Slope: SD per progress-year";
+          }
+        }
+
+        // Update the main label units text
+        const labelElement = document.querySelector('label[for="ai_research_taste_slope"], label:has(#ai_research_taste_slope_val)');
+        if (labelElement) {
+          const unitsText = labelElement.querySelector(':scope > *:last-child');
+          if (unitsText && unitsText.nodeType === Node.TEXT_NODE) {
+            // Find and update the units text node
+            const textNode = Array.from(labelElement.childNodes).find(node =>
+              node.nodeType === Node.TEXT_NODE && node.textContent.trim().startsWith('SD/')
+            );
+            if (textNode) {
+              if (selected === "SDs per effective OOM") {
+                textNode.textContent = 'SD/effective-OOM';
+              } else if (selected === "SDs per progress-year") {
+                textNode.textContent = 'SD/progress-year';
+              }
+            }
+          } else {
+            // Fallback: update the last text content
+            const html = labelElement.innerHTML;
+            if (selected === "SDs per effective OOM") {
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/effective-OOM');
+            } else if (selected === "SDs per progress-year") {
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/progress-year');
+            }
+          }
+        }
+
+        // Update the slider value to the appropriate default for the mode
+        const slopeSlider = document.getElementById("ai_research_taste_slope");
+        if (slopeSlider && parameterConfig?.taste_slope_defaults) {
+          const defaultValue = parameterConfig.taste_slope_defaults[selected];
+          if (defaultValue !== undefined) {
+            slopeSlider.value = defaultValue;
+            // Update the display value
+            updateDisplayValue(slopeSlider);
           }
         }
       }
@@ -3707,13 +3745,26 @@
             "ai_research_taste_slope_info"
           );
           if (slopeInfoEl) {
-            const slope =
-              summary.ai_research_taste_slope_per_anchor_progress_year;
+            // Get current taste schedule type
+            const tasteScheduleSelect = document.getElementById("taste_schedule_type");
+            const currentType = tasteScheduleSelect ? tasteScheduleSelect.value : "SDs per effective OOM";
+
+            let slope, units;
+            if (currentType === "SDs per progress-year") {
+              // When in progress-year mode, show the equivalent effective OOM value
+              slope = summary.ai_research_taste_slope_per_effective_oom;
+              units = "SD/effective-OOM";
+            } else {
+              // When in effective OOM mode, show the equivalent progress-year value
+              slope = summary.ai_research_taste_slope_per_anchor_progress_year;
+              units = "SD/anchor-progress-year";
+            }
+
             if (slope !== undefined && slope !== null && isFinite(slope)) {
               slopeInfoEl.textContent = `Slope at present: ${fmt(
                 slope,
                 2
-              )} SD/anchor-progress-year`;
+              )} ${units}`;
             } else {
               slopeInfoEl.textContent = "Steepness of research taste curve";
             }
