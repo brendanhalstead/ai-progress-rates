@@ -452,10 +452,8 @@
                         }
                     } else if (dist === 'shifted_lognormal') {
                         if (lowVal > 0 && highVal > 0) {
-                            const shiftField = specCell.querySelector('.dist-field[data-key="shift"]');
-                            const shift = parseNum(shiftField?.value);
                             const baseMedian = Math.sqrt(lowVal * highVal);
-                            median = isFiniteNumber(baseMedian) ? baseMedian + (isFiniteNumber(shift) ? shift : 0) : null;
+                            median = isFiniteNumber(baseMedian) ? baseMedian : null;
                         }
                     }
                 }

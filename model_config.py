@@ -35,7 +35,7 @@ AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 
 # Research Taste Distribution Parameters (Log-Normal)
 TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
-MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.23           # threshold taste ÷ median taste
+MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration (UI-level options)
 # Internally, both SD-based options map to 'sd_per_progress' logic; units differ in UI only
