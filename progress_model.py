@@ -240,8 +240,7 @@ class TasteDistribution:
         return (f"TasteDistribution(top_percentile={self.top_percentile:.3f}, "
                 f"median_to_top_gap={self.median_to_top_gap:.2f}, "
                 f"baseline_mean={self.baseline_mean:.2f})")
-
-
+    
 @dataclass
 class Parameters:
     """Model parameters with validation"""
@@ -415,6 +414,69 @@ class Parameters:
             logger.warning(f"Invalid baseline_annual_compute_multiplier: {self.baseline_annual_compute_multiplier}, setting to default")
             self.baseline_annual_compute_multiplier = cfg.BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT
         
+class AutomationModel:
+    """Automation model"""
+    def __init__(self, params: Parameters):
+        self.initial_FTE_per_GPU = 0.01
+        self.FTE_per_GPU_slope = 1.0
+        self.progress_base_unit = 10 # This assumes each unit of progress is an OOM of E.C.
+        self.schedule_type = getattr(params, 'automation_interp_type', cfg.DEFAULT_PARAMETERS['automation_interp_type'])
+        anchors = list(params.automation_anchors.items())
+        anchors.sort(key=lambda x: x[0])
+        self.anchor_points = anchors
+        (prog_1, aut_1), (prog_2, aut_2) = self.anchor_points
+        self.linear_aut_slope = (aut_2 - aut_1) / (prog_2 - prog_1)
+        self.linear_aut_intercept = aut_1 - self.linear_aut_slope * prog_1
+        self.exponential_aut_slope = (np.log(aut_2) - np.log(aut_1)) / (prog_2 - prog_1)
+
+    def get_automation_fraction(self, progress:float) -> float:
+        """Compute the automation fraction"""
+        if self.schedule_type == "linear":
+            return np.clip(self.linear_aut_intercept + self.linear_aut_slope * progress, 0.0, 1.0)
+        elif self.schedule_type == "exponential":
+            assert False, "Exponential schedule type not implemented"
+        else:
+            assert False, "Invalid schedule type"
+
+    def get_progress_from_index(self, index:float) -> float:
+        """Get the progress from the index"""
+        def get_prog_linear(index:float) -> float:
+            """Get the progress from the index"""
+            (prog_1, aut_1), (prog_2, aut_2) = self.anchor_points
+            prog_slope = 1 / self.linear_aut_slope
+            prog_for_zero = prog_1 - prog_slope * aut_1
+            prog_for_one = prog_2 + prog_slope * (1 - aut_2)
+            return index * prog_for_one + (1 - index) * prog_for_zero
+        def get_prog_exponential(index:float) -> float:
+            """Get the progress from the index"""
+            assert False, "Exponential schedule type not implemented"
+        if self.schedule_type == "linear":
+            return get_prog_linear(index)
+        elif self.schedule_type == "exponential":
+            return get_prog_exponential(index)
+        else:
+            assert False, "Invalid schedule type"
+
+    def get_FTE_per_GPU(self, index:float, progress:float) -> float:
+        """Compute the FTE per GPU for a given task index at a given E.C. level"""
+        index_progress = self.get_progress_from_index(index)
+        if progress < index_progress:
+            return 0.0
+        progress_diff = progress - index_progress
+        growth_factor = self.progress_base_unit ** (self.FTE_per_GPU_slope * progress_diff)
+        return self.initial_FTE_per_GPU * growth_factor
+
+    def get_crit_index(self, progress:float, aut_compute: float, L_HUMAN: float, rho: float) -> float:
+        """
+        Compute the critical index for a given progress
+        TODO: Implement actual optimization to find the critical index
+        """
+        return self.get_automation_fraction(progress)
+    
+    def get_coding_labor(self, crit_index:float, progress:float, aut_compute: float, L_HUMAN: float, rho: float) -> float:
+        """Compute the coding labor for a given critical index and progress"""
+        return self.get_FTE_per_GPU(crit_index, progress)
+
 
 @dataclass
 class AnchorConstraint:
@@ -1147,6 +1209,9 @@ def compute_automation_fraction(cumulative_progress: float, params: Parameters) 
     Returns:
         Automation fraction in [0, 1].
     """
+    automation_model = AutomationModel(params)
+    return automation_model.get_automation_fraction(cumulative_progress)
+
     if params.automation_anchors is None:
         assert False, "automation_anchors must be provided"
     
