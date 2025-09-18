@@ -26,7 +26,7 @@ parameters:
   # Superhuman coder time horizon + extrapolation
   sc_time_horizon_minutes:
     dist: lognormal
-    ci80: [62280, 2.4e13] # [6 work months, 200,000 work years]
+    ci80: [62280, 2.5e12] # [6 work months, 2,000,000 work years]
   horizon_extrapolation_type:
     dist: fixed
     value: decaying doubling time
