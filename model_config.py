@@ -35,7 +35,7 @@ AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 
 # Research Taste Distribution Parameters (Log-Normal)
 TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
-MEDIAN_TO_TOP_TASTE_GAP = 3.25           # threshold taste ÷ median taste
+MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.23           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration (UI-level options)
 # Internally, both SD-based options map to 'sd_per_progress' logic; units differ in UI only
@@ -128,6 +128,8 @@ PARAMETER_BOUNDS = {
     'inv_compute_anchor_exp_cap': (0, 10),
     # parallel penalty for experiment capacity CES
     'parallel_penalty': (0.0, 1.0),
+    # Research taste distribution parameter
+    'median_to_top_taste_multiplier': (1.1, 20.0),
 }
 
 # Validation thresholds for parameter combinations
@@ -212,6 +214,8 @@ DEFAULT_PARAMETERS = {
     'pre_gap_sc_time_horizon': 575500.0,
     # penalty on parallel coding labor contribution in exp capacity
     'parallel_penalty': 0.52,
+    # Research taste distribution parameter
+    'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
 }
 
 # =============================================================================

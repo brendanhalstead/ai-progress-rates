@@ -63,7 +63,7 @@ class TasteDistribution:
     
     def __init__(self, 
                  top_percentile: float = cfg.TOP_PERCENTILE,
-                 median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
+                 median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER,
                  baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE):
         """
         Initialize the taste distribution with empirical anchors.
@@ -293,7 +293,10 @@ class Parameters:
     inv_compute_anchor_exp_cap: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['inv_compute_anchor_exp_cap'])
     # penalty on parallel coding labor in exp capacity CES
     parallel_penalty: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['parallel_penalty'])
-    
+
+    # Research taste distribution parameter
+    median_to_top_taste_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['median_to_top_taste_multiplier'])
+
     # Benchmarks and gaps mode
     include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
     gap_years: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_years'])
@@ -319,7 +322,7 @@ class Parameters:
         # If SD-specification is provided, convert to raw taste via TasteDistribution
         if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
             try:
-                taste_distribution_tmp = TasteDistribution()
+                taste_distribution_tmp = TasteDistribution(median_to_top_gap=self.median_to_top_taste_multiplier)
                 converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_superhuman_coder_sd))
                 if np.isfinite(converted_taste):
                     self.ai_research_taste_at_superhuman_coder = float(converted_taste)
@@ -878,7 +881,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         else:
             initial_automation = compute_automation_fraction(initial_progress, params)
             initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
-            initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+            initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
             coding_labor_0 = compute_coding_labor(
                 initial_automation, L_AI_0, L_HUMAN_0, 
                 params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
@@ -991,7 +994,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
         initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
-        initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste)
+        initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
         coding_labor = compute_coding_labor(
             initial_automation, L_AI, L_HUMAN, 
             params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
@@ -1385,7 +1388,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
 
 def compute_aggregate_research_taste(ai_research_taste: float, 
                                    top_percentile: float = cfg.TOP_PERCENTILE,
-                                   median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_GAP,
+                                   median_to_top_gap: float = cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER,
                                    baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     Compute aggregate research taste using the log-normal distribution with a *clip-and-keep* floor.
@@ -1430,7 +1433,7 @@ def compute_aggregate_research_taste(ai_research_taste: float,
     
     if median_to_top_gap <= 1:
         logger.warning(f"Invalid median_to_top_gap: {median_to_top_gap}, using default")
-        median_to_top_gap = cfg.MEDIAN_TO_TOP_TASTE_GAP
+        median_to_top_gap = cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER
     
     if baseline_mean <= 0:
         logger.warning(f"Invalid baseline_mean: {baseline_mean}, using default")
@@ -1541,7 +1544,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             
             # Compute AI research taste and aggregate research taste
             ai_research_taste = compute_ai_research_taste(cumulative_progress, params)
-            aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
+            aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
             
             # Compute cognitive output with validation
             coding_labor = compute_coding_labor(
@@ -1794,7 +1797,7 @@ class ProgressModel:
         self._horizon_params = None
         
         # Initialize taste distribution for working with research taste
-        self.taste_distribution = TasteDistribution()
+        self.taste_distribution = TasteDistribution(median_to_top_gap=self.params.median_to_top_taste_multiplier)
     
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
@@ -2613,7 +2616,7 @@ class ProgressModel:
                 ai_research_taste = compute_ai_research_taste(progress, self.params)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
-                aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste)
+                aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste, median_to_top_gap=self.params.median_to_top_taste_multiplier)
                 ai_research_tastes.append(ai_research_taste)
                 ai_research_taste_sds.append(ai_research_taste_sd if np.isfinite(ai_research_taste_sd) else 0.0)
                 ai_research_taste_quantiles.append(ai_research_taste_quantile if np.isfinite(ai_research_taste_quantile) else 0.0)
@@ -2665,7 +2668,7 @@ class ProgressModel:
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
                 human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
-                human_only_aggregate_research_taste = compute_aggregate_research_taste(0) # No AI research taste
+                human_only_aggregate_research_taste = compute_aggregate_research_taste(0, median_to_top_gap=self.params.median_to_top_taste_multiplier) # No AI research taste
                 human_only_research_effort = compute_research_effort(
                     experiment_compute, human_only_coding_labor, 
                     self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste

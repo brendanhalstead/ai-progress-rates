@@ -1804,7 +1804,9 @@ def params_to_dict(params: Parameters):
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
         # Gap mode selection
         'include_gap': getattr(params, 'include_gap', 'no gap'),
-        'gap_years': float(getattr(params, 'gap_years', 0.0))
+        'gap_years': float(getattr(params, 'gap_years', 0.0)),
+        # Research taste distribution parameter
+        'median_to_top_taste_multiplier': getattr(params, 'median_to_top_taste_multiplier', None),
     }
     
     # Add calculated SC information if available from the current session
@@ -2078,6 +2080,11 @@ def get_parameter_config():
                     'name': 'Exp. Cap. Reduction with 0.1x compute',
                     'description': 'Inverse form: capacity at 0.1x compute relative to baseline (i.e., reduction factor). The model uses 1 / value internally for the direct anchor.',
                     'units': 'x relative to baseline'
+                },
+                'median_to_top_taste_multiplier': {
+                    'name': 'Median to Top Taste Multiplier',
+                    'description': 'Ratio of top percentile researcher taste to median researcher taste',
+                    'units': 'ratio'
                 }
             }
         }
@@ -2519,8 +2526,10 @@ def get_default_data():
             'present_horizon': params.present_horizon,
             'present_doubling_time': params.present_doubling_time,
             'doubling_decay_rate': params.doubling_decay_rate,
-            # Baseline Annual Compute Multiplier  
-            'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier
+            # Baseline Annual Compute Multiplier
+            'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
+            # Research taste distribution parameter
+            'median_to_top_taste_multiplier': params.median_to_top_taste_multiplier
         }
     })
 

@@ -824,6 +824,25 @@
                         >
                       </div>
                     </div>
+                    <div class="row mt-2">
+                      <div class="col-12">
+                        <label class="param-label"
+                          >Median to Top Taste Multiplier:
+                          <span id="median_to_top_taste_multiplier_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="median_to_top_taste_multiplier"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >Ratio of top percentile researcher taste to median researcher taste</small
+                        >
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="param-group">
@@ -1244,6 +1263,7 @@
         "parallel_penalty",
         "ai_research_taste_at_superhuman_coder_sd",
         "ai_research_taste_slope",
+        "median_to_top_taste_multiplier",
         "taste_schedule_type",
         "sc_time_horizon_minutes",
         "horizon_extrapolation_type",
