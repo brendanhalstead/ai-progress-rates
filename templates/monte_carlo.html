@@ -151,7 +151,7 @@
                                 <label class="form-label small">Sensitivity: Spearman Correlation (top)</label>
                                 <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" style="display: none;">
                                 <label class="form-label small">Sensitivity: Permutation Importance (top)</label>
                                 <img id="imgSensPerm" class="img-fluid rounded border" alt="Sensitivity Permutation" />
                             </div>
@@ -998,12 +998,8 @@
             } else {
                 spWrap.style.display = 'none';
             }
-            if (hasAny('sensitivity_permutation_top.png')) {
-                document.getElementById('imgSensPerm').src = base('sensitivity_permutation_top.png');
-                pmWrap.style.display = '';
-            } else {
-                pmWrap.style.display = 'none';
-            }
+            // Permutation importance always hidden
+            pmWrap.style.display = 'none';
 
             // Wire up download-all
             const btnZip = document.getElementById('btnDownloadZip');
