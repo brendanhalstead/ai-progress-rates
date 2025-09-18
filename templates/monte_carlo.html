@@ -144,7 +144,11 @@
                                 <img id="imgHorizonTraj" class="img-fluid rounded border" alt="Horizon trajectories" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small">Sensitivity: Spearman (top)</label>
+                                <label class="form-label small">Sensitivity: Pearson Correlation (top)</label>
+                                <img id="imgSensPearson" class="img-fluid rounded border" alt="Sensitivity Pearson" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Spearman Correlation (top)</label>
                                 <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
                             </div>
                             <div class="col-md-6">
@@ -914,6 +918,7 @@
             // Toggle and set image sources based on available artifacts
             const scWrap = document.getElementById('imgScHist').closest('.col-12');
             const htWrap = document.getElementById('imgHorizonTraj').closest('.col-12');
+            const pearsonWrap = document.getElementById('imgSensPearson').closest('.col-md-6');
             const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
             const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
             const scqWrap = document.getElementById('scByQuarter').closest('.col-12');
@@ -980,6 +985,12 @@
                 htWrap.style.display = '';
             } else {
                 htWrap.style.display = 'none';
+            }
+            if (hasAny('sensitivity_pearson_top.png')) {
+                document.getElementById('imgSensPearson').src = base('sensitivity_pearson_top.png');
+                pearsonWrap.style.display = '';
+            } else {
+                pearsonWrap.style.display = 'none';
             }
             if (hasAny('sensitivity_spearman_top.png')) {
                 document.getElementById('imgSensSpearman').src = base('sensitivity_spearman_top.png');

@@ -51,6 +51,30 @@ def _is_numeric(value: Any) -> bool:
     return isinstance(value, (int, float)) and np.isfinite(value)
 
 
+def _map_include_gap_to_binary(values: List[Any]) -> np.ndarray:
+    """
+    Map include_gap values to binary for correlation purposes:
+    - "gap" (and common truthy variants) -> 1.0
+    - "no gap" (and common falsy variants) -> 0.0
+    Anything else -> NaN
+    """
+    mapped = np.full(len(values), np.nan, dtype=float)
+    for i, v in enumerate(values):
+        if v is None:
+            continue
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("gap", "yes", "true", "1"):
+                mapped[i] = 1.0
+            elif s in ("no gap", "no", "false", "0"):
+                mapped[i] = 0.0
+        elif isinstance(v, bool):
+            mapped[i] = 1.0 if v else 0.0
+        elif isinstance(v, (int, float)):
+            mapped[i] = 1.0 if float(v) != 0.0 else 0.0
+    return mapped
+
+
 def _collect_dataset(records: List[Dict[str, Any]]) -> Tuple[List[str], List[str], np.ndarray, Dict[str, List[Any]]]:
     """
     From rollout records, build:
@@ -271,6 +295,20 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
         vals = param_values_raw[name]
         correlations[name] = _compute_categorical_anova(vals, y)
 
+    # Special-case: treat include_gap as binary for Spearman and Pearson
+    if "include_gap" in categorical_names:
+        try:
+            mapped = _map_include_gap_to_binary(param_values_raw["include_gap"])  # type: ignore[index]
+            sp = _compute_numeric_correlations(mapped, y)
+            correlations.setdefault("include_gap", {})
+            # Record Spearman and Pearson so it can be plotted/printed alongside numeric params
+            correlations["include_gap"]["spearman_rho"] = float(sp.get("spearman_rho", float("nan")))
+            correlations["include_gap"]["spearman_p"] = float(sp.get("spearman_p", float("nan")))
+            correlations["include_gap"]["pearson_r"] = float(sp.get("pearson_r", float("nan")))
+            correlations["include_gap"]["pearson_p"] = float(sp.get("pearson_p", float("nan")))
+        except Exception:
+            pass
+
     # Build feature matrix for permutation importance
     # Numeric features
     feature_names: List[str] = []
@@ -325,9 +363,35 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
         try:
             import matplotlib.pyplot as plt
 
-            # Spearman for numeric only
+            # Pearson correlation for numeric parameters (+ special-case include_gap)
+            pearson_names = list(numeric_names)
+            if "include_gap" not in pearson_names and "include_gap" in correlations:
+                pearson_names.append("include_gap")
+            pearson_items = [
+                (name, correlations[name]["pearson_r"]) for name in pearson_names if np.isfinite(correlations[name].get("pearson_r", float("nan")))  # type: ignore[index]
+            ]
+            pearson_items.sort(key=lambda x: abs(x[1]), reverse=True)
+
+            if pearson_items:
+                names, vals = zip(*pearson_items[:30])
+                plt.figure(figsize=(10, max(3, len(names) * 0.3)))
+                y_pos = np.arange(len(names))
+                plt.barh(y_pos, vals, align='center')
+                plt.yticks(y_pos, names)
+                plt.xlabel('Pearson r with sc_time')
+                plt.title('Top numeric parameters by Pearson correlation')
+                plt.gca().invert_yaxis()
+                plot_path = rollouts_path.parent / 'sensitivity_pearson_top.png'
+                plt.tight_layout()
+                plt.savefig(plot_path, dpi=150)
+                plt.close()
+
+            # Spearman correlation for numeric parameters (+ special-case include_gap)
+            spearman_names = list(numeric_names)
+            if "include_gap" not in spearman_names and "include_gap" in correlations:
+                spearman_names.append("include_gap")
             spearman_items = [
-                (name, correlations[name]["spearman_rho"]) for name in numeric_names if np.isfinite(correlations[name]["spearman_rho"])  # type: ignore[index]
+                (name, correlations[name]["spearman_rho"]) for name in spearman_names if np.isfinite(correlations[name].get("spearman_rho", float("nan")))  # type: ignore[index]
             ]
             spearman_items.sort(key=lambda x: abs(x[1]), reverse=True)
 
@@ -344,6 +408,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150)
                 plt.close()
+
 
             # Permutation importance
             perm_items = [(k, v[0]) for k, v in permutation_summary.items() if np.isfinite(v[0])]
@@ -396,21 +461,66 @@ def main() -> None:
 
     # Print concise top-10 summary to stdout
     print(f"Loaded {result['num_samples_used']} usable samples (of {result['num_records_total']}).")
-    # Spearman
+
+    # Numeric parameters - Pearson correlation (plus include_gap special-case)
     numeric_names = result.get("numeric_parameters", [])
+    categorical_names = result.get("categorical_parameters", [])
     assoc = result.get("associations", {})
+
+    pearson_list = []
+    pearson_names = list(numeric_names)
+    if "include_gap" not in pearson_names and "include_gap" in assoc and np.isfinite(assoc.get("include_gap", {}).get("pearson_r", float("nan"))):
+        pearson_names.append("include_gap")
+    for name in pearson_names:
+        entry = assoc.get(name, {})
+        r = entry.get("pearson_r")
+        if r is not None and np.isfinite(r):
+            pearson_list.append((name, float(r)))
+    pearson_list.sort(key=lambda x: abs(x[1]), reverse=True)
+    print("Top numeric by Pearson correlation (abs):")
+    for name, r in pearson_list[:10]:
+        print(f"  {name:30s}  r={r:+.3f}")
+
+    # Numeric parameters - Spearman correlation (plus include_gap special-case)
     spearman_list = []
-    for name in numeric_names:
+    spearman_names = list(numeric_names)
+    if "include_gap" not in spearman_names and "include_gap" in assoc and np.isfinite(assoc.get("include_gap", {}).get("spearman_rho", float("nan"))):
+        spearman_names.append("include_gap")
+    for name in spearman_names:
         entry = assoc.get(name, {})
         rho = entry.get("spearman_rho")
         if rho is not None and np.isfinite(rho):
             spearman_list.append((name, float(rho)))
     spearman_list.sort(key=lambda x: abs(x[1]), reverse=True)
-    print("Top numeric by Spearman (abs):")
+    print("Top numeric by Spearman correlation (abs):")
     for name, rho in spearman_list[:10]:
         print(f"  {name:30s}  rho={rho:+.3f}")
 
-    # Permutation
+    # Categorical parameters - ANOVA F-statistic
+    anova_list = []
+    for name in categorical_names:
+        entry = assoc.get(name, {})
+        f_stat = entry.get("anova_F")
+        if f_stat is not None and np.isfinite(f_stat):
+            anova_list.append((name, float(f_stat)))
+    anova_list.sort(key=lambda x: x[1], reverse=True)
+    print("Top categorical by ANOVA F-statistic:")
+    for name, f_stat in anova_list[:10]:
+        print(f"  {name:30s}  F={f_stat:.2f}")
+
+    # Categorical parameters - Eta-squared effect size
+    eta_list = []
+    for name in categorical_names:
+        entry = assoc.get(name, {})
+        eta_sq = entry.get("eta_squared")
+        if eta_sq is not None and np.isfinite(eta_sq):
+            eta_list.append((name, float(eta_sq)))
+    eta_list.sort(key=lambda x: x[1], reverse=True)
+    print("Top categorical by eta-squared effect size:")
+    for name, eta_sq in eta_list[:10]:
+        print(f"  {name:30s}  η²={eta_sq:.4f}")
+
+    # Permutation importance
     perm = result.get("permutation_importance", {})
     perm_items = [(k, v.get("mean_drop_in_r2", float("nan"))) for k, v in perm.items()]
     perm_items = [(k, v) for k, v in perm_items if np.isfinite(v)]
