@@ -130,6 +130,12 @@ PARAMETER_BOUNDS = {
     'parallel_penalty': (0.0, 1.0),
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': (1.1, 20.0),
+    # Optimal CES coding labor parameters
+    'optimal_ces_theta': (0.01, 10.0),
+    'optimal_ces_eta_init': (1e-12, 1e12),
+    'optimal_ces_grid_size': (256, 16384),
+    # coding labor mode (categorical; bounds unused by UI collector)
+    'coding_labor_mode': (0, 1),
 }
 
 # Validation thresholds for parameter combinations
@@ -216,6 +222,11 @@ DEFAULT_PARAMETERS = {
     'parallel_penalty': 0.52,
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
+    # Optimal CES coding labor configuration
+    'coding_labor_mode': 'simple_ces',  # {'simple_ces','optimal_ces'}
+    'optimal_ces_theta': 1.0,
+    'optimal_ces_eta_init': 1.0,
+    'optimal_ces_grid_size': 4096,
 }
 
 # =============================================================================

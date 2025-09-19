@@ -1786,6 +1786,10 @@ def params_to_dict(params: Parameters):
         'automation_interp_type': getattr(params, 'automation_interp_type', 'exponential'),
 
         'coding_labor_normalization': params.coding_labor_normalization,
+        'coding_labor_mode': getattr(params, 'coding_labor_mode', 'simple_ces'),
+        'optimal_ces_theta': getattr(params, 'optimal_ces_theta', 1.0),
+        'optimal_ces_eta_init': getattr(params, 'optimal_ces_eta_init', 1.0),
+        'optimal_ces_grid_size': getattr(params, 'optimal_ces_grid_size', 4096),
         'experiment_compute_exponent': params.experiment_compute_exponent,
             'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
             'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
@@ -1929,6 +1933,7 @@ def get_parameter_config():
             'taste_schedule_types': cfg.TASTE_SCHEDULE_TYPES,
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'automation_interp_types': ['exponential', 'linear'],
+            'coding_labor_modes': ['simple_ces', 'optimal_ces'],
             'pre_gap_sc_time_horizon': cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'],
             'descriptions': {
                 'rho_coding_labor': {
@@ -1971,6 +1976,26 @@ def get_parameter_config():
                     'name': 'Cognitive Output Normalization',
                     'description': 'Normalization factor for cognitive output',
                     'units': 'dimensionless'
+                },
+                'coding_labor_mode': {
+                    'name': 'Coding Labor Mode',
+                    'description': 'Select between simple CES and optimal frontier CES',
+                    'units': 'categorical'
+                },
+                'optimal_ces_theta': {
+                    'name': 'Optimal CES θ',
+                    'description': 'Slope of automation multiplier above threshold (η ∝ E^θ)',
+                    'units': 'dimensionless'
+                },
+                'optimal_ces_eta_init': {
+                    'name': 'Optimal CES η_init',
+                    'description': 'Automation multiplier at the threshold',
+                    'units': 'dimensionless'
+                },
+                'optimal_ces_grid_size': {
+                    'name': 'Optimal CES Grid Size',
+                    'description': 'Number of grid points for frontier precompute',
+                    'units': 'count'
                 },
                 'experiment_compute_exponent': {
                     'name': 'Experiment Compute Discounting (ζ)',

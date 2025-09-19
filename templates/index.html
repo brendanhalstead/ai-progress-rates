@@ -95,6 +95,69 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Coding Labor Mode and Optimal CES Settings -->
+            <div class="param-group">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <h6 class="text-muted mb-0">Coding Labor Mode and Optimal CES</h6>
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#optimalCesParams"
+                  aria-expanded="false"
+                  aria-controls="optimalCesParams"
+                >
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+              </div>
+              <div class="collapse" id="optimalCesParams">
+                <div class="mb-3">
+                  <label class="param-label" for="coding_labor_mode">Coding Labor Mode:</label>
+                  <select class="form-select form-select-sm" id="coding_labor_mode">
+                    <option value="simple_ces">Simple CES</option>
+                    <option value="optimal_ces">Optimal Frontier CES</option>
+                  </select>
+                  <small class="text-muted">Choose between the legacy simple CES and the optimized frontier CES implementation.</small>
+                </div>
+                <div class="mb-3">
+                  <label class="param-label" for="optimal_ces_theta">
+                    Optimal CES θ: <span id="optimal_ces_theta_val">Loading...</span>
+                  </label>
+                  <input
+                    type="range"
+                    class="range-input form-range"
+                    id="optimal_ces_theta"
+                    step="0.01"
+                  />
+                  <small class="text-muted">Slope of automation multiplier above threshold (η ∝ E^θ).</small>
+                </div>
+                <div class="mb-3">
+                  <label class="param-label" for="optimal_ces_eta_init">Optimal CES η_init</label>
+                  <input
+                    type="number"
+                    class="form-control form-control-sm"
+                    id="optimal_ces_eta_init"
+                    step="any"
+                  />
+                  <small class="text-muted">Automation multiplier at the threshold. Use scientific notation if needed (e.g., 1e-6).</small>
+                </div>
+                <div class="mb-3">
+                  <label class="param-label" for="optimal_ces_grid_size">
+                    Optimal CES Grid Size: <span id="optimal_ces_grid_size_val">Loading...</span>
+                  </label>
+                  <input
+                    type="range"
+                    class="range-input form-range"
+                    id="optimal_ces_grid_size"
+                    step="1"
+                  />
+                  <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
+                </div>
+              </div>
+            </div>
             <!-- Navigation Tabs -->
             <ul class="nav nav-tabs mb-3" id="controlTabs">
               <li class="nav-item">
@@ -1252,6 +1315,11 @@
         "swe_multiplier_at_present_day",
         "automation_interp_type",
         "coding_labor_normalization",
+        // Optimal CES and mode
+        "coding_labor_mode",
+        "optimal_ces_theta",
+        "optimal_ces_eta_init",
+        "optimal_ces_grid_size",
         
         "experiment_compute_exponent",
         // exp capacity pseudoparameters
@@ -1438,6 +1506,8 @@
             updateHorizonExtrapolationVisibility();
           } else if (this.id === "taste_schedule_type") {
             updateTasteUnitsVisibility();
+          } else if (this.id === "coding_labor_mode") {
+            // no-op; backend uses this value directly
           }
           // Auto-update if enabled
           if ($("#autoUpdate").is(":checked")) {
@@ -1799,7 +1869,8 @@
             if (
               id === "taste_schedule_type" ||
               id === "horizon_extrapolation_type" ||
-              id === "automation_interp_type"
+          id === "automation_interp_type" ||
+          id === "coding_labor_mode"
             ) {
               value = element.val(); // Keep as string
             } else {
@@ -1837,7 +1908,8 @@
             if (
               id !== "taste_schedule_type" &&
               id !== "horizon_extrapolation_type" &&
-              id !== "automation_interp_type" &&
+          id !== "automation_interp_type" &&
+          id !== "coding_labor_mode" &&
               id !== "include_gap" &&
               value !== null &&
               !isFinite(value)
@@ -1915,6 +1987,19 @@
                 value =
                   parameterConfig?.defaults?.automation_interp_type ||
                   "exponential";
+              }
+            } else if (id === "coding_labor_mode") {
+              const allowedModes = parameterConfig?.coding_labor_modes || [
+                "simple_ces",
+                "optimal_ces",
+              ];
+              if (!allowedModes.includes(value)) {
+                console.warn(
+                  `Invalid coding_labor_mode: ${value}, using default`
+                );
+                value =
+                  parameterConfig?.defaults?.coding_labor_mode ||
+                  "simple_ces";
               }
             }
 
@@ -3011,6 +3096,23 @@
           );
         }
 
+        // Initialize coding_labor_mode dropdown
+        try {
+          const clmSelect = document.getElementById("coding_labor_mode");
+          if (clmSelect && parameterConfig?.coding_labor_modes) {
+            clmSelect.innerHTML = "";
+            parameterConfig.coding_labor_modes.forEach((mode) => {
+              const opt = document.createElement("option");
+              opt.value = mode;
+              opt.textContent = mode === 'optimal_ces' ? 'Optimal Frontier CES' : 'Simple CES';
+              clmSelect.appendChild(opt);
+            });
+            clmSelect.value = parameterConfig?.defaults?.coding_labor_mode || 'simple_ces';
+          }
+        } catch (e) {
+          console.warn("Failed to initialize coding_labor_mode dropdown", e);
+        }
+
         // Initialize parallel penalty toggle state. Default: enabled iff default != 0
         try {
           const toggle = document.getElementById("enable_parallel_penalty");
@@ -3135,6 +3237,16 @@
               )}, default: ${defaultType}`
             );
           }
+        }
+
+        // Set defaults for non-range inputs in Optimal CES group
+        try {
+          const etaInitEl = document.getElementById('optimal_ces_eta_init');
+          if (etaInitEl && parameterConfig?.defaults?.optimal_ces_eta_init !== undefined) {
+            etaInitEl.value = parameterConfig.defaults.optimal_ces_eta_init;
+          }
+        } catch (e) {
+          console.warn('Failed to initialize optimal_ces_eta_init', e);
         }
 
         // Initialize number inputs (simulation settings)

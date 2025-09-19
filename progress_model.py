@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict, Any, Union
+from typing import List, Tuple, Optional, Dict, Any, Union, NamedTuple
 from scipy import optimize, integrate, interpolate
 import logging
 import model_config as cfg
@@ -299,6 +299,12 @@ class Parameters:
     # Benchmarks and gaps mode
     include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
     gap_years: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['gap_years'])
+
+    # Coding labor mode and optimal CES params (see AUTOMATION_SUGGESTION.md)
+    coding_labor_mode: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('coding_labor_mode', 'simple_ces'))
+    optimal_ces_theta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_theta', 1.0))
+    optimal_ces_eta_init: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
+    optimal_ces_grid_size: int = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
     
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
@@ -413,6 +419,23 @@ class Parameters:
         if not np.isfinite(self.baseline_annual_compute_multiplier) or self.baseline_annual_compute_multiplier <= 0:
             logger.warning(f"Invalid baseline_annual_compute_multiplier: {self.baseline_annual_compute_multiplier}, setting to default")
             self.baseline_annual_compute_multiplier = cfg.BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT
+
+        # Sanitize coding_labor_mode
+        if self.coding_labor_mode not in ("simple_ces", "optimal_ces"):
+            logger.warning(f"Invalid coding_labor_mode: {self.coding_labor_mode}, defaulting to 'simple_ces'")
+            self.coding_labor_mode = 'simple_ces'
+        # Sanitize optimal CES parameters
+        try:
+            if not np.isfinite(self.optimal_ces_theta) or self.optimal_ces_theta <= 0:
+                self.optimal_ces_theta = float(cfg.DEFAULT_PARAMETERS.get('optimal_ces_theta', 1.0))
+            if not np.isfinite(self.optimal_ces_eta_init) or self.optimal_ces_eta_init <= 0:
+                self.optimal_ces_eta_init = float(cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
+            if not np.isfinite(self.optimal_ces_grid_size) or int(self.optimal_ces_grid_size) < 256:
+                self.optimal_ces_grid_size = int(cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
+            else:
+                self.optimal_ces_grid_size = int(self.optimal_ces_grid_size)
+        except Exception:
+            self.coding_labor_mode = 'simple_ces'
         
 class AutomationModel:
     """Automation model"""
@@ -428,6 +451,10 @@ class AutomationModel:
         self.linear_aut_slope = (aut_2 - aut_1) / (prog_2 - prog_1)
         self.linear_aut_intercept = aut_1 - self.linear_aut_slope * prog_1
         self.exponential_aut_slope = (np.log(aut_2) - np.log(aut_1)) / (prog_2 - prog_1)
+
+        # Optimal CES frontier precompute cache (lazy init)
+        self._frontier_pc: Optional[Dict[str, Any]] = None
+        self._frontier_params_signature: Optional[Tuple] = None
 
     def get_automation_fraction(self, progress:float) -> float:
         """Compute the automation fraction"""
@@ -472,10 +499,174 @@ class AutomationModel:
         TODO: Implement actual optimization to find the critical index
         """
         return self.get_automation_fraction(progress)
+
+    def get_compute_allocation(self, index:float, progress:float, aut_compute: float, L_HUMAN: float, crit_index:float, rho: float) -> float:
+        """Compute the optimal compute allocation for a given task index."""
+        return 0
+        
     
     def get_coding_labor(self, crit_index:float, progress:float, aut_compute: float, L_HUMAN: float, rho: float) -> float:
         """Compute the coding labor for a given critical index and progress"""
+        
+        
         return self.get_FTE_per_GPU(crit_index, progress)
+
+    # ===================== Optimal CES fast path (embedded) =====================
+    class _FrontierPrecomp(NamedTuple):
+        grid_i: np.ndarray
+        Eaut: np.ndarray
+        B: np.ndarray
+        F: np.ndarray
+        Q: np.ndarray
+        R: np.ndarray
+        rho: float
+        theta: float
+        eta_init: float
+        eps_i1: float
+
+    @staticmethod
+    def _interp(x_grid: np.ndarray, y_grid: np.ndarray, x: float) -> float:
+        j = int(np.searchsorted(x_grid, x, side='right') - 1)
+        j = int(np.clip(j, 0, len(x_grid) - 2))
+        x0 = x_grid[j]
+        x1 = x_grid[j + 1]
+        t = 0.0 if x1 == x0 else (x - x0) / (x1 - x0)
+        return (1.0 - t) * y_grid[j] + t * y_grid[j + 1]
+
+    @staticmethod
+    def _invert_monotone(x_grid: np.ndarray, y_grid: np.ndarray, y: float) -> float:
+        lo, hi = 0, len(x_grid) - 1
+        if y <= y_grid[lo]:
+            return float(x_grid[lo])
+        if y >= y_grid[hi]:
+            return float(x_grid[hi])
+        while hi - lo > 1:
+            mid = (hi + lo) // 2
+            if y_grid[mid] < y:
+                lo = mid
+            else:
+                hi = mid
+        y0, y1 = y_grid[lo], y_grid[hi]
+        t = (y - y0) / (y1 - y0 + 1e-18)
+        return float((1.0 - t) * x_grid[lo] + t * x_grid[hi])
+
+    def _precompute_frontier(self, params: Parameters) -> Optional[_FrontierPrecomp]:
+        try:
+            M = int(max(256, min(int(params.optimal_ces_grid_size), 16384)))
+            grid_i = np.linspace(0.0, 1.0 - 1e-6, M)
+
+            # Build E_aut(i) using existing inverse mapping: get_progress_from_index(i)
+            # Then convert progress (OOMs of effective compute) to effective compute using baseline multiplier.
+            # E_aut = (baseline_annual_compute_multiplier) ** progress_threshold
+            log_base = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM))
+            # progress threshold at each index (OOMs of effective compute)
+            idx_progress = np.array([self.get_progress_from_index(float(ix)) for ix in grid_i], dtype=float)
+            idx_progress = np.maximum.accumulate(idx_progress)
+            # Effective capability threshold in log-space to avoid overflow
+            log_Eaut = idx_progress * log_base
+            Eaut = np.exp(log_Eaut)
+
+            rho = float(params.rho_coding_labor)
+            theta = float(params.optimal_ces_theta)
+            # Use FTE-per-GPU as baseline eta; allow multiplicative tweak via optimal_ces_eta_init
+            eta_init = float(self.initial_FTE_per_GPU) * float(params.optimal_ces_eta_init)
+            if not (rho < 1 and abs(rho) > 1e-18 and theta > 0 and eta_init > 0):
+                return None
+
+            di = grid_i[1] - grid_i[0]
+            alpha = rho / (1.0 - rho)
+            beta = alpha * theta
+            gamma = theta / (1.0 - rho)
+
+            # Compute weights in log space: w = Eaut^(-beta) = exp(-beta * log_Eaut)
+            w = np.exp(-beta * log_Eaut)
+            B = np.concatenate([[0.0], np.cumsum(0.5 * (w[1:] + w[:-1])) * di])
+
+            one_minus_i = 1.0 - grid_i
+            Q = np.power(one_minus_i, 1.0 - rho)
+            # R = Q * Eaut^(-theta) => exp(-theta * log_Eaut)
+            R = Q * np.exp(-theta * log_Eaut)
+            # F = (B * Eaut^gamma) / (1-i)
+            F = (B * np.exp(gamma * log_Eaut)) / (one_minus_i + 1e-18)
+            # Enforce monotone
+            F = np.maximum.accumulate(F)
+
+            return AutomationModel._FrontierPrecomp(grid_i, Eaut, B, F, Q, R, rho, theta, eta_init, float(1.0 - grid_i[-1]))
+        except Exception as e:
+            logger.warning(f"Frontier precompute failed: {e}")
+            return None
+
+    def _ensure_frontier(self, params: Parameters) -> Optional[_FrontierPrecomp]:
+        signature = (
+            float(params.rho_coding_labor),
+            float(params.optimal_ces_theta),
+            float(params.optimal_ces_eta_init),
+            int(params.optimal_ces_grid_size),
+            tuple(self.anchor_points),
+        )
+        if self._frontier_pc is None or self._frontier_params_signature != signature:
+            pc = self._precompute_frontier(params)
+            if pc is None:
+                self._frontier_pc = None
+                self._frontier_params_signature = None
+            else:
+                self._frontier_pc = pc
+                self._frontier_params_signature = signature
+        return self._frontier_pc
+
+    def coding_labor_optimal_ces(self, H: float, C: float, E: float, params: Parameters, return_details: bool = False):
+        pc = self._ensure_frontier(params)
+        if pc is None:
+            return None if return_details else None
+        try:
+            # Capability-limited index i_E: find rightmost Eaut <= E (if E < min(Eaut), force i_E=0)
+            j = int(np.searchsorted(pc.Eaut, E, side='right') - 1)
+            if j < 0:
+                # No tasks above threshold; boundary at 0
+                i_E = float(pc.grid_i[0])
+                F_iE = AutomationModel._interp(pc.grid_i, pc.F, i_E)
+                i_c = i_E
+                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
+                B_i = AutomationModel._interp(pc.grid_i, pc.B, i_c)
+                S = (C / max(H, 1e-18)) * pc.eta_init * (E ** pc.theta)
+                comp = (S ** pc.rho) * (B_i ** (1.0 - pc.rho))
+                L_norm_rho = human + comp
+                L = H * (L_norm_rho ** (1.0 / pc.rho))
+                if return_details:
+                    return L, {"i_cut": i_c, "i_E": i_E, "case": "boundary:E_below_min", "human_term": human, "comp_term": comp}
+                return L
+            j = int(np.clip(j, 0, len(pc.grid_i) - 2))
+            i0, i1 = pc.grid_i[j], pc.grid_i[j + 1]
+            e0, e1 = pc.Eaut[j], pc.Eaut[j + 1]
+            tE = 0.0 if e1 == e0 else float(np.clip((E - e0) / (e1 - e0), 0.0, 1.0))
+            i_E = float((1.0 - tE) * i0 + tE * i1)
+
+            kappa = C / max(H, 1e-18)
+            # S = kappa * eta_init * (E ** theta), where E is effective compute
+            S = kappa * pc.eta_init * (E ** pc.theta)
+
+            F_iE = AutomationModel._interp(pc.grid_i, pc.F, i_E)
+            if S <= F_iE:
+                i_c = AutomationModel._invert_monotone(pc.grid_i, pc.F, S)
+                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
+                comp = S * AutomationModel._interp(pc.grid_i, pc.R, i_c)
+                L_norm_rho = human + comp
+                case = "interior"
+            else:
+                i_c = i_E
+                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
+                B_i = AutomationModel._interp(pc.grid_i, pc.B, i_c)
+                comp = (S ** pc.rho) * (B_i ** (1.0 - pc.rho))
+                L_norm_rho = human + comp
+                case = "boundary"
+
+            L = H * (L_norm_rho ** (1.0 / pc.rho))
+            if return_details:
+                return L, {"i_cut": i_c, "i_E": i_E, "case": case, "human_term": human, "comp_term": comp}
+            return L
+        except Exception as e:
+            logger.warning(f"coding_labor_optimal_ces failed at runtime: {e}")
+            return None if not return_details else (None, {"error": str(e)})
 
 
 @dataclass
@@ -1612,9 +1803,27 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
             
             # Compute cognitive output with validation
-            coding_labor = compute_coding_labor(
-                automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
-            )
+            if getattr(params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
+                # Map model quantities to H, C, E (E is effective compute)
+                H = float(L_HUMAN)
+                C = float(L_AI)
+                E = float(cfg.BASE_FOR_SOFTWARE_LOM ** cumulative_progress)
+                try:
+                    # Build or reuse AutomationModel for frontier (uses current anchors)
+                    automation_model = AutomationModel(params)
+                    L_opt = automation_model.coding_labor_optimal_ces(H, C, E, params)
+                    if L_opt is None or not np.isfinite(L_opt):
+                        coding_labor = compute_coding_labor(automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
+                    else:
+                        # Match units with compute_coding_labor: apply parallel_penalty and normalization
+                        coding_labor = float((L_opt ** params.parallel_penalty) * params.coding_labor_normalization)
+                except Exception as e:
+                    logger.warning(f"Falling back to simple CES due to optimal_ces error: {e}")
+                    coding_labor = compute_coding_labor(automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
+            else:
+                coding_labor = compute_coding_labor(
+                    automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
+                )
         
         if not np.isfinite(coding_labor) or coding_labor < 0:
             logger.warning(f"Invalid cognitive output: {coding_labor}")
@@ -2703,10 +2912,31 @@ class ProgressModel:
                 discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
                 # Compute coding labor
-                coding_labor = compute_coding_labor(
-                    automation_fraction, L_AI, L_HUMAN, 
-                    self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
-                )
+                if getattr(self.params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
+                    H = float(L_HUMAN)
+                    C = float(L_AI)
+                    E = float(cfg.BASE_FOR_SOFTWARE_LOM ** progress)
+                    try:
+                        automation_model = AutomationModel(self.params)
+                        L_opt = automation_model.coding_labor_optimal_ces(H, C, E, self.params)
+                        if L_opt is None or not np.isfinite(L_opt):
+                            coding_labor = compute_coding_labor(
+                                automation_fraction, L_AI, L_HUMAN, 
+                                self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
+                            )
+                        else:
+                            coding_labor = float((L_opt ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
+                    except Exception as e:
+                        logger.warning(f"Falling back to simple CES in metrics due to optimal_ces error: {e}")
+                        coding_labor = compute_coding_labor(
+                            automation_fraction, L_AI, L_HUMAN, 
+                            self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
+                        )
+                else:
+                    coding_labor = compute_coding_labor(
+                        automation_fraction, L_AI, L_HUMAN, 
+                        self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
+                    )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 
                 # Compute software progress rate
