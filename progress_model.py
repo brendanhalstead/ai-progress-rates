@@ -514,11 +514,11 @@ class AutomationModel:
     # ===================== Optimal CES fast path (embedded) =====================
     class _FrontierPrecomp(NamedTuple):
         grid_i: np.ndarray
-        Eaut: np.ndarray
-        B: np.ndarray
-        F: np.ndarray
-        Q: np.ndarray
-        R: np.ndarray
+        log_Eaut: np.ndarray
+        log_B: np.ndarray
+        log_F: np.ndarray
+        log_Q: np.ndarray
+        log_R: np.ndarray
         rho: float
         theta: float
         eta_init: float
@@ -564,7 +564,6 @@ class AutomationModel:
             idx_progress = np.maximum.accumulate(idx_progress)
             # Effective capability threshold in log-space to avoid overflow
             log_Eaut = idx_progress * log_base
-            Eaut = np.exp(log_Eaut)
 
             rho = float(params.rho_coding_labor)
             theta = float(params.optimal_ces_theta)
@@ -578,20 +577,26 @@ class AutomationModel:
             beta = alpha * theta
             gamma = theta / (1.0 - rho)
 
-            # Compute weights in log space: w = Eaut^(-beta) = exp(-beta * log_Eaut)
+            # Compute weights in log space: w = exp(-beta * log_Eaut)
             w = np.exp(-beta * log_Eaut)
             B = np.concatenate([[0.0], np.cumsum(0.5 * (w[1:] + w[:-1])) * di])
+            # log_B with safe handling of zeros using ufunc where/out (avoid evaluating log(0))
+            log_B = np.empty_like(B)
+            log_B.fill(-np.inf)
+            np.log(B, out=log_B, where=(B > 0.0))
 
             one_minus_i = 1.0 - grid_i
-            Q = np.power(one_minus_i, 1.0 - rho)
-            # R = Q * Eaut^(-theta) => exp(-theta * log_Eaut)
-            R = Q * np.exp(-theta * log_Eaut)
-            # F = (B * Eaut^gamma) / (1-i)
-            F = (B * np.exp(gamma * log_Eaut)) / (one_minus_i + 1e-18)
-            # Enforce monotone
-            F = np.maximum.accumulate(F)
+            # log_Q = (1-rho) * log(1-i)
+            log_one_minus_i = np.log(one_minus_i + 1e-18)
+            log_Q = (1.0 - rho) * log_one_minus_i
+            # log_R = log_Q - theta * log_Eaut
+            log_R = log_Q - theta * log_Eaut
+            # log_F = log_B + gamma * log_Eaut - log(1 - i)
+            log_F = log_B + (gamma * log_Eaut) - log_one_minus_i
+            # Enforce monotone in log-space
+            log_F = np.maximum.accumulate(log_F)
 
-            return AutomationModel._FrontierPrecomp(grid_i, Eaut, B, F, Q, R, rho, theta, eta_init, float(1.0 - grid_i[-1]))
+            return AutomationModel._FrontierPrecomp(grid_i, log_Eaut, log_B, log_F, log_Q, log_R, rho, theta, eta_init, float(1.0 - grid_i[-1]))
         except Exception as e:
             logger.warning(f"Frontier precompute failed: {e}")
             return None
@@ -614,54 +619,68 @@ class AutomationModel:
                 self._frontier_params_signature = signature
         return self._frontier_pc
 
-    def coding_labor_optimal_ces(self, H: float, C: float, E: float, params: Parameters, return_details: bool = False):
+    def coding_labor_optimal_ces(self, H: float, C: float, logE: float, params: Parameters, return_details: bool = False):
         pc = self._ensure_frontier(params)
         if pc is None:
             return None if return_details else None
         try:
-            # Capability-limited index i_E: find rightmost Eaut <= E (if E < min(Eaut), force i_E=0)
-            j = int(np.searchsorted(pc.Eaut, E, side='right') - 1)
+            # Capability-limited index i_E: find rightmost log_Eaut <= logE (if logE < min(log_Eaut), force i_E=0)
+            j = int(np.searchsorted(pc.log_Eaut, logE, side='right') - 1)
             if j < 0:
                 # No tasks above threshold; boundary at 0
                 i_E = float(pc.grid_i[0])
-                F_iE = AutomationModel._interp(pc.grid_i, pc.F, i_E)
                 i_c = i_E
-                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
-                B_i = AutomationModel._interp(pc.grid_i, pc.B, i_c)
-                S = (C / max(H, 1e-18)) * pc.eta_init * (E ** pc.theta)
-                comp = (S ** pc.rho) * (B_i ** (1.0 - pc.rho))
-                L_norm_rho = human + comp
-                L = H * (L_norm_rho ** (1.0 / pc.rho))
+                log_human = AutomationModel._interp(pc.grid_i, pc.log_Q, i_c)
+                log_B_i = AutomationModel._interp(pc.grid_i, pc.log_B, i_c)
+                if H <= 0.0:
+                    L = 0.0
+                    if return_details:
+                        return L, {"i_cut": i_c, "i_E": i_E, "case": "boundary:E_below_min", "human_term": float(np.exp(log_human)), "comp_term": 0.0}
+                    return L
+                kappa = C / max(H, 1e-18)
+                logS = np.log(max(kappa * pc.eta_init, 1e-300)) + (pc.theta * logE)
+                log_comp = (pc.rho * logS) + ((1.0 - pc.rho) * log_B_i)
+                log_L_norm_rho = np.logaddexp(log_human, log_comp)
+                log_L = np.log(H) + (1.0 / pc.rho) * log_L_norm_rho
+                L = float(np.exp(log_L))
                 if return_details:
+                    human = float(np.exp(log_human))
+                    comp = float(np.exp(log_comp))
                     return L, {"i_cut": i_c, "i_E": i_E, "case": "boundary:E_below_min", "human_term": human, "comp_term": comp}
                 return L
             j = int(np.clip(j, 0, len(pc.grid_i) - 2))
             i0, i1 = pc.grid_i[j], pc.grid_i[j + 1]
-            e0, e1 = pc.Eaut[j], pc.Eaut[j + 1]
-            tE = 0.0 if e1 == e0 else float(np.clip((E - e0) / (e1 - e0), 0.0, 1.0))
+            le0, le1 = pc.log_Eaut[j], pc.log_Eaut[j + 1]
+            tE = 0.0 if le1 == le0 else float(np.clip((logE - le0) / (le1 - le0), 0.0, 1.0))
             i_E = float((1.0 - tE) * i0 + tE * i1)
 
+            if H <= 0.0:
+                return 0.0 if not return_details else (0.0, {"i_cut": i_E, "i_E": i_E, "case": "H_zero", "human_term": 0.0, "comp_term": 0.0})
             kappa = C / max(H, 1e-18)
-            # S = kappa * eta_init * (E ** theta), where E is effective compute
-            S = kappa * pc.eta_init * (E ** pc.theta)
+            # logS = log(kappa * eta_init) + theta * logE
+            logS = np.log(max(kappa * pc.eta_init, 1e-300)) + (pc.theta * logE)
 
-            F_iE = AutomationModel._interp(pc.grid_i, pc.F, i_E)
-            if S <= F_iE:
-                i_c = AutomationModel._invert_monotone(pc.grid_i, pc.F, S)
-                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
-                comp = S * AutomationModel._interp(pc.grid_i, pc.R, i_c)
-                L_norm_rho = human + comp
+            log_F_iE = AutomationModel._interp(pc.grid_i, pc.log_F, i_E)
+            if logS <= log_F_iE:
+                i_c = AutomationModel._invert_monotone(pc.grid_i, pc.log_F, logS)
+                log_human = AutomationModel._interp(pc.grid_i, pc.log_Q, i_c)
+                log_R_i = AutomationModel._interp(pc.grid_i, pc.log_R, i_c)
+                log_comp = logS + log_R_i
+                log_L_norm_rho = np.logaddexp(log_human, log_comp)
                 case = "interior"
             else:
                 i_c = i_E
-                human = AutomationModel._interp(pc.grid_i, pc.Q, i_c)
-                B_i = AutomationModel._interp(pc.grid_i, pc.B, i_c)
-                comp = (S ** pc.rho) * (B_i ** (1.0 - pc.rho))
-                L_norm_rho = human + comp
+                log_human = AutomationModel._interp(pc.grid_i, pc.log_Q, i_c)
+                log_B_i = AutomationModel._interp(pc.grid_i, pc.log_B, i_c)
+                log_comp = (pc.rho * logS) + ((1.0 - pc.rho) * log_B_i)
+                log_L_norm_rho = np.logaddexp(log_human, log_comp)
                 case = "boundary"
 
-            L = H * (L_norm_rho ** (1.0 / pc.rho))
+            log_L = np.log(H) + (1.0 / pc.rho) * log_L_norm_rho
+            L = float(np.exp(log_L))
             if return_details:
+                human = float(np.exp(log_human))
+                comp = float(np.exp(log_comp))
                 return L, {"i_cut": i_c, "i_E": i_E, "case": case, "human_term": human, "comp_term": comp}
             return L
         except Exception as e:
@@ -1807,11 +1826,11 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
                 # Map model quantities to H, C, E (E is effective compute)
                 H = float(L_HUMAN)
                 C = float(L_AI)
-                E = float(cfg.BASE_FOR_SOFTWARE_LOM ** cumulative_progress)
+                logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * cumulative_progress)
                 try:
                     # Build or reuse AutomationModel for frontier (uses current anchors)
                     automation_model = AutomationModel(params)
-                    L_opt = automation_model.coding_labor_optimal_ces(H, C, E, params)
+                    L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, params)
                     if L_opt is None or not np.isfinite(L_opt):
                         coding_labor = compute_coding_labor(automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
                     else:
@@ -2915,10 +2934,10 @@ class ProgressModel:
                 if getattr(self.params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
                     H = float(L_HUMAN)
                     C = float(L_AI)
-                    E = float(cfg.BASE_FOR_SOFTWARE_LOM ** progress)
+                    logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * progress)
                     try:
                         automation_model = AutomationModel(self.params)
-                        L_opt = automation_model.coding_labor_optimal_ces(H, C, E, self.params)
+                        L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
                             coding_labor = compute_coding_labor(
                                 automation_fraction, L_AI, L_HUMAN, 
