@@ -440,9 +440,9 @@ class Parameters:
 class AutomationModel:
     """Automation model"""
     def __init__(self, params: Parameters):
-        self.initial_FTE_per_GPU = 0.01
+        self.initial_FTE_per_GPU = 1
         self.FTE_per_GPU_slope = 1.0
-        self.progress_base_unit = 10 # This assumes each unit of progress is an OOM of E.C.
+        self.progress_base_unit = cfg.BASE_FOR_SOFTWARE_LOM
         self.schedule_type = getattr(params, 'automation_interp_type', cfg.DEFAULT_PARAMETERS['automation_interp_type'])
         anchors = list(params.automation_anchors.items())
         anchors.sort(key=lambda x: x[0])
@@ -490,7 +490,7 @@ class AutomationModel:
         if progress < index_progress:
             return 0.0
         progress_diff = progress - index_progress
-        growth_factor = self.progress_base_unit ** (self.FTE_per_GPU_slope * progress_diff)
+        growth_factor = cfg.BASE_FOR_SOFTWARE_LOM ** (self.FTE_per_GPU_slope * progress_diff)
         return self.initial_FTE_per_GPU * growth_factor
 
     def get_crit_index(self, progress:float, aut_compute: float, L_HUMAN: float, rho: float) -> float:
@@ -2835,7 +2835,7 @@ class ProgressModel:
         anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
         # compute automation fraction at anchor time
         anchor_aut_frac = aut_frac_from_swe_multiplier(self.params.swe_multiplier_at_present_day, anchor_human_labor, anchor_ai_labor, self.params)
-        # anchor_aut_frac = 0.01
+        anchor_aut_frac = 0.01
         logger.info(f"calculated anchor automation fraction: {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             anchor_progress: anchor_aut_frac,
