@@ -470,6 +470,10 @@ class AutomationModel:
         def get_prog_linear(index:float) -> float:
             """Get the progress from the index"""
             (prog_1, aut_1), (prog_2, aut_2) = self.anchor_points
+            # Guard against zero or near-zero slope to avoid division-by-zero
+            if abs(self.linear_aut_slope) < 1e-12:
+                # Fallback: interpolate progress directly between anchors
+                return (1.0 - index) * prog_1 + index * prog_2
             prog_slope = 1 / self.linear_aut_slope
             prog_for_zero = prog_1 - prog_slope * aut_1
             prog_for_one = prog_2 + prog_slope * (1 - aut_2)
@@ -1402,6 +1406,124 @@ def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: fl
             logger.warning(f"Grid search fallback also failed: {e2}")
             # Return a reasonable default
             return 0.5
+
+
+def solve_lower_anchor_via_automation_model(
+    swe_multiplier: float,
+    anchor_progress: float,
+    L_HUMAN: float,
+    L_AI: float,
+    params: Parameters,
+) -> float:
+    """
+    Solve for the lower anchor automation fraction at the anchor progress such that,
+    when initializing AutomationModel with anchors
+        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_superhuman_coder },
+    the implied coding-labor multiplier at anchor_progress matches swe_multiplier.
+
+    The multiplier is defined on coding labor after applying parallel_penalty and normalization, i.e.
+        coding_labor_with_AI = swe_multiplier**parallel_penalty * coding_labor_human_only.
+
+    If the optimal-CES frontier is unavailable for given parameters, falls back to the simple CES formulation.
+    Returns a clipped value in (cfg.AUTOMATION_FRACTION_CLIP_MIN, 1 - cfg.AUTOMATION_FRACTION_CLIP_MIN).
+    """
+    try:
+        # Validate inputs
+        if not all(np.isfinite([swe_multiplier, anchor_progress, L_HUMAN, L_AI])):
+            logger.warning("Non-finite inputs to solve_lower_anchor_via_automation_model")
+            return 0.01
+        if swe_multiplier <= 0 or L_HUMAN <= 0 or L_AI < 0:
+            logger.warning("Invalid inputs to solve_lower_anchor_via_automation_model")
+            return 0.01
+
+        # Ensure an upper anchor exists
+        progress_at_sc = getattr(params, 'progress_at_sc', None)
+        aut_at_sc = getattr(params, 'automation_fraction_at_superhuman_coder', None)
+        if progress_at_sc is None or not np.isfinite(progress_at_sc) or aut_at_sc is None:
+            logger.warning("Missing progress_at_sc or automation_fraction_at_superhuman_coder; falling back to direct solver")
+            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, L_AI, params)
+
+        # Target coding-labor ratio in parallel_penalty space
+        target_ratio = float(np.power(swe_multiplier, params.parallel_penalty))
+
+        # Baseline human-only coding labor (consistent with definition of multiplier)
+        baseline = compute_coding_labor(
+            0, L_AI, L_HUMAN,
+            params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization,
+            human_only=True
+        )
+        if baseline <= 0 or not np.isfinite(baseline):
+            logger.warning("Invalid baseline coding labor in anchor solver; using fallback")
+            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, L_AI, params)
+
+        logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * anchor_progress)
+
+        def implied_ratio_for_anchor(a_lower: float) -> float:
+            # Build temporary params with candidate anchors
+            p = copy.deepcopy(params)
+            # Clip candidate to safe open interval
+            a_clipped = float(np.clip(a_lower, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN))
+            p.automation_anchors = {
+                float(anchor_progress): a_clipped,
+                float(progress_at_sc): float(np.clip(aut_at_sc, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)),
+            }
+            try:
+                am = AutomationModel(p)
+                H = float(L_HUMAN)
+                C = float(L_AI)
+                L_opt = am.coding_labor_optimal_ces(H, C, logE, p)
+                if L_opt is None or not np.isfinite(L_opt):
+                    # Fallback to simple CES using the schedule's automation at the anchor (which equals a_lower)
+                    A = am.get_automation_fraction(anchor_progress)
+                    L_ai = compute_coding_labor(
+                        A, L_AI, L_HUMAN,
+                        p.rho_coding_labor, p.parallel_penalty, p.coding_labor_normalization
+                    )
+                else:
+                    # Match units with compute_coding_labor
+                    L_ai = float((L_opt ** p.parallel_penalty) * p.coding_labor_normalization)
+                if not np.isfinite(L_ai) or L_ai <= 0:
+                    return 0.0
+                return float(L_ai / baseline)
+            except Exception as e:
+                logger.warning(f"Error computing implied ratio for anchor {a_lower}: {e}")
+                return 0.0
+
+        def objective(a_lower: float) -> float:
+            return implied_ratio_for_anchor(a_lower) - target_ratio
+
+        # Bounds slightly inside (0, 1) to avoid numerical issues
+        lo = float(cfg.AUTOMATION_FRACTION_CLIP_MIN)
+        hi = float(1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)
+
+        try:
+            from scipy.optimize import brentq, minimize_scalar
+
+            f_lo = objective(lo)
+            f_hi = objective(hi)
+            if np.isfinite(f_lo) and np.isfinite(f_hi) and f_lo * f_hi <= 0:
+                root = brentq(objective, lo, hi, xtol=1e-8, maxiter=100)
+                return float(np.clip(root, lo, hi))
+
+            # If no sign change, minimize absolute error
+            res = minimize_scalar(lambda x: abs(objective(x)), bounds=(lo, hi), method='bounded', options={'xatol': 1e-8, 'maxiter': 200})
+            if getattr(res, 'success', False):
+                return float(np.clip(res.x, lo, hi))
+            else:
+                raise RuntimeError("Anchor solver bounded minimization failed")
+        except Exception as e:
+            logger.warning(f"Anchor solver root-finding failed; using grid search fallback: {e}")
+            try:
+                grid = np.linspace(lo, hi, 512)
+                errs = [abs(objective(a)) for a in grid]
+                idx = int(np.argmin(errs))
+                return float(grid[idx])
+            except Exception as e2:
+                logger.warning(f"Grid search fallback failed in anchor solver: {e2}")
+                return 0.01
+    except Exception as e:
+        logger.warning(f"solve_lower_anchor_via_automation_model failed unexpectedly: {e}")
+        return 0.01
 
 def compute_automation_fraction(cumulative_progress: float, params: Parameters) -> float:
     """
@@ -2833,10 +2955,15 @@ class ProgressModel:
         anchor_progress = self.human_only_results['anchor_stats']['progress']
         anchor_human_labor = self.human_only_results['anchor_stats']['human_labor']
         anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
-        # compute automation fraction at anchor time
-        anchor_aut_frac = aut_frac_from_swe_multiplier(self.params.swe_multiplier_at_present_day, anchor_human_labor, anchor_ai_labor, self.params)
-        anchor_aut_frac = 0.01
-        logger.info(f"calculated anchor automation fraction: {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
+        # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
+        anchor_aut_frac = solve_lower_anchor_via_automation_model(
+            self.params.swe_multiplier_at_present_day,
+            float(anchor_progress),
+            float(anchor_human_labor),
+            float(anchor_ai_labor),
+            self.params,
+        )
+        logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             anchor_progress: anchor_aut_frac,
             self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
