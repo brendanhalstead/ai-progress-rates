@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Dict, Any, Union, NamedTuple
 from scipy import optimize, integrate, interpolate
 import logging
+import time
 import model_config as cfg
 import yaml
 import copy
@@ -2912,6 +2913,7 @@ class ProgressModel:
         Returns:
             Tuple of (times, cumulative_progress_values, research_stock_values)
         """
+        _fn_start_time = time.perf_counter()
         # first, compute exp capacity params from asymptotes and anchors
         if not self.params.direct_input_exp_cap_ces_params:
             ref_exp_compute = _log_interp(cfg.REFERENCE_YEAR, self.data.time, self.data.experiment_compute)
@@ -2940,14 +2942,22 @@ class ProgressModel:
         # next compute human-only trajectory
         # Need to do this for various reasons, e.g. to auto-fit the METR trajectory you need to the (effective compute, horizon) pairs (we assume no automation)
         # Also if we want to specify current doubling time or gap size in years rather than progress units, need to know how much EC was increased in present day
+        _t_human_only_start = time.perf_counter()
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
+        _dt_human_only = time.perf_counter() - _t_human_only_start
+        logger.info(f"Timing: human-only trajectory computed in {_dt_human_only:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
         # estimate horizon trajectory from METR data using human-only trajectory
+        _t_horizon_est_start = time.perf_counter()
         try:
             anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
             self.estimate_horizon_trajectory(human_only_times, human_only_progress, anchor_progress_rate)
+            _dt_horizon_est = time.perf_counter() - _t_horizon_est_start
+            logger.info(f"Timing: horizon trajectory estimation completed in {_dt_horizon_est:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         except Exception as e:
             logger.warning(f"Failed to estimate horizon trajectory: {e}")
+            _dt_horizon_est = time.perf_counter() - _t_horizon_est_start
+            logger.info(f"Timing: horizon trajectory estimation failed after {_dt_horizon_est:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
             self.horizon_trajectory = None
 
         # Convert AI research taste slope if using "SDs per progress-year" mode
@@ -2975,6 +2985,7 @@ class ProgressModel:
         anchor_human_labor = self.human_only_results['anchor_stats']['human_labor']
         anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
         # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
+        _t_anchor_solver_start = time.perf_counter()
         anchor_aut_frac = solve_lower_anchor_via_automation_model(
             self.params.swe_multiplier_at_present_day,
             float(anchor_progress),
@@ -2982,6 +2993,8 @@ class ProgressModel:
             float(anchor_ai_labor),
             self.params,
         )
+        _dt_anchor_solver = time.perf_counter() - _t_anchor_solver_start
+        logger.info(f"Timing: lower anchor via AutomationModel solved in {_dt_anchor_solver:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             anchor_progress: anchor_aut_frac,
@@ -2989,9 +3002,13 @@ class ProgressModel:
         }
         logger.info(f"Automation anchors: {automation_anchors}")
         self.params.automation_anchors = automation_anchors
+
         # Below gives you at each time what is the effectige compute value and what is the research stock value. It runs the whole model.
         # With just time -> effective compute and research stock, you can compute all the other metrics.
+        _t_integrate_start = time.perf_counter()
         times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
+        _dt_integrate = time.perf_counter() - _t_integrate_start
+        logger.info(f"Timing: integrate_progress completed in {_dt_integrate:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
         # This ensures that the horizon at present_day matches the specified present_horizon value
@@ -3040,6 +3057,7 @@ class ProgressModel:
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
+        _t_metrics_loop_start = time.perf_counter()
         for i, (t, progress, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             try:
                 state = [progress, rs]
@@ -3235,8 +3253,10 @@ class ProgressModel:
                 effective_compute.append(0.0)
                 training_compute.append(0.0)
                 experiment_capacity.append(0.0)
-        
-            
+        _dt_metrics_loop = time.perf_counter() - _t_metrics_loop_start
+        _num_iters = len(times) if 'times' in locals() and times is not None else 0
+        _avg_iter_ms = (1000.0 * _dt_metrics_loop / _num_iters) if _num_iters > 0 else float('nan')
+        logger.info(f"Timing: metrics loop processed {_num_iters} points in {_dt_metrics_loop:.3f}s (avg {_avg_iter_ms:.3f} ms/iter, elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         # Calculate time when superhuman coder level is reached
         sc_time = None
         if self.params.progress_at_sc is not None:
