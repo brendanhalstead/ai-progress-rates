@@ -229,9 +229,9 @@ DEFAULT_PARAMETERS = {
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
     # Optimal CES coding labor configuration
-    'coding_labor_mode': 'simple_ces',  # {'simple_ces','optimal_ces'}
+    'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
     'optimal_ces_theta': 1.0,
-    'optimal_ces_eta_init': 1.0,
+    'optimal_ces_eta_init': 0.01,
     'optimal_ces_grid_size': 4096,
 }
 
