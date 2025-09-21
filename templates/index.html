@@ -1439,7 +1439,7 @@
             setCesInputMode(this.checked);
           });
           // Initialize default mode (pseudoparameters mode)
-          setCesInputMode(false);
+          //setCesInputMode(false);
 
           // Wait for session to be ready, then compute model
           sessionPromise
@@ -3360,11 +3360,12 @@
         }
         // Apply CES input mode UI after initializing controls
         setCesInputMode(
-          document.getElementById("directCesToggle")?.checked || false
+          document.getElementById("directCesToggle")?.checked || false,
+          true
         );
       }
 
-      function setCesInputMode(useDirect) {
+      function setCesInputMode(useDirect, suppressCompute = false) {
         try {
           const directGroup = document.getElementById("expCesDirectGroup");
           const pseudoGroup = document.getElementById("expPseudoparamsGroup");
@@ -3377,8 +3378,8 @@
           if (codingExpGroup)
             codingExpGroup.style.display = useDirect ? "" : "none";
           if (computedEl) computedEl.style.display = useDirect ? "none" : "";
-          // Auto-update if enabled
-          if ($("#autoUpdate").is(":checked")) {
+          // Auto-update if enabled and not suppressed
+          if (!suppressCompute && $("#autoUpdate").is(":checked")) {
             clearTimeout(window.updateTimer);
             window.updateTimer = setTimeout(computeModel, 300);
           }
