@@ -265,6 +265,7 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                         known = [
                             "sc_time_hist.png",
                             "horizon_trajectories.png",
+                            "sensitivity_pearson_top.png",
                             "sensitivity_spearman_top.png",
                             "sensitivity_permutation_top.png",
                             "sc_by_quarter.html",

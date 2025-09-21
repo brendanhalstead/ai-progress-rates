@@ -144,10 +144,14 @@
                                 <img id="imgHorizonTraj" class="img-fluid rounded border" alt="Horizon trajectories" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small">Sensitivity: Spearman (top)</label>
-                                <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
+                                <label class="form-label small">Sensitivity: Pearson Correlation (top)</label>
+                                <img id="imgSensPearson" class="img-fluid rounded border" alt="Sensitivity Pearson" />
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Spearman Correlation (top)</label>
+                                <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
+                            </div>
+                            <div class="col-md-6" style="display: none;">
                                 <label class="form-label small">Sensitivity: Permutation Importance (top)</label>
                                 <img id="imgSensPerm" class="img-fluid rounded border" alt="Sensitivity Permutation" />
                             </div>
@@ -448,10 +452,8 @@
                         }
                     } else if (dist === 'shifted_lognormal') {
                         if (lowVal > 0 && highVal > 0) {
-                            const shiftField = specCell.querySelector('.dist-field[data-key="shift"]');
-                            const shift = parseNum(shiftField?.value);
                             const baseMedian = Math.sqrt(lowVal * highVal);
-                            median = isFiniteNumber(baseMedian) ? baseMedian + (isFiniteNumber(shift) ? shift : 0) : null;
+                            median = isFiniteNumber(baseMedian) ? baseMedian : null;
                         }
                     }
                 }
@@ -914,6 +916,7 @@
             // Toggle and set image sources based on available artifacts
             const scWrap = document.getElementById('imgScHist').closest('.col-12');
             const htWrap = document.getElementById('imgHorizonTraj').closest('.col-12');
+            const pearsonWrap = document.getElementById('imgSensPearson').closest('.col-md-6');
             const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
             const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
             const scqWrap = document.getElementById('scByQuarter').closest('.col-12');
@@ -981,18 +984,20 @@
             } else {
                 htWrap.style.display = 'none';
             }
+            if (hasAny('sensitivity_pearson_top.png')) {
+                document.getElementById('imgSensPearson').src = base('sensitivity_pearson_top.png');
+                pearsonWrap.style.display = '';
+            } else {
+                pearsonWrap.style.display = 'none';
+            }
             if (hasAny('sensitivity_spearman_top.png')) {
                 document.getElementById('imgSensSpearman').src = base('sensitivity_spearman_top.png');
                 spWrap.style.display = '';
             } else {
                 spWrap.style.display = 'none';
             }
-            if (hasAny('sensitivity_permutation_top.png')) {
-                document.getElementById('imgSensPerm').src = base('sensitivity_permutation_top.png');
-                pmWrap.style.display = '';
-            } else {
-                pmWrap.style.display = 'none';
-            }
+            // Permutation importance always hidden
+            pmWrap.style.display = 'none';
 
             // Wire up download-all
             const btnZip = document.getElementById('btnDownloadZip');

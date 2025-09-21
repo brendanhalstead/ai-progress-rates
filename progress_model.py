@@ -264,7 +264,7 @@ class Parameters:
     ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
     ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
-    ai_research_taste_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_slope'])
+    ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
     sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
@@ -276,7 +276,7 @@ class Parameters:
     present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_day'])
     present_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_horizon'])
     present_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_doubling_time'])
-    doubling_decay_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_decay_rate'])
+    doubling_difficulty_growth_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_difficulty_growth_rate'])
     
     # Normalization
     coding_labor_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_normalization'])
@@ -380,10 +380,10 @@ class Parameters:
                 logger.warning(f"Invalid present_doubling_time: {self.present_doubling_time}, setting to None for optimization")
                 self.present_doubling_time = None
         
-        if self.doubling_decay_rate is not None:
-            if not np.isfinite(self.doubling_decay_rate):
-                logger.warning(f"Invalid doubling_decay_rate: {self.doubling_decay_rate}, setting to None for optimization")
-                self.doubling_decay_rate = None
+        if self.doubling_difficulty_growth_rate is not None:
+            if not np.isfinite(self.doubling_difficulty_growth_rate):
+                logger.warning(f"Invalid doubling_difficulty_growth_rate: {self.doubling_difficulty_growth_rate}, setting to None for optimization")
+                self.doubling_difficulty_growth_rate = None
 
         if self.inv_compute_anchor_exp_cap is not None:
             logger.warning(f"inv_compute_anchor_exp_cap is not None, overriding compute_anchor_exp_cap to 1 / inv_compute_anchor_exp_cap")
@@ -2451,9 +2451,9 @@ class ProgressModel:
                     else:
                         params_to_optimize.append('T_0')
                     
-                    # Handle A_0 (doubling_decay_rate)
-                    if self.params.doubling_decay_rate is not None:
-                        fixed_params['A_0'] = self.params.doubling_decay_rate
+                    # Handle A_0 (doubling_difficulty_growth_rate converted to decay_rate)
+                    if self.params.doubling_difficulty_growth_rate is not None:
+                        fixed_params['A_0'] = 1.0 - self.params.doubling_difficulty_growth_rate
                     else:
                         params_to_optimize.append('A_0')
                     
@@ -2461,7 +2461,7 @@ class ProgressModel:
                         # All parameters specified (Case 8)
                         H_0 = self.params.present_horizon
                         T_0 = doubling_time_in_progress_units
-                        A_0 = self.params.doubling_decay_rate
+                        A_0 = 1.0 - self.params.doubling_difficulty_growth_rate
                         logger.info(f"Manual decaying doubling time: All parameters specified")
                     elif len(params_to_optimize) == 1:
                         # Optimize one parameter
@@ -2932,9 +2932,9 @@ class ProgressModel:
         else:
             logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}")
         
-        # hackily handle doubling_decay_rate = 0 case
-        if self.params.doubling_decay_rate == 0:
-            logger.info(f"doubling_decay_rate is 0, setting to exponential")
+        # hackily handle doubling_difficulty_growth_rate = 1 case (equivalent to decay_rate = 0)
+        if self.params.doubling_difficulty_growth_rate == 1.0:
+            logger.info(f"doubling_difficulty_growth_rate is 1.0 (decay_rate = 0), setting to exponential")
             self.params.horizon_extrapolation_type = "exponential"
 
         # next compute human-only trajectory
@@ -2949,6 +2949,25 @@ class ProgressModel:
         except Exception as e:
             logger.warning(f"Failed to estimate horizon trajectory: {e}")
             self.horizon_trajectory = None
+
+        # Convert AI research taste slope if using "SDs per progress-year" mode
+        # This must be done after computing anchor_progress_rate but before the main trajectory
+        # Store original slope for display purposes
+        self._original_taste_slope = self.params.ai_research_taste_slope
+        if self.params.taste_schedule_type == "SDs per progress-year":
+            try:
+                anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
+                if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0:
+                    # Convert from SD/progress-year to SD/progress-unit by multiplying by (1 year / anchor_progress_rate progress-units)
+                    # which simplifies to dividing by anchor_progress_rate
+                    original_slope = self.params.ai_research_taste_slope
+                    converted_slope = original_slope / anchor_progress_rate
+                    logger.info(f"Converting taste slope from {original_slope:.6f} SD/progress-year to {converted_slope:.6f} SD/progress-unit (anchor rate: {anchor_progress_rate:.6f})")
+                    self.params.ai_research_taste_slope = converted_slope
+                else:
+                    logger.warning(f"Invalid anchor_progress_rate for taste slope conversion: {anchor_progress_rate}")
+            except Exception as e:
+                logger.warning(f"Failed to convert taste slope for progress-year mode: {e}")
 
         # compute automation fraction at anchor time
         present_day = self.params.present_day
@@ -3281,11 +3300,20 @@ class ProgressModel:
 
         # Compute AI research taste slope in SD per anchor-progress-year (SD/year at anchor)
         ai_taste_slope_per_anchor_progress_year = None
+        ai_taste_slope_per_effective_oom = None
         try:
             if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate):
-                ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
+                if self.params.taste_schedule_type == "SDs per progress-year":
+                    # For progress-year mode, use original input value for progress-year display
+                    ai_taste_slope_per_anchor_progress_year = float(self._original_taste_slope)
+                    # And compute effective OOM value using converted slope
+                    ai_taste_slope_per_effective_oom = float(self.params.ai_research_taste_slope)
+                else:
+                    # For effective OOM mode, compute progress-year display from effective OOM input
+                    ai_taste_slope_per_effective_oom = float(self.params.ai_research_taste_slope)
+                    ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
         except Exception as e:
-            logger.warning(f"Failed computing taste slope per anchor-progress-year: {e}")
+            logger.warning(f"Failed computing taste slope conversions: {e}")
         
         # Store comprehensive results
         self.results = {
@@ -3321,6 +3349,7 @@ class ProgressModel:
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
             'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
+            'ai_research_taste_slope_per_effective_oom': ai_taste_slope_per_effective_oom,  # SD per effective OOM
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

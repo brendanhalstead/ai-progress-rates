@@ -35,12 +35,18 @@ AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 
 # Research Taste Distribution Parameters (Log-Normal)
 TOP_PERCENTILE = 0.01                    # fraction classed as "top" researchers
-MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.23           # threshold taste ÷ median taste
+MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration (UI-level options)
 # Internally, both SD-based options map to 'sd_per_progress' logic; units differ in UI only
 TASTE_SCHEDULE_TYPES = ["SDs per effective OOM", "SDs per progress-year"]
-DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per effective OOM"
+DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per progress-year"
+
+# Default AI research taste slope values for different modes
+TASTE_SLOPE_DEFAULTS = {
+    "SDs per effective OOM": 1.18,
+    "SDs per progress-year": 1.8
+}
 
 # Horizon Extrapolation Configuration
 HORIZON_EXTRAPOLATION_TYPES = ["exponential", "decaying doubling time"]  # Available extrapolation types
@@ -50,7 +56,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 DEFAULT_present_day = 2025.6
 DEFAULT_present_horizon = 26  # Will be optimized if None
 DEFAULT_present_doubling_time = 0.408  # Will be optimized if None
-DEFAULT_DOUBLING_DECAY_RATE = 0.080  # Will be optimized if None
+DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE = 0.920  # Will be optimized if None (1 - 0.080)
 
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
@@ -116,7 +122,7 @@ PARAMETER_BOUNDS = {
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
     'present_doubling_time': (0.01, 2),  # doubling time in present years
-    'doubling_decay_rate': (-0.5, 0.5),  # decay rate
+    'doubling_difficulty_growth_rate': (0.5, 1.5),  # difficulty growth rate (1 - decay rate)
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
     # coding_labor_exponent deprecated in favor of parallel_penalty
@@ -194,17 +200,17 @@ DEFAULT_PARAMETERS = {
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 1,  # Optional: specify SC taste in SD-within-human-range
-    'ai_research_taste_slope': 2.0,
+    'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
-    'sc_time_horizon_minutes': 1223000000,
+    'sc_time_horizon_minutes': 124560000,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
     'present_day': DEFAULT_present_day,
     'present_horizon': DEFAULT_present_horizon,
     'present_doubling_time': DEFAULT_present_doubling_time,
-    'doubling_decay_rate': DEFAULT_DOUBLING_DECAY_RATE,
+    'doubling_difficulty_growth_rate': DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # coding_labor_exponent deprecated in favor of parallel_penalty
