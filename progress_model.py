@@ -3107,7 +3107,7 @@ class ProgressModel:
                     C = float(L_AI)
                     logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * progress)
                     try:
-                        automation_model = AutomationModel(self.params)
+                        automation_model = self.params.automation_model
                         L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
                             coding_labor = compute_coding_labor(
