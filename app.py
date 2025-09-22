@@ -205,7 +205,7 @@ def plot_labor_comparison(fig, time_series, row, col):
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.L_AI.tolist(),
+        go.Scatter(x=time_series.time.tolist(), y=time_series.inference_compute.tolist(),
                   name='Inference Compute',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines+markers', marker=dict(size=4),
@@ -1361,7 +1361,7 @@ def get_tab_configurations():
         'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')),
         'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('progress_at_sc')),
         'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
-        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].L_AI, r, c),
+        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].inference_compute, r, c),
         'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
         'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['time_series'].time, data['time_series'].training_compute_growth_rate, r, c),
         'plot_software_efficiency': lambda fig, data, r, c: plot_software_efficiency(fig, data['metrics']['times'], data['metrics']['software_efficiency'], r, c),
@@ -1727,12 +1727,12 @@ def create_default_time_series():
             
             time = np.array([float(row['time']) for row in data])
             L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
-            L_AI = np.array([float(row['L_AI']) for row in data])
+            inference_compute = np.array([float(row['inference_compute']) for row in data])
             experiment_compute = np.array([float(row['experiment_compute']) for row in data])
             training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
             
             logger.info(f"Loaded time series data: {len(data)} points from {time[0]} to {time[-1]}")
-            return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+            return TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
         else:
             logger.warning("input_data.csv not found, falling back to synthetic data")
             raise FileNotFoundError("input_data.csv not found")
@@ -1742,12 +1742,12 @@ def create_default_time_series():
         # Fallback to synthetic data if CSV loading fails
         time = np.linspace(2029, 2030, 12)
         L_HUMAN = np.ones_like(time) * 1e6
-        L_AI = np.logspace(3, 8, len(time))
+        inference_compute = np.logspace(3, 8, len(time))
         experiment_compute = np.logspace(6, 10, len(time))  # Use exponential growth as fallback
         training_compute_growth_rate = np.logspace(6, 10, len(time))
         
         logger.info("Using synthetic fallback data")
-        return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+        return TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
 
 def create_default_parameters():
     """Create default model parameters"""
@@ -1760,17 +1760,17 @@ def load_time_series_from_csv_path(csv_path):
         data = list(reader)
     time = np.array([float(row['time']) for row in data])
     L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
-    L_AI = np.array([float(row['L_AI']) for row in data])
+    inference_compute = np.array([float(row['inference_compute']) for row in data])
     experiment_compute = np.array([float(row['experiment_compute']) for row in data])
     training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
-    return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+    return TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
 
 def time_series_to_dict(data: TimeSeriesData):
     """Convert TimeSeriesData to dictionary for JSON serialization"""
     return {
         'time': data.time.tolist(),
         'L_HUMAN': data.L_HUMAN.tolist(),
-        'L_AI': data.L_AI.tolist(),
+        'inference_compute': data.inference_compute.tolist(),
         'experiment_compute': data.experiment_compute.tolist(),
         'training_compute_growth_rate': data.training_compute_growth_rate.tolist()
     }
@@ -2148,11 +2148,11 @@ def upload_data():
         # Parse data
         time = np.array([float(row['time']) for row in data])
         L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
-        L_AI = np.array([float(row['L_AI']) for row in data])
+        inference_compute = np.array([float(row['inference_compute']) for row in data])
         experiment_compute = np.array([float(row['experiment_compute']) for row in data])
         training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
         
-        time_series = TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+        time_series = TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
         session_data['time_series'] = time_series
         
         return jsonify({

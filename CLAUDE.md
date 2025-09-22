@@ -11,7 +11,7 @@ This repository contains a Python script for modeling AI progress over time usin
 The model consists of several key components:
 
 1. **Data Structures**:
-   - `TimeSeriesData`: Input time series (time, L_HUMAN, L_AI, experiment_compute, training_compute)
+   - `TimeSeriesData`: Input time series (time, L_HUMAN, inference_compute, experiment_compute, training_compute)
    - `Parameters`: Model parameters (elasticities, weights, automation anchors)
    - `AnchorConstraint`: Constraints for parameter estimation
 

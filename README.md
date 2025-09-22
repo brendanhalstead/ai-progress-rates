@@ -11,7 +11,7 @@
 | :---- | :---- |
 | progress\_model.py | Core model: defines `TimeSeriesData`, `Parameters`, and `ProgressModel`; computes automation, cognitive output, software/overall progress, integrates ODEs, and supports parameter estimation/utilities. |
 | model\_config.py | Central configuration: numerical constants, default parameter values, bounds/validation, and `PLOT_METADATA` used by the app/plots. |
- | input\_data.csv | Default input time series (time, `L_HUMAN`, `L_AI`, experiment/training compute) used by the app and scripts. |
+ | input\_data.csv | Default input time series (time, `L_HUMAN`, `inference_compute`, experiment/training compute) used by the app and scripts. |
  | benchmark\_results.yaml | Benchmark metadata used to overlay SOTA METR p80 horizon points on horizon plots. |
 
 ### Webapp-related files

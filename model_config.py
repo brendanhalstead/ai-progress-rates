@@ -267,7 +267,7 @@ PLOT_METADATA = {
         'title': 'Inference Compute for R&D Automation',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'H100e', 'type': 'log'},
-        'data_keys': ['times', 'L_AI']
+        'data_keys': ['times', 'inference_compute']
     },
     'plot_experiment_compute': {
         'title': 'Experiment Compute',

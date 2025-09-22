@@ -30,7 +30,7 @@ class TimeSeriesData:
     """Input time series data"""
     time: np.ndarray  # Decimal years
     L_HUMAN: np.ndarray  # Human labor supply
-    L_AI: np.ndarray  # AI labor supply (human-equivalents)
+    inference_compute: np.ndarray  # AI labor supply (human-equivalents)
     experiment_compute: np.ndarray  # Experiment compute budget
     training_compute_growth_rate: np.ndarray  # Training compute budget
 
@@ -698,7 +698,7 @@ class Parameters:
 class AnchorConstraint:
     """Specifies a constraint for parameter estimation"""
     # Dict mapping variable names to values (can be partial)
-    conditions: Dict[str, float]  # e.g., {"automation_fraction": 0.9, "L_AI": 1e6}
+    conditions: Dict[str, float]  # e.g., {"automation_fraction": 0.9, "inference_compute": 1e6}
     # Expected outcome
     target_variable: str  # e.g., "progress_rate"
     target_value: float   # e.g., 5.0
@@ -775,20 +775,20 @@ def _ces_function(X1: float, X2: float, w1: float, rho: float) -> float:
         return w1 * X1 + w2 * X2
 
 
-def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float, rho: float, parallel_penalty: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
+def compute_coding_labor(automation_fraction: float, inference_compute: float, L_HUMAN: float, rho: float, parallel_penalty: float, cognitive_normalization: float = 1.0, human_only: bool = False) -> float:
     """
     CES combination of AI and human labor using an alternative formulation inspired by
-    the structure in FORMULAS.md: Y = ( (A^(1-rho) * L_AI^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
-    This can be seen as a standard CES function on effective labor inputs L_AI/A and L_HUMAN/(1-A).
+    the structure in FORMULAS.md: Y = ( (A^(1-rho) * inference_compute^rho) + ((1-A)^(1-rho) * L_HUMAN^rho) )^(1/rho)
+    This can be seen as a standard CES function on effective labor inputs inference_compute/A and L_HUMAN/(1-A).
     
     Args:
         automation_fraction: Fraction of work automated (A) [0,1]
-        L_AI: AI labor supply
+        inference_compute: AI labor supply
         L_HUMAN: Human labor supply
         rho: Standard substitution parameter in (-inf, 1].
-             rho -> 1: perfect substitutes (Y = L_AI + L_HUMAN)
-             rho -> 0: Cobb-Douglas (Y = (L_AI/A)^A * (L_HUMAN/(1-A))^(1-A))
-             rho -> -inf: perfect complements (Y = min(L_AI/A, L_HUMAN/(1-A)))
+             rho -> 1: perfect substitutes (Y = inference_compute + L_HUMAN)
+             rho -> 0: Cobb-Douglas (Y = (inference_compute/A)^A * (L_HUMAN/(1-A))^(1-A))
+             rho -> -inf: perfect complements (Y = min(inference_compute/A, L_HUMAN/(1-A)))
         parallel_penalty: Power transformation parameter applied to CES output before normalization
         cognitive_normalization: Normalization constant for cognitive output
     
@@ -799,11 +799,11 @@ def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float
         return (L_HUMAN ** parallel_penalty) * cognitive_normalization 
     
     # Input validation
-    if not all(np.isfinite([automation_fraction, L_AI, L_HUMAN, rho, parallel_penalty, cognitive_normalization])):
+    if not all(np.isfinite([automation_fraction, inference_compute, L_HUMAN, rho, parallel_penalty, cognitive_normalization])):
         logger.warning("Non-finite inputs to compute_coding_labor")
         return 0.0
     
-    if L_AI < 0 or L_HUMAN < 0:
+    if inference_compute < 0 or L_HUMAN < 0:
         logger.warning("Negative labor inputs")
         return 0.0
     
@@ -812,47 +812,47 @@ def compute_coding_labor(automation_fraction: float, L_AI: float, L_HUMAN: float
 
     # Handle edge cases for rho
     if abs(rho) < cfg.RHO_COBB_DOUGLAS_THRESHOLD:  # Cobb-Douglas case
-        if L_AI > 0 and L_HUMAN > 0:
+        if inference_compute > 0 and L_HUMAN > 0:
             try:
-                # Effective inputs are L_AI/a and L_HUMAN/(1-a)
-                # Cobb-Douglas form is (L_AI/a)^a * (L_HUMAN/(1-a))^(1-a)
-                term1 = a * (np.log(L_AI) - np.log(a))
+                # Effective inputs are inference_compute/a and L_HUMAN/(1-a)
+                # Cobb-Douglas form is (inference_compute/a)^a * (L_HUMAN/(1-a))^(1-a)
+                term1 = a * (np.log(inference_compute) - np.log(a))
                 term2 = (1 - a) * (np.log(L_HUMAN) - np.log(1 - a))
                 log_result = term1 + term2
                 result = np.exp(log_result)
             except (ValueError, OverflowError):
                 logger.warning("Overflow in Cobb-Douglas case, using linear fallback")
-                result = a * L_AI + (1-a) * L_HUMAN
+                result = a * inference_compute + (1-a) * L_HUMAN
         else:
             result = 0.0
 
     elif rho == 1.0:  # Perfect substitutes
-        # Formula simplifies to L_AI + L_HUMAN
-        result = L_AI + L_HUMAN
+        # Formula simplifies to inference_compute + L_HUMAN
+        result = inference_compute + L_HUMAN
 
     elif rho < cfg.RHO_LEONTIEF_THRESHOLD:  # Nearly perfect complements (Leontief)
-        # Limit is min(L_AI/a, L_HUMAN/(1-a))
-        result = min(L_AI / a, L_HUMAN / (1 - a))
+        # Limit is min(inference_compute/a, L_HUMAN/(1-a))
+        result = min(inference_compute / a, L_HUMAN / (1 - a))
 
     else: # Standard CES formula for the alternative model
         try:
-            term1 = np.power(a, 1 - rho) * np.power(L_AI, rho) if L_AI > 0 else 0
+            term1 = np.power(a, 1 - rho) * np.power(inference_compute, rho) if inference_compute > 0 else 0
             term2 = np.power(1 - a, 1 - rho) * np.power(L_HUMAN, rho) if L_HUMAN > 0 else 0
             
             total = term1 + term2
             if total <= 0:
                 logger.warning(f"Alternative CES inner term is non-positive ({total}) with rho={rho}. Fallback to min.")
-                result = min(L_AI / a, L_HUMAN / (1 - a))
+                result = min(inference_compute / a, L_HUMAN / (1 - a))
             else:
                 result = np.power(total, 1 / rho)
 
             if not np.isfinite(result):
                 logger.warning(f"Non-finite result in Alternative CES (rho={rho}), using linear fallback.")
-                result = a * L_AI + (1-a) * L_HUMAN
+                result = a * inference_compute + (1-a) * L_HUMAN
         
         except (OverflowError, ZeroDivisionError, ValueError) as e:
             logger.warning(f"Numerical error in Alternative CES (rho={rho}): {e}, using linear fallback.")
-            result = a * L_AI + (1-a) * L_HUMAN
+            result = a * inference_compute + (1-a) * L_HUMAN
             
     # Apply parallel_penalty transformation before normalization
     try:
@@ -1149,11 +1149,11 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         
         
         L_HUMAN_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI_0 = _log_interp(start_time, time_series_data.time, time_series_data.L_AI)
+        inference_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.inference_compute)
         experiment_compute_0 = _log_interp(start_time, time_series_data.time, time_series_data.experiment_compute)
         
         if params.human_only:
-            coding_labor_0 = compute_coding_labor(None, L_AI_0, L_HUMAN_0, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
+            coding_labor_0 = compute_coding_labor(None, inference_compute_0, L_HUMAN_0, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: coding_labor_0: {coding_labor_0}")
             initial_aggregate_research_taste = 1.0
         else:
@@ -1161,7 +1161,7 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
             initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
             initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
             coding_labor_0 = compute_coding_labor(
-                initial_automation, L_AI_0, L_HUMAN_0, 
+                initial_automation, inference_compute_0, L_HUMAN_0, 
                 params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
             logger.info(f"ACTUAL::: coding_labor_0: {coding_labor_0}")
@@ -1175,16 +1175,16 @@ def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: P
         # Calculate RS'(dt) for numerical differentiation
         # Use log-space interpolation for exponential trends
         L_HUMAN_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.L_HUMAN)
-        L_AI_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.L_AI)
+        inference_compute_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.inference_compute)
         experiment_compute_dt = _log_interp(start_time + dt, time_series_data.time, time_series_data.experiment_compute)
         
         # Automation fraction changes very little over small dt, so use same value
         if params.human_only:
-            coding_labor_dt = compute_coding_labor(None, L_AI_dt, L_HUMAN_dt, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
+            coding_labor_dt = compute_coding_labor(None, inference_compute_dt, L_HUMAN_dt, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
             logger.info(f"HUMAN-ONLY::: coding_labor_dt: {coding_labor_dt}")
         else:
             coding_labor_dt = compute_coding_labor(
-                initial_automation, L_AI_dt, L_HUMAN_dt,
+                initial_automation, inference_compute_dt, L_HUMAN_dt,
                 params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
         
@@ -1233,7 +1233,7 @@ class InitialConditions:
     initial_progress: float
     initial_automation: float
     L_HUMAN: float
-    L_AI: float
+    inference_compute: float
     experiment_compute: float
     training_compute_growth_rate: float
     coding_labor: float
@@ -1261,7 +1261,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
     
     # TODO: may need to change to log-space interpolation
     L_HUMAN = np.interp(start_time, time_series_data.time, time_series_data.L_HUMAN)
-    L_AI = np.interp(start_time, time_series_data.time, time_series_data.L_AI)
+    inference_compute = np.interp(start_time, time_series_data.time, time_series_data.inference_compute)
     experiment_compute = np.interp(start_time, time_series_data.time, time_series_data.experiment_compute)
     training_compute_growth_rate = np.interp(start_time, time_series_data.time, time_series_data.training_compute_growth_rate)
 
@@ -1269,14 +1269,14 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_automation = 1.0
         initial_ai_research_taste = 0.0
         initial_aggregate_research_taste = 1.0
-        coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
+        coding_labor = compute_coding_labor(None, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
         research_effort = compute_research_effort(experiment_compute, coding_labor, params.alpha_experiment_capacity, params.rho_experiment_capacity, params.experiment_compute_exponent, initial_aggregate_research_taste)
     else:
         initial_automation = compute_automation_fraction(initial_progress, params)
         initial_ai_research_taste = compute_ai_research_taste(initial_progress, params)
         initial_aggregate_research_taste = compute_aggregate_research_taste(initial_ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
         coding_labor = compute_coding_labor(
-            initial_automation, L_AI, L_HUMAN, 
+            initial_automation, inference_compute, L_HUMAN, 
             params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
         )
     
@@ -1298,7 +1298,7 @@ def compute_initial_conditions(time_series_data: TimeSeriesData, params: Paramet
         initial_progress=initial_progress,
         initial_automation=initial_automation,
         L_HUMAN=L_HUMAN,
-        L_AI=L_AI,
+        inference_compute=inference_compute,
         experiment_compute=experiment_compute,
         training_compute_growth_rate=training_compute_growth_rate,
         coding_labor=coding_labor,
@@ -1327,34 +1327,34 @@ def setup_model(time_series_data: TimeSeriesData, params: Parameters,
     
     return params, initial_conditions
 
-def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, L_AI: float, params: Parameters) -> float:
+def aut_frac_from_swe_multiplier(swe_multiplier: float, L_HUMAN: float, inference_compute: float, params: Parameters) -> float:
     """
     Compute automation fraction from swe multiplier.
 
     Solve for A in:
-      (swe_multiplier)**params.parallel_penalty * compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True) = compute_coding_labor(A, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
+      (swe_multiplier)**params.parallel_penalty * compute_coding_labor(A, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True) = compute_coding_labor(A, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
     where p = params.rho_coding_labor.
     Returns A in (0, 1). If there are multiple solutions, return the lower one.
 
     """
     # Input validation
-    if not all(np.isfinite([swe_multiplier, L_HUMAN, L_AI])):
+    if not all(np.isfinite([swe_multiplier, L_HUMAN, inference_compute])):
         logger.warning("Non-finite inputs to aut_frac_from_swe_multiplier")
         return 0.0
     
-    if swe_multiplier <= 0 or L_HUMAN <= 0 or L_AI < 0:
+    if swe_multiplier <= 0 or L_HUMAN <= 0 or inference_compute < 0:
         logger.warning("Invalid inputs to aut_frac_from_swe_multiplier")
         return 0.0
     
     # Target value we want to achieve
-    target_output = swe_multiplier**params.parallel_penalty * compute_coding_labor(0, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
+    target_output = swe_multiplier**params.parallel_penalty * compute_coding_labor(0, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)
     
     # Define the objective function to minimize
     def objective(A_candidate):
         """Return the difference between target and actual cognitive output"""
         try:
             actual_output = compute_coding_labor(
-                A_candidate, L_AI, L_HUMAN, 
+                A_candidate, inference_compute, L_HUMAN, 
                 params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
             )
             return actual_output - target_output
@@ -1416,7 +1416,7 @@ def solve_lower_anchor_via_automation_model(
     swe_multiplier: float,
     anchor_progress: float,
     L_HUMAN: float,
-    L_AI: float,
+    inference_compute: float,
     params: Parameters,
 ) -> float:
     """
@@ -1433,10 +1433,10 @@ def solve_lower_anchor_via_automation_model(
     """
     try:
         # Validate inputs
-        if not all(np.isfinite([swe_multiplier, anchor_progress, L_HUMAN, L_AI])):
+        if not all(np.isfinite([swe_multiplier, anchor_progress, L_HUMAN, inference_compute])):
             logger.warning("Non-finite inputs to solve_lower_anchor_via_automation_model")
             return 0.01
-        if swe_multiplier <= 0 or L_HUMAN <= 0 or L_AI < 0:
+        if swe_multiplier <= 0 or L_HUMAN <= 0 or inference_compute < 0:
             logger.warning("Invalid inputs to solve_lower_anchor_via_automation_model")
             return 0.01
 
@@ -1445,20 +1445,20 @@ def solve_lower_anchor_via_automation_model(
         aut_at_sc = getattr(params, 'automation_fraction_at_superhuman_coder', None)
         if progress_at_sc is None or not np.isfinite(progress_at_sc) or aut_at_sc is None:
             logger.warning("Missing progress_at_sc or automation_fraction_at_superhuman_coder; falling back to direct solver")
-            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, L_AI, params)
+            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, inference_compute, params)
 
         # Target coding-labor ratio in parallel_penalty space
         target_ratio = float(np.power(swe_multiplier, params.parallel_penalty))
 
         # Baseline human-only coding labor (consistent with definition of multiplier)
         baseline = compute_coding_labor(
-            0, L_AI, L_HUMAN,
+            0, inference_compute, L_HUMAN,
             params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization,
             human_only=True
         )
         if baseline <= 0 or not np.isfinite(baseline):
             logger.warning("Invalid baseline coding labor in anchor solver; using fallback")
-            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, L_AI, params)
+            return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, inference_compute, params)
 
         logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * anchor_progress)
 
@@ -1474,13 +1474,13 @@ def solve_lower_anchor_via_automation_model(
             try:
                 am = AutomationModel(p)
                 H = float(L_HUMAN)
-                C = float(L_AI)
+                C = float(inference_compute)
                 L_opt = am.coding_labor_optimal_ces(H, C, logE, p)
                 if L_opt is None or not np.isfinite(L_opt):
                     # Fallback to simple CES using the schedule's automation at the anchor (which equals a_lower)
                     A = am.get_automation_fraction(anchor_progress)
                     L_ai = compute_coding_labor(
-                        A, L_AI, L_HUMAN,
+                        A, inference_compute, L_HUMAN,
                         p.rho_coding_labor, p.parallel_penalty, p.coding_labor_normalization
                     )
                 else:
@@ -1904,11 +1904,11 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         else:
             L_HUMAN = np.interp(t, time_series_data.time, time_series_data.L_HUMAN)
         
-        if np.all(time_series_data.L_AI > 0):
-            log_L_AI = np.log(time_series_data.L_AI)
-            L_AI = np.exp(np.interp(t, time_series_data.time, log_L_AI))
+        if np.all(time_series_data.inference_compute > 0):
+            log_inference_compute = np.log(time_series_data.inference_compute)
+            inference_compute = np.exp(np.interp(t, time_series_data.time, log_inference_compute))
         else:
-            L_AI = np.interp(t, time_series_data.time, time_series_data.L_AI)
+            inference_compute = np.interp(t, time_series_data.time, time_series_data.inference_compute)
         
         if np.all(time_series_data.experiment_compute > 0):
             log_experiment_compute = np.log(time_series_data.experiment_compute)
@@ -1919,20 +1919,20 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         training_compute_growth_rate = np.interp(t, time_series_data.time, time_series_data.training_compute_growth_rate)
         
         # Validate interpolated values
-        if not all(np.isfinite([L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate])):
+        if not all(np.isfinite([L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate])):
             logger.warning(f"Non-finite interpolated values at t={t}")
             return [0.0, 0.0]
         
         # Ensure non-negative values
         L_HUMAN = max(0.0, L_HUMAN)
-        L_AI = max(0.0, L_AI)
+        inference_compute = max(0.0, inference_compute)
         experiment_compute = max(0.0, experiment_compute)
         training_compute_growth_rate = max(0.0, training_compute_growth_rate)
         
         if params.human_only:
             automation_fraction = 0.0
             aggregate_research_taste = 1.0
-            coding_labor = compute_coding_labor(None, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)  
+            coding_labor = compute_coding_labor(None, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
             automation_fraction = compute_automation_fraction(cumulative_progress, params)
@@ -1948,24 +1948,24 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             if getattr(params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
                 # Map model quantities to H, C, E (E is effective compute)
                 H = float(L_HUMAN)
-                C = float(L_AI)
+                C = float(inference_compute)
                 logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * cumulative_progress)
                 try:
                     # Build or reuse AutomationModel for frontier (uses current anchors)
                     automation_model = params.automation_model
                     L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, params)
                     if L_opt is None or not np.isfinite(L_opt):
-                        coding_labor = compute_coding_labor(automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
+                        coding_labor = compute_coding_labor(automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
                     # TODO: is this redundant? what is going on here?
                     else:
                         # Match units with compute_coding_labor: apply parallel_penalty and normalization
                         coding_labor = float((L_opt ** params.parallel_penalty) * params.coding_labor_normalization)
                 except Exception as e:
                     logger.warning(f"Falling back to simple CES due to optimal_ces error: {e}")
-                    coding_labor = compute_coding_labor(automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
+                    coding_labor = compute_coding_labor(automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
             else:
                 coding_labor = compute_coding_labor(
-                    automation_fraction, L_AI, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
+                    automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization
                 )
         
         if not np.isfinite(coding_labor) or coding_labor < 0:
@@ -2875,10 +2875,10 @@ class ProgressModel:
             anchor_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
         else:
             anchor_human_labor = np.interp(present_day, self.data.time, self.data.L_HUMAN)
-        if np.all(self.data.L_AI > 0):
-            anchor_ai_labor = _log_interp(present_day, self.data.time, self.data.L_AI)
+        if np.all(self.data.inference_compute > 0):
+            anchor_ai_labor = _log_interp(present_day, self.data.time, self.data.inference_compute)
         else:
-            anchor_ai_labor = np.interp(present_day, self.data.time, self.data.L_AI)
+            anchor_ai_labor = np.interp(present_day, self.data.time, self.data.inference_compute)
         
         self.human_only_results = {
             'times': times,
@@ -2895,7 +2895,7 @@ class ProgressModel:
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,
-                'L_AI': self.data.L_AI,
+                'inference_compute': self.data.inference_compute,
                 'experiment_compute': self.data.experiment_compute,
                 'training_compute_growth_rate': self.data.training_compute_growth_rate
             }
@@ -3090,7 +3090,7 @@ class ProgressModel:
                 
                 # Interpolate input time series to current time
                 L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
-                L_AI = _log_interp(t, self.data.time, self.data.L_AI)
+                inference_compute = _log_interp(t, self.data.time, self.data.inference_compute)
                 experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
                 training_compute_growth_rate = _log_interp(t, self.data.time, self.data.training_compute_growth_rate)
                 
@@ -3101,14 +3101,14 @@ class ProgressModel:
                 # Compute coding labor
                 if getattr(self.params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
                     H = float(L_HUMAN)
-                    C = float(L_AI)
+                    C = float(inference_compute)
                     logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * progress)
                     try:
                         automation_model = self.params.automation_model
                         L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
                             coding_labor = compute_coding_labor(
-                                automation_fraction, L_AI, L_HUMAN, 
+                                automation_fraction, inference_compute, L_HUMAN, 
                                 self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                             )
                         else:
@@ -3116,12 +3116,12 @@ class ProgressModel:
                     except Exception as e:
                         logger.warning(f"Falling back to simple CES in metrics due to optimal_ces error: {e}")
                         coding_labor = compute_coding_labor(
-                            automation_fraction, L_AI, L_HUMAN, 
+                            automation_fraction, inference_compute, L_HUMAN, 
                             self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                         )
                 else:
                     coding_labor = compute_coding_labor(
-                        automation_fraction, L_AI, L_HUMAN, 
+                        automation_fraction, inference_compute, L_HUMAN, 
                         self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                     )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
@@ -3149,7 +3149,7 @@ class ProgressModel:
                 software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
                 
                 # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_coding_labor = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
+                human_only_coding_labor = compute_coding_labor(0, inference_compute, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
                 human_only_aggregate_research_taste = compute_aggregate_research_taste(0, median_to_top_gap=self.params.median_to_top_taste_multiplier) # No AI research taste
                 human_only_research_effort = compute_research_effort(
                     experiment_compute, human_only_coding_labor, 
@@ -3172,7 +3172,7 @@ class ProgressModel:
                 )
                 
                 # Calculate labor contributions to cognitive output
-                human_contrib = compute_coding_labor(0, L_AI, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
+                human_contrib = compute_coding_labor(0, inference_compute, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
                 ai_contrib = max(0.0, coding_labor - human_contrib)  # Ensure non-negative
                 
                 human_labor_contributions.append(human_contrib)
@@ -3377,7 +3377,7 @@ class ProgressModel:
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,
-                'L_AI': self.data.L_AI,
+                'inference_compute': self.data.inference_compute,
                 'experiment_compute': self.data.experiment_compute,
                 'training_compute_growth_rate': self.data.training_compute_growth_rate
             },
@@ -3436,7 +3436,7 @@ class ProgressModel:
             condition_array = self.results.get(condition_key)
             if condition_array is None:
                 # Handle input time series conditions
-                if condition_key in ['L_HUMAN', 'L_AI', 'experiment_compute']:
+                if condition_key in ['L_HUMAN', 'inference_compute', 'experiment_compute']:
                     input_series = self.results['input_time_series'][condition_key]
                     # Interpolate to model times for comparison
                     condition_array = np.interp(times, self.results['input_time_series']['time'], input_series)
@@ -3609,8 +3609,8 @@ def load_time_series_data(filename: str) -> TimeSeriesData:
     
     time = np.array([float(row['time']) for row in data])
     L_HUMAN = np.array([float(row['L_HUMAN']) for row in data])
-    L_AI = np.array([float(row['L_AI']) for row in data])
+    inference_compute = np.array([float(row['inference_compute']) for row in data])
     experiment_compute = np.array([float(row['experiment_compute']) for row in data])
     training_compute_growth_rate = np.array([float(row['training_compute_growth_rate']) for row in data])
     
-    return TimeSeriesData(time, L_HUMAN, L_AI, experiment_compute, training_compute_growth_rate)
+    return TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
