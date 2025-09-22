@@ -264,15 +264,15 @@ PLOT_METADATA = {
         'data_keys': ['times', 'L_HUMAN']
     },
     'plot_ai_labor': {
-        'title': 'AI Labor',
+        'title': 'Inference Compute for R&D Automation',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Human Equivalents', 'type': 'log'},
+        'y_axis': {'title': 'H100e', 'type': 'log'},
         'data_keys': ['times', 'L_AI']
     },
     'plot_experiment_compute': {
         'title': 'Experiment Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': '(scaled) FLOPs', 'type': 'log'},
+        'y_axis': {'title': 'H100e', 'type': 'log'},
         'data_keys': ['times', 'experiment_compute']
     },
     'plot_training_compute_growth_rate': {
@@ -288,9 +288,9 @@ PLOT_METADATA = {
         'data_keys': ['times', 'software_efficiency']
     },
     'plot_labor_comparison': {
-        'title': 'Available Labor Pools',
+        'title': 'Inference Compute and Human Labor',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'Automated-human equivalents', 'type': 'log'},
+        'y_axis': {'title': 'H100e / Humans', 'type': 'log'},
         'data_keys': ['time_series']
     },
     'plot_compute_comparison': {
@@ -483,11 +483,11 @@ This tab displays the exogenous inputs that drive AI progress in the model:
 ### Human Labor (Top Left)
 Human researchers and engineers working on AGI development, calculated using data from [this post](https://forum.effectivealtruism.org/posts/xoX936hEvpxToeuLw/estimating-the-substitutability-between-compute-and).
 
-### AI Labor (Top Right) 
-Inference compute budget for running agents to be spread across automated tasks. Measured in human-equivalents.
+### Inference Compute for R&D Automation (Top Right) 
+Inference compute budget for running agents to be spread across automated tasks. Measured in H100-equivalents.
 
 ### Experiment Compute (Bottom Left)
-Basically assumed to scale with training compute. Normalized arbitrarily to 1 in 2019.
+Compute budget for running experiments. Measured in H100-equivalents.
 
 ### Training Compute Growth Rate (Bottom Right)
 Factor by which frontier training run compute grows each year, measured in OOMs.

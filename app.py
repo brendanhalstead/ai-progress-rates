@@ -149,11 +149,11 @@ def plot_ai_labor(fig, times, values, row, col):
     """Plot AI labor over time"""
     fig.add_trace(
         go.Scatter(x=times.tolist(), y=values.tolist(),
-                  name='AI Labor',
+                  name='Inference Compute for R&D Automation',
                   line=dict(color='#1f77b4', width=3),
                   mode='lines+markers', marker=dict(size=4),
                   customdata=[(format_decimal_year_to_month_year(t), format_number_mbt(v)) for t, v in zip(times, values)],
-                  hovertemplate='Year: %{customdata[0]}<br>AI Labor: %{customdata[1]}<extra></extra>'),
+                  hovertemplate='Year: %{customdata[0]}<br>Inference Compute: %{customdata[1]}<extra></extra>'),
         row=row, col=col
     )
 
@@ -206,7 +206,7 @@ def plot_labor_comparison(fig, time_series, row, col):
     )
     fig.add_trace(
         go.Scatter(x=time_series.time.tolist(), y=time_series.L_AI.tolist(),
-                  name='AI Labor',
+                  name='Inference Compute',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines+markers', marker=dict(size=4),
                   customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
