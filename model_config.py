@@ -60,8 +60,8 @@ DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE = 0.920  # Will be optimized if None (1 
 
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
-AI_RESEARCH_TASTE_MAX = 1e10  # Match the upper bound from PARAMETER_BOUNDS
-AI_RESEARCH_TASTE_MAX_SD = 23
+AI_RESEARCH_TASTE_MAX = 1e30  # Match the upper bound from PARAMETER_BOUNDS
+AI_RESEARCH_TASTE_MAX_SD = 100
 
 # Baseline Annual Compute Multiplier
 BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT = 4.5
@@ -78,19 +78,19 @@ REFERENCE_COMPUTE_CHANGE = 0.1
 # =============================================================================
 # MODEL RATE & VALUE CAPS
 # =============================================================================
-MAX_RESEARCH_EFFORT = 1000000000000000000000000.0
-MAX_NORMALIZED_PROGRESS_RATE = 1000.0
+MAX_RESEARCH_EFFORT = 1e30
+MAX_NORMALIZED_PROGRESS_RATE = 1e30
 TIME_EXTRAPOLATION_WINDOW = 10.0
 
 # =============================================================================
 # ODE INTEGRATION
 # =============================================================================
-PROGRESS_ODE_CLAMP_MAX = 1e6
-RESEARCH_STOCK_ODE_CLAMP_MAX = 1e20
+PROGRESS_ODE_CLAMP_MAX = 1e30
+RESEARCH_STOCK_ODE_CLAMP_MAX = 1e30
 ODE_MAX_STEP = 1.0
 EULER_FALLBACK_MIN_STEPS = 100
 EULER_FALLBACK_STEPS_PER_YEAR = 10
-DENSE_OUTPUT_POINTS = 100
+DENSE_OUTPUT_POINTS = 250
 
 # ODE step size logging configuration
 ODE_STEP_SIZE_LOGGING = False
