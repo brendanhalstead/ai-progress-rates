@@ -1,4 +1,4 @@
-time,L_HUMAN,L_AI,experiment_compute,training_compute_growth_rate
+time,L_HUMAN,inference_compute,experiment_compute,training_compute_growth_rate
 2012.0,80.19524196,0.001623671838,0.002914771509,0.6532125138
 2013.0,104.2538146,0.005717914825,0.01165908604,0.6532125138
 2014.0,135.5299589,0.02013618096,0.04663634415,0.6549976392
