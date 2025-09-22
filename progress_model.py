@@ -1752,21 +1752,18 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     
     try:
         # Compute offset so curve passes through (progress_at_sc, taste_at_sc)
-        # We want: taste_at_sc = taste_distribution.get_taste_at_sd(slope * penalty * progress_at_sc + offset)
-        # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * penalty * progress_at_sc
+        # We want: taste_at_sc = taste_distribution.get_taste_at_sd(slope * progress_at_sc + offset)
+        # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_sc
         
         # Clamp taste_at_sc to valid range to avoid log(0) issues
         taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
         target_sd = taste_distribution.get_sd_of_taste(taste_at_sc_clamped)
-        # Penalty moderates slope as taste approaches the upper SD bound
-        penalty = (cfg.AI_RESEARCH_TASTE_MAX_SD - target_sd) / cfg.AI_RESEARCH_TASTE_MAX_SD
-        penalty = np.clip(penalty, 0.0, 1.0)
-        # Adjust offset to maintain the anchor point under penalized slope
-        offset = target_sd - slope * penalty * progress_at_sc
+        # Adjust offset to maintain the anchor point with unpenalized slope
+        offset = target_sd - slope * progress_at_sc
         
         # Compute AI research taste at current progress
-        current_sd = slope * penalty * cumulative_progress + offset
+        current_sd = slope * cumulative_progress + offset
         current_sd_clamped = min(current_sd, cfg.AI_RESEARCH_TASTE_MAX_SD)
 
         ai_research_taste = taste_distribution.get_taste_at_sd(current_sd_clamped)
