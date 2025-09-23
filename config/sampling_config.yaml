@@ -108,3 +108,8 @@ parameters:
   r_software:
     dist: lognormal
     ci80: [0.7, 9]
+
+  # Software efficiency growth rate in reference year (2023)
+  software_progress_rate_at_reference_year:
+    dist: lognormal
+    ci80: [0.25, 2.5]  # 80% CI around default of 0.79
