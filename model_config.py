@@ -29,6 +29,8 @@ PARALLEL_PENALTY_MAX = 1.0
 # =============================================================================
 # OTHER RANDOM CONSTANTS
 # =============================================================================
+
+LABOR_MULT_EXTRA_FOR_AI2027_SC = 20
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
@@ -362,11 +364,23 @@ PLOT_METADATA = {
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
         'data_keys': ['times', 'coding_labors', 'human_labor_contributions']
     },
+    'plot_coding_labor_with_present_resources': {
+        'title': 'Coding Labor (Present Resources)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Nonsense units', 'type': 'log'},
+        'data_keys': ['times', 'coding_labors_with_present_resources']
+    },
     'plot_ai_coding_labor_multiplier': {
         'title': 'AI Parallel Coding Labor Multiplier',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Coding labor per human', 'type': 'log'},
         'data_keys': ['times', 'ai_coding_labor_multipliers']
+    },
+    'plot_ai_coding_labor_mult_ref_present_day': {
+        'title': 'AI Coding Labor Multiplier (Ref Present Day Human Labor)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Coding labor per present-day human', 'type': 'log'},
+        'data_keys': ['times', 'ai_coding_labor_mult_ref_present_day']
     },
     
     # Software R&D plots
@@ -532,12 +546,14 @@ Average of the research taste distribution, after replacing sub-AI human researc
     'coding_labor': {
         'id': 'cognitive-output',
         'name': 'Coding Labor',
-        'rows': 2, 'cols': 2,
+        'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_labor_comparison', 'position': (1, 1)},
             {'function': 'plot_automation_fraction', 'position': (1, 2)},
-            {'function': 'plot_ai_coding_labor_multiplier', 'position': (2, 1)},
-            {'function': 'plot_cognitive_components', 'position': (2, 2)}
+            {'function': 'plot_coding_labor_with_present_resources', 'position': (2, 1)},
+            {'function': 'plot_ai_coding_labor_multiplier', 'position': (2, 2)},
+            {'function': 'plot_ai_coding_labor_mult_ref_present_day', 'position': (3, 1)},
+            {'function': 'plot_cognitive_components', 'position': (3, 2)}
         ],
         'explanation': """
 ## Coding Labor (from coding automation fraction, human labor, and AI labor)
@@ -551,8 +567,8 @@ See Automation tab.
 ### AI Coding Labor Multiplier (Bottom Left)
 Obtained by taking the (pre-discounting) combined coding labor and dividing it by the (pre-discounting) human labor.
 
-### Normalized Coding Labor (Bottom Right)
-Depicts the actual combined coding labor that gets passed into the next tab. The combination is given by (insert equation).
+### Present-Day-Referenced Coding Labor Multiplier (Bottom Right)
+Multiplier of coding labor relative to the present-day human labor baseline (with current inference compute), raised to 1/parallel_penalty when enabled.
 
         """
     },

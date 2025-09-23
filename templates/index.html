@@ -88,6 +88,12 @@
               </div>
               <div class="col-6">
                 <div class="summary-card">
+                  <div class="summary-label">@AI2027 SC Time</div>
+                  <div class="summary-value" id="summary_ai2027_sc_time">—</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="summary-card">
                   <div class="summary-label">SW Progress Multiplier at SC (TCD-AI)</div>
                   <div class="summary-value" id="summary_sc_rd_multiplier">
                     —
@@ -3832,6 +3838,12 @@
           $("#summary_sc_time").text(
             summary.sc_time != null
               ? formatDecimalYearToMonthYear(summary.sc_time)
+              : "—"
+          );
+          // @AI2027 SC Time (formatted as month and year)
+          $("#summary_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
               : "—"
           );
           // SC R&D progress multiplier

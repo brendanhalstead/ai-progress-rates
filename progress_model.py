@@ -3019,6 +3019,7 @@ class ProgressModel:
         present_day_progress = self.human_only_results['anchor_stats']['progress']
         present_day_human_labor = self.human_only_results['anchor_stats']['human_labor']
         present_day_inference_compute = self.human_only_results['anchor_stats']['inference_compute']
+        logger.info(f"present_day_human_labor: {present_day_human_labor}, present_day_inference_compute: {present_day_inference_compute}")
         # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
         _t_anchor_solver_start = time.perf_counter()
         anchor_aut_frac = solve_lower_anchor_via_automation_model(
@@ -3076,6 +3077,7 @@ class ProgressModel:
         ai_research_taste_quantiles = []
         aggregate_research_tastes = []
         coding_labors = []
+        coding_labors_with_present_resources = []
         software_progress_rates = []
         software_efficiency = []  # Integral of software_progress_rate
         human_only_research_efforts = []
@@ -3084,6 +3086,7 @@ class ProgressModel:
         ai_labor_contributions = []
         human_labor_contributions = []
         ai_coding_labor_multipliers = []
+        ai_coding_labor_mult_ref_present_day = []
         ai_research_stock_multipliers = []
         ai_software_progress_multipliers = []
         ai_overall_progress_multipliers = []
@@ -3140,15 +3143,19 @@ class ProgressModel:
                     try:
                         automation_model = self.params.automation_model
                         L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
+                        L_opt_present_resources = automation_model.coding_labor_optimal_ces(present_day_human_labor, present_day_inference_compute, logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
+                            assert False, "L_opt is None or not np.isfinite(L_opt)"
                             coding_labor = compute_coding_labor(
                                 automation_fraction, inference_compute, L_HUMAN, 
                                 self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                             )
                         else:
                             coding_labor = float((L_opt ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
+                            coding_labor_with_present_resources = float((L_opt_present_resources ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
                     except Exception as e:
                         logger.warning(f"Falling back to simple CES in metrics due to optimal_ces error: {e}")
+                        assert False, "Falling back to simple CES in metrics due to optimal_ces error: {e}"
                         coding_labor = compute_coding_labor(
                             automation_fraction, inference_compute, L_HUMAN, 
                             self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
@@ -3159,7 +3166,7 @@ class ProgressModel:
                         self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                     )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
-                
+                coding_labors_with_present_resources.append(coding_labor_with_present_resources if np.isfinite(coding_labor_with_present_resources) else 0.0)
                 # Compute software progress rate
                 current_research_effort = research_efforts[i]
                 software_rate = compute_software_progress_rate(
@@ -3215,7 +3222,8 @@ class ProgressModel:
                 # Calculate automation multipliers on various quantities
                 # Avoid division by zero when parallel_penalty is 0
                 if self.params.parallel_penalty and self.params.parallel_penalty != 0:
-                    ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.parallel_penalty) if ai_contrib > 0 else 0.0)
+                    ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.parallel_penalty) if ai_contrib > 0 else 1.0)
+                    ai_coding_labor_mult_ref_present_day.append((coding_labor_with_present_resources**(1.0/self.params.parallel_penalty) / present_day_human_labor) if ai_contrib > 0 else 1.0)
                 else:
                     ai_coding_labor_multipliers.append(0.0)
                 ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
@@ -3325,6 +3333,44 @@ class ProgressModel:
         else:
             sc_sw_multiplier = None
         
+        # Compute the time when ai_coding_labor_mult_ref_present_day first reaches the required threshold.
+        # Use robust crossing detection; return None if threshold is never reached.
+        ai2027_sc_time = None
+        try:
+            if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
+                ai2027_sc_required_mult = (
+                    cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty)
+                )
+                labor_mult_series = np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float)
+                time_series = np.asarray(times, dtype=float)
+                if (
+                    labor_mult_series.size == time_series.size
+                    and labor_mult_series.size > 0
+                    and np.isfinite(ai2027_sc_required_mult)
+                ):
+                    # Find first index where series crosses or equals the required multiplier
+                    crossing_indices = np.where(labor_mult_series >= ai2027_sc_required_mult)[0]
+                    if crossing_indices.size > 0:
+                        j = int(crossing_indices[0])
+                        if j == 0:
+                            ai2027_sc_time = float(time_series[0])
+                        else:
+                            x0 = labor_mult_series[j - 1]
+                            x1 = labor_mult_series[j]
+                            y0 = time_series[j - 1]
+                            y1 = time_series[j]
+                            if np.isfinite(x0) and np.isfinite(x1) and x1 != x0:
+                                frac = (ai2027_sc_required_mult - x0) / (x1 - x0)
+                                # Clamp to [0,1] to avoid slight numerical overshoots
+                                frac = min(max(frac, 0.0), 1.0)
+                                ai2027_sc_time = float(y0 + frac * (y1 - y0))
+                            else:
+                                ai2027_sc_time = float(y1)
+                    else:
+                        ai2027_sc_time = None
+        except Exception as e:
+            logger.warning(f"Error computing ai2027_sc_time: {e}")
+            
         # Calculate progress rate at anchor time
         present_day = self.params.present_day
         anchor_progress_rate = None
@@ -3386,12 +3432,14 @@ class ProgressModel:
             'progress_rates': progress_rates,
             'research_efforts': research_efforts,
             'coding_labors': coding_labors,
+            'coding_labors_with_present_resources': coding_labors_with_present_resources,
             'software_progress_rates': software_progress_rates,
             'software_efficiency': software_efficiency,
             'human_only_progress_rates': human_only_progress_rates,
             'ai_labor_contributions': ai_labor_contributions,
             'human_labor_contributions': human_labor_contributions,
             'ai_coding_labor_multipliers': ai_coding_labor_multipliers,
+            'ai_coding_labor_mult_ref_present_day': ai_coding_labor_mult_ref_present_day,
             'ai_research_stock_multipliers': ai_research_stock_multipliers,
             'ai_software_progress_multipliers': ai_software_progress_multipliers,
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
@@ -3403,6 +3451,7 @@ class ProgressModel:
             'sc_time': sc_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
+            'ai2027_sc_time': ai2027_sc_time,  # Time when @AI2027 SC condition is met
             'present_day': present_day,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
