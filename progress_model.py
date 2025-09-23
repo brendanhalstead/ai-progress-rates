@@ -356,7 +356,26 @@ class AutomationModel:
             else:
                 hi = mid
         y0, y1 = y_grid[lo], y_grid[hi]
-        t = (y - y0) / (y1 - y0 + 1e-18)
+        # Handle non-finite brackets robustly to avoid NaNs
+        if not (np.isfinite(y0) and np.isfinite(y1) and np.isfinite(y)):
+            if not np.isfinite(y0) and np.isfinite(y1):
+                # Lower endpoint is -inf; any finite y falls near the upper x
+                assert False, "Lower endpoint is -inf in _invert_monotone"
+                return float(x_grid[hi])
+            if np.isfinite(y0) and not np.isfinite(y1):
+                # Upper endpoint is +inf; any finite y falls near the lower x
+                assert False, "Upper endpoint is +inf in _invert_monotone"
+                return float(x_grid[lo])
+            # Both endpoints (or y) are non-finite; fall back to midpoint
+            assert False, "Non-finite endpoints in _invert_monotone"
+            return float(0.5 * (x_grid[lo] + x_grid[hi]))
+        denom = y1 - y0
+        if denom == 0.0:
+            assert False, "Denominator is 0 in _invert_monotone"
+            t = 0.0
+        else:
+            t = (y - y0) / denom
+        t = float(np.clip(t, 0.0, 1.0))
         return float((1.0 - t) * x_grid[lo] + t * x_grid[hi])
 
     def _precompute_frontier(self, params) -> Optional[_FrontierPrecomp]:
