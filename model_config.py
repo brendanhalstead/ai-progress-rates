@@ -73,6 +73,9 @@ REFERENCE_YEAR = 2024.8
 REFERENCE_LABOR_CHANGE = 30.0
 REFERENCE_COMPUTE_CHANGE = 0.1
 
+# Software progress scale reference year
+SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR = 2023.0
+
 # benchmarks and gaps mode
 
 # =============================================================================
@@ -108,6 +111,7 @@ PARAMETER_BOUNDS = {
     'rho_experiment_capacity': (-1, 1),
     'alpha_experiment_capacity': (0.05, 0.95),
     'r_software': (0.1, 10),
+    'software_progress_rate_at_reference_year': (0.05, 10),
     'automation_fraction_at_superhuman_coder': (0.1, 1.0),
     'swe_multiplier_at_present_day': (1.0, 10.0),
     'coding_labor_normalization': (0.00001, 10),
@@ -192,6 +196,7 @@ DEFAULT_PARAMETERS = {
     'rho_experiment_capacity': -0.137,
     'alpha_experiment_capacity': 0.701,
     'r_software': 2.40,
+    'software_progress_rate_at_reference_year': 0.79,
     'automation_fraction_at_superhuman_coder': 1.0,
     'swe_multiplier_at_present_day': 1.35,
     'automation_interp_type': "linear",

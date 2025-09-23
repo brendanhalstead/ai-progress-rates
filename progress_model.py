@@ -528,6 +528,7 @@ class Parameters:
     rho_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['rho_experiment_capacity'])
     alpha_experiment_capacity: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['alpha_experiment_capacity'])
     r_software: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['r_software'])
+    software_progress_rate_at_reference_year: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['software_progress_rate_at_reference_year'])
     experiment_compute_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['experiment_compute_exponent'])
     
     # Automation parameters
@@ -2877,27 +2878,30 @@ class ProgressModel:
         logger.info(f"HUMAN-ONLY::: initial_research_stock_val: {initial_research_stock_val}, initial_research_effort_val: {initial_research_effort_val}")
         progress_rates = []
         research_efforts = []
+        sw_progress_rates = []
 
         # human-only metrics
         for i, (t, p, rs) in enumerate(zip(times, progress_values, research_stock_values)):
             state = [p, rs]
-            rates = progress_rate_at_time(t, state, self.data, human_only_params, initial_research_effort_val, initial_research_stock_val)
-            progress_rates.append(rates[0])
-            research_efforts.append(rates[1])
+            progress_rate, research_effort = progress_rate_at_time(t, state, self.data, human_only_params, initial_research_effort_val, initial_research_stock_val)
+            progress_rates.append(progress_rate)
+            research_efforts.append(research_effort)
+            sw_progress_rates.append(compute_software_progress_rate(rs, research_effort, initial_research_stock_val, initial_research_effort_val, human_only_params.r_software))
         
         # Anchor stats at params.present_day
         present_day = human_only_params.present_day
-        anchor_progress = np.interp(present_day, times, progress_values)
-        anchor_progress_rate = np.interp(present_day, times, progress_rates)
+        present_day_progress = np.interp(present_day, times, progress_values)
+        present_day_progress_rate = np.interp(present_day, times, progress_rates)
+        reference_sw_progress_rate = np.interp(cfg.SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR, times, sw_progress_rates)
         # Interpolate human and AI labor at anchor time using log-space when positive
         if np.all(self.data.L_HUMAN > 0):
-            anchor_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
+            present_day_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
         else:
-            anchor_human_labor = np.interp(present_day, self.data.time, self.data.L_HUMAN)
+            present_day_human_labor = np.interp(present_day, self.data.time, self.data.L_HUMAN)
         if np.all(self.data.inference_compute > 0):
-            anchor_ai_labor = _log_interp(present_day, self.data.time, self.data.inference_compute)
+            present_day_inference_compute = _log_interp(present_day, self.data.time, self.data.inference_compute)
         else:
-            anchor_ai_labor = np.interp(present_day, self.data.time, self.data.inference_compute)
+            present_day_inference_compute = np.interp(present_day, self.data.time, self.data.inference_compute)
         
         self.human_only_results = {
             'times': times,
@@ -2906,10 +2910,11 @@ class ProgressModel:
             'progress_rates': progress_rates,
             'research_efforts': research_efforts,
             'anchor_stats': {
-                'progress': anchor_progress,
-                'progress_rate': anchor_progress_rate,
-                'human_labor': anchor_human_labor,
-                'ai_labor': anchor_ai_labor
+                'progress': present_day_progress,
+                'progress_rate': present_day_progress_rate,
+                'sw_progress_rate': reference_sw_progress_rate,
+                'human_labor': present_day_human_labor,
+                'inference_compute': present_day_inference_compute
             },
             'input_time_series': {
                 'time': self.data.time,
@@ -2963,7 +2968,17 @@ class ProgressModel:
         # Need to do this for various reasons, e.g. to auto-fit the METR trajectory you need to the (effective compute, horizon) pairs (we assume no automation)
         # Also if we want to specify current doubling time or gap size in years rather than progress units, need to know how much EC was increased in present day
         _t_human_only_start = time.perf_counter()
+        # First, rum a human-only trajectory to get anchor stats
+        self.compute_human_only_trajectory(time_range, initial_progress)
+        # Then, scale r_software so that sw_progress_rate at anchor time is 1
+        logger.info(f"reference year: {cfg.SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR}")
+        logger.info(f"reference sw_progress_rate: {self.human_only_results['anchor_stats']['sw_progress_rate']}")
+        logger.info(f"desired software_progress_rate_at_reference_year: {self.params.software_progress_rate_at_reference_year}")
+        self.params.r_software = self.params.software_progress_rate_at_reference_year * self.params.r_software/self.human_only_results['anchor_stats']['sw_progress_rate']
+        logger.info(f"new r_software: {self.params.r_software}")
+        #Finally, recompute the human-only trajectory with the new r_software
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
+        logger.info(f"new reference sw_progress_rate: {self.human_only_results['anchor_stats']['sw_progress_rate']}")
         _dt_human_only = time.perf_counter() - _t_human_only_start
         logger.info(f"Timing: human-only trajectory computed in {_dt_human_only:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
@@ -3001,23 +3016,23 @@ class ProgressModel:
 
         # compute automation fraction at anchor time
         present_day = self.params.present_day
-        anchor_progress = self.human_only_results['anchor_stats']['progress']
-        anchor_human_labor = self.human_only_results['anchor_stats']['human_labor']
-        anchor_ai_labor = self.human_only_results['anchor_stats']['ai_labor']
+        present_day_progress = self.human_only_results['anchor_stats']['progress']
+        present_day_human_labor = self.human_only_results['anchor_stats']['human_labor']
+        present_day_inference_compute = self.human_only_results['anchor_stats']['inference_compute']
         # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
         _t_anchor_solver_start = time.perf_counter()
         anchor_aut_frac = solve_lower_anchor_via_automation_model(
             self.params.swe_multiplier_at_present_day,
-            float(anchor_progress),
-            float(anchor_human_labor),
-            float(anchor_ai_labor),
+            float(present_day_progress),
+            float(present_day_human_labor),
+            float(present_day_inference_compute),
             self.params,
         )
         _dt_anchor_solver = time.perf_counter() - _t_anchor_solver_start
         logger.info(f"Timing: lower anchor via AutomationModel solved in {_dt_anchor_solver:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
-            anchor_progress: anchor_aut_frac,
+            present_day_progress: anchor_aut_frac,
             self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
         }
         logger.info(f"Automation anchors: {automation_anchors}")
@@ -3040,11 +3055,11 @@ class ProgressModel:
             self.params.present_horizon is not None):
             
             # Recompute the actual progress at present_day from the integrated trajectory
-            actual_anchor_progress = np.interp(self.params.present_day, times, progress_values)
+            actual_present_day_progress = np.interp(self.params.present_day, times, progress_values)
             
             # Update the horizon trajectory function with the corrected anchor progress
-            logger.info(f"Updating anchor progress from fitted value ({anchor_progress:.6f}) to actual integrated value: {actual_anchor_progress:.6f}")
-            self._update_horizon_trajectory_anchor(actual_anchor_progress)
+            logger.info(f"Updating present_day progress from fitted value ({present_day_progress:.6f}) to actual integrated value: {actual_present_day_progress:.6f}")
+            self._update_horizon_trajectory_anchor(actual_present_day_progress)
         
         # Use utility function to compute initial conditions with the correct parameters
         initial_conditions = compute_initial_conditions(self.data, self.params, initial_progress)

@@ -929,21 +929,21 @@
                   <div class="collapse" id="overallProgressParams">
                     <div class="mb-3">
                       <label class="param-label"
-                        >Returns to Software R&D:
-                        <span id="r_software_val">Loading...</span></label
+                        >Software efficiency growth rate in 2023:
+                        <span id="software_progress_rate_at_reference_year_val">Loading...</span> OOMs/year</label
                       >
                       <input
                         type="range"
                         class="range-input form-range"
-                        id="r_software"
+                        id="software_progress_rate_at_reference_year"
                         step="0.05"
                       />
                       <small class="text-muted"
-                        >Determines the number of doublings of software
+                        >Used to find r, the number of doublings of software
                         efficiency per doubling in cumulative research
                         effort.</small
                       >
-                      <small class="text-muted" id="r_software_range"
+                      <small class="text-muted" id="software_progress_rate_at_reference_year_range"
                         >Loading range...</small
                       >
                     </div>
@@ -1310,7 +1310,7 @@
         "rho_coding_labor",
         "rho_experiment_capacity",
         "alpha_experiment_capacity",
-        "r_software",
+        "software_progress_rate_at_reference_year",
         "automation_fraction_at_superhuman_coder",
         "swe_multiplier_at_present_day",
         "automation_interp_type",
@@ -1791,7 +1791,7 @@
           input.id.includes("progress") ||
           input.id.includes("research_stock")
         ) {
-          displayValue = value.toFixed(1);
+          displayValue = value.toFixed(2);
         } else if (input.id === "coding_labor_normalization") {
           // Show actual value; respect precise mode
           const actualValue = usePreciseInputs ? value : Math.pow(10, value);
@@ -1968,7 +1968,7 @@
                   rho_coding_labor: -2,
                   rho_experiment_capacity: -0.1,
                   alpha_experiment_capacity: 0.5,
-                  r_software: 0.5,
+                  software_progress_rate_at_reference_year: 0.5,
                   automation_fraction_at_superhuman_coder: 0.99,
                   swe_multiplier_at_present_day: 2.0,
                   coding_labor_normalization: 1,
@@ -3475,7 +3475,7 @@
               rho_coding_labor: [-10, 1],
               rho_experiment_capacity: [-1, 1],
               alpha_experiment_capacity: [0.05, 0.95],
-              r_software: [0.1, 10],
+              software_progress_rate_at_reference_year: [0.1, 10],
               automation_fraction_at_superhuman_coder: [0.1, 0.99],
 
               swe_multiplier_at_present_day: [1.0, 10.0],
@@ -3601,7 +3601,7 @@
             range: "[-1, 1]",
           },
           alpha_experiment_capacity: { min: 0.05, max: 0.95, value: 0.5 },
-          r_software: { min: 0.1, max: 10, value: 1.0, range: "[0.1, 10]" },
+          software_progress_rate_at_reference_year: { min: 0.1, max: 10, value: 1.0, range: "[0.1, 10]" },
           automation_fraction_at_superhuman_coder: {
             min: 0.1,
             max: 0.99,
@@ -3735,7 +3735,7 @@
             rho_coding_labor: "Cognitive Elasticity",
             rho_experiment_capacity: "Progress Elasticity",
             alpha_experiment_capacity: "Compute Weight",
-            r_software: "Software Scale",
+            software_progress_rate_at_reference_year: "Software Scale",
             automation_fraction_at_superhuman_coder: "SC Automation Fraction:",
 
             swe_multiplier_at_present_day: "SWE Multiplier at Anchor Time",
