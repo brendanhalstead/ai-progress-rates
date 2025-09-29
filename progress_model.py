@@ -1009,11 +1009,11 @@ def compute_research_effort(experiment_compute: float, serial_coding_labor: floa
         Research stock growth rate RS'(t)
     """
     # Input validation
-    if not all(np.isfinite([experiment_compute, coding_labor, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
+    if not all(np.isfinite([experiment_compute, serial_coding_labor, alpha_experiment_capacity, rho, experiment_compute_exponent, aggregate_research_taste])):
         logger.warning("Non-finite inputs to compute_research_effort")
         return 0.0
     
-    if experiment_compute < 0 or coding_labor < 0:
+    if experiment_compute < 0 or serial_coding_labor < 0:
         logger.warning("Negative inputs to compute_research_effort")
         return 0.0
     
