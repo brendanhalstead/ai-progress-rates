@@ -3294,17 +3294,8 @@ class ProgressModel:
                 
                 training_compute.append(training_compute_val if np.isfinite(training_compute_val) else 0.0)
 
-                # EFFECTIVE COMPUTE
-                effective_compute_val = 0.0  # Default fallback
-                try:
-                    # commenting temporarily to test something.
-                    # effective_compute_val = self.params.baseline_annual_compute_multiplier ** progress
-                    if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
-                        effective_compute_val = 0.0
-                except Exception as compute_e:
-                    assert False, f"Error computing effective compute at progress {progress}: {compute_e}"
-                    logger.warning(f"Error computing effective compute at progress {progress}: {compute_e}")
-                    effective_compute_val = 0.0
+                # EFFECTIVE COMPUTE (OOMS)
+                effective_compute_val = training_compute_val + software_efficiency_val
                 effective_compute.append(effective_compute_val)
 
                 # TIME HORIZON
@@ -3490,6 +3481,13 @@ class ProgressModel:
         except Exception as e:
             logger.warning(f"Failed computing taste slope conversions: {e}")
         
+        # RESCALE SOFTWARE EFFICIENCY TO REFLECT PRESENT-DAY BASELINE
+        software_efficiency = software_efficiency - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, software_efficiency)
+        training_compute = training_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, training_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
+        print(software_efficiency)
+        print(training_compute)
+        effective_compute = effective_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, effective_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
+
         # Store comprehensive results
         self.results = {
             'times': times,
@@ -3558,9 +3556,7 @@ class ProgressModel:
             'TCD-AI': {
                 'metric': 'progress',
                 'target': self.results['sc_progress_level'],
-                'interpolation_type': 'linear',
-                'effective_compute_ooms': self.results['sc_progress_level'],
-            },
+                'interpolation_type': 'linear',            },
             'AI2027-SC': {
                 'metric': 'ai_coding_labor_mult_ref_present_day',
                 'target': cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty),
@@ -3617,7 +3613,7 @@ class ProgressModel:
                 if 'progress_multiplier' not in milestone:
                     milestone['progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['ai_sw_progress_mult_ref_present_day'], dtype=float))
                 if 'effective_compute_ooms' not in milestone:
-                    milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['progress'], dtype=float))
+                    milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['effective_compute'], dtype=float))
         return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:

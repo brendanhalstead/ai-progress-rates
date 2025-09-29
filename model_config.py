@@ -78,6 +78,9 @@ REFERENCE_COMPUTE_CHANGE = 0.1
 # Software progress scale reference year
 SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR = 2023.0
 
+TRAINING_COMPUTE_REFERENCE_YEAR = 2022.1
+TRAINING_COMPUTE_REFERENCE_OOMS = 23.5
+
 # benchmarks and gaps mode
 
 # =============================================================================
@@ -414,7 +417,7 @@ PLOT_METADATA = {
         'title': 'Components of Effective Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'OOMs', 'type': 'linear'},
-        'data_keys': ['times', 'progress', 'training_compute']
+        'data_keys': ['times', 'effective_compute', 'training_compute']
     },
     'plot_progress_rate': {
         'title': 'Effective Compute Growth Rate',

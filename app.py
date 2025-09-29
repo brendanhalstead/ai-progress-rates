@@ -255,7 +255,7 @@ def plot_cumulative_progress(fig, times, progress, row, col):
     if results and 'training_compute' in results:
         training_compute = results['training_compute']
         fig.add_trace(
-            go.Scatter(x=times.tolist(), y=training_compute, 
+            go.Scatter(x=times.tolist(), y=training_compute.tolist(), 
                       name='Training Compute',
                       line=dict(color='#9467bd', width=3),
                       mode='lines+markers', marker=dict(size=4),
@@ -1470,7 +1470,7 @@ def get_tab_configurations():
         'plot_research_effort': lambda fig, data, r, c: plot_research_effort(fig, data['metrics']['times'], data['metrics']['research_efforts'], r, c),
         'plot_experiment_capacity': lambda fig, data, r, c: plot_experiment_capacity(fig, data['metrics']['times'], data['metrics']['experiment_capacity'], r, c),
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
-        'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['progress'], r, c),
+        'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
         'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
         'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['time_series'].time, data['time_series'].training_compute_growth_rate), r, c),
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
