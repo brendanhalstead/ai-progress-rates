@@ -2041,7 +2041,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
                     # Match units with compute_coding_labor: apply parallel_penalty and normalization
                     coding_labor = float((L_opt ** params.parallel_penalty) * params.coding_labor_normalization)
                 except Exception as e:
-                    assert False, "Falling back to simple CES due to optimal_ces error"
+                    assert False, f"Falling back to simple CES due to optimal_ces error: {e}"
                     logger.warning(f"Falling back to simple CES due to optimal_ces error: {e}")
                     coding_labor = compute_coding_labor(automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
             else:
@@ -3484,8 +3484,6 @@ class ProgressModel:
         # RESCALE SOFTWARE EFFICIENCY TO REFLECT PRESENT-DAY BASELINE
         software_efficiency = software_efficiency - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, software_efficiency)
         training_compute = training_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, training_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
-        print(software_efficiency)
-        print(training_compute)
         effective_compute = effective_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, effective_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
 
         # Store comprehensive results
