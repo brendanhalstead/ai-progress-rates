@@ -3553,7 +3553,7 @@ class ProgressModel:
         Compute milestones for the model.
         """
         milestones = {
-            'TCD-AI': {
+            'ACD-AI': {
                 'metric': 'progress',
                 'target': self.results['sc_progress_level'],
                 'interpolation_type': 'linear',            },

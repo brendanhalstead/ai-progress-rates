@@ -193,7 +193,7 @@
                           max="10"
                         />
                         <small class="text-muted"
-                          >Additional gap after saturation horizon to reach TCD-AI,
+                          >Additional gap after saturation horizon to reach ACD-AI,
                           measured in
                           <span id="gap_years_units_help"
                             >anchor-progress-years</span
@@ -208,7 +208,7 @@
                         style="display: none"
                       >
                         <label class="param-label"
-                          >Pre-gap TCD-AI Time Horizon:
+                          >Pre-gap ACD-AI Time Horizon:
                           <span id="pre_gap_sc_time_horizon_val"
                             >Loading...</span
                           >
@@ -228,7 +228,7 @@
                     </div>
                     <div class="mb-3" id="sc_time_horizon_group">
                       <label class="param-label"
-                        >80% Time Horizon at TCD-AI:
+                        >80% Time Horizon at ACD-AI:
                         <span id="sc_time_horizon_minutes_val">Loading...</span>
                         work months</label
                       >
@@ -446,7 +446,7 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
-                        >TCD-AI Automation Level:
+                        >ACD-AI Automation Level:
                         <span id="automation_fraction_at_superhuman_coder_val"
                           >Loading...</span
                         ></label
@@ -458,7 +458,7 @@
                         step="0.01"
                       />
                       <small class="text-muted"
-                        >Fraction of SWE tasks that TCD-AI can automate</small
+                        >Fraction of SWE tasks that ACD-AI can automate</small
                       >
                     </div>
                     <div class="mb-3">
@@ -787,7 +787,7 @@
                     <div class="row">
                       <div class="col-6" id="sc_taste_fraction_group">
                         <label class="param-label"
-                          >TCD-AI Research Taste:
+                          >ACD-AI Research Taste:
                           <span id="ai_research_taste_at_superhuman_coder_val"
                             >Loading...</span
                           ></label
@@ -799,7 +799,7 @@
                           step="0.01"
                         />
                         <small class="text-muted"
-                          >Research Taste at TCD-AI (units: multiplier on research
+                          >Research Taste at ACD-AI (units: multiplier on research
                           effort)</small
                         >
                       </div>
@@ -809,7 +809,7 @@
                         style="display: none"
                       >
                         <label class="param-label"
-                          >TCD-AI Research Taste (SD):
+                          >ACD-AI Research Taste (SD):
                           <span
                             id="ai_research_taste_at_superhuman_coder_sd_val"
                             >Loading...</span
@@ -822,7 +822,7 @@
                           step="0.1"
                         />
                         <small class="text-muted"
-                          >TCD-AI taste in human-range standard deviations</small
+                          >ACD-AI taste in human-range standard deviations</small
                         >
                       </div>
                     </div>
@@ -1802,8 +1802,8 @@
             const isSC = input.id === "sc_time_horizon_minutes";
             if (workMonths > 12) {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at TCD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
-                : 'Pre-gap TCD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
+                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
               if (workYears >= 10) {
                 displayValue = workYears.toFixed(0);
               } else if (workYears >= 1) {
@@ -1813,8 +1813,8 @@
               }
             } else {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at TCD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
-                : 'Pre-gap TCD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
+                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
               if (workMonths >= 10) {
                 displayValue = workMonths.toFixed(0);
               } else if (workMonths >= 1) {
@@ -3724,12 +3724,12 @@
             rho_experiment_capacity: "Progress Elasticity",
             alpha_experiment_capacity: "Compute Weight",
             software_progress_rate_at_reference_year: "Software Scale",
-            automation_fraction_at_superhuman_coder: "TCD-AI Automation Fraction:",
+            automation_fraction_at_superhuman_coder: "ACD-AI Automation Fraction:",
 
             swe_multiplier_at_present_day: "SWE Multiplier at Present Day",
             coding_labor_normalization: "Parallel Coding Labor Normalization",
             experiment_compute_exponent: "Experiment Compute Discounting",
-            ai_research_taste_at_superhuman_coder: "TCD-AI Research Taste",
+            ai_research_taste_at_superhuman_coder: "ACD-AI Research Taste",
             ai_research_taste_slope: "AI Research Taste Slope",
             sc_time_horizon_minutes: "Time Horizon to Superhuman Coder",
           };
@@ -3965,7 +3965,7 @@
             });
           } else {
             const summary = response?.summary || {};
-            entries.push({ name: "TCD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null });
+            entries.push({ name: "ACD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null });
             entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null });
           }
 
