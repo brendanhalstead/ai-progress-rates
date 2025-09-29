@@ -238,7 +238,7 @@ DEFAULT_PARAMETERS = {
     # Optimal CES coding labor configuration
     'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
     'optimal_ces_theta': 1.0,
-    'optimal_ces_eta_init': 0.01,
+    'optimal_ces_eta_init': 0.05,
     'optimal_ces_grid_size': 4096,
 }
 
