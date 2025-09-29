@@ -785,6 +785,36 @@ def plot_all_ai_multipliers(fig, times, ai_coding_labor_multipliers, ai_research
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
 
+def plot_ai_sw_progress_mult_ref_present_day(fig, times, ai_sw_progress_mult_ref_present_day, row, col):
+    """Plot AI software progress multiplier referenced to present-day baseline"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=ai_sw_progress_mult_ref_present_day.tolist(),
+                  name='AI Software Progress Multiplier (ref present day)',
+                  line=dict(color='#bcbd22', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[ai_sw_progress_mult_ref_present_day.min(), ai_sw_progress_mult_ref_present_day.max()],
+                          name='TCD-AI Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
 def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
     """Plot AI research taste over time"""
     fig.add_trace(
@@ -1446,6 +1476,7 @@ def get_tab_configurations():
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
         'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
         'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),
+        'plot_ai_sw_progress_mult_ref_present_day': lambda fig, data, r, c: plot_ai_sw_progress_mult_ref_present_day(fig, data['metrics']['times'], data['metrics']['ai_sw_progress_mult_ref_present_day'], r, c),
         'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
         'plot_human_only_progress_rate': lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c),
         'plot_automation_multiplier': lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c),
@@ -1734,6 +1765,7 @@ def create_multi_tab_dashboard(metrics: Dict[str, Any], time_range: List[float] 
         'ai_coding_labor_multipliers',
         'ai_research_stock_multipliers', 
         'ai_software_progress_multipliers',
+        'ai_sw_progress_mult_ref_present_day',
         'ai_overall_progress_multipliers'
     ]
     

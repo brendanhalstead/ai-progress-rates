@@ -989,14 +989,14 @@ def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_com
     # import pdb; pdb.set_trace()
     return rho, alpha_experiment_capacity, experiment_compute_exponent
 
-def compute_research_effort(experiment_compute: float, coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
+def compute_research_effort(experiment_compute: float, serial_coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
     """
     CES combination of compute and cognitive work to determine research stock growth rate.
     This replaces the previous direct software progress calculation.
     
     Args:
         experiment_compute: Experiment compute budget
-        coding_labor: Output from cognitive work
+        serial_coding_labor: Output from cognitive work
         alpha_experiment_capacity: Weight on experiment compute [0,1]
         rho: Standard substitution parameter in (-inf, 1].
              rho -> 1: perfect substitutes
@@ -1032,7 +1032,7 @@ def compute_research_effort(experiment_compute: float, coding_labor: float, alph
     discounted_experiment_compute = np.power(experiment_compute, experiment_compute_exponent)
     
     # Use the generic CES function for computation
-    rate = _ces_function(discounted_experiment_compute, coding_labor, alpha_experiment_capacity, rho)
+    rate = _ces_function(discounted_experiment_compute, serial_coding_labor, alpha_experiment_capacity, rho)
     
     # Cap extremely large rates to prevent numerical issues
     if rate > cfg.MAX_RESEARCH_EFFORT:
@@ -1078,7 +1078,7 @@ def compute_software_progress_rate(research_stock: float, research_effort: float
         logger.warning("Non-positive initial research stock rate")
         return 0.0
     
-    if r_software < 0.1 or r_software > 10:
+    if r_software < 0.01:
         logger.warning(f"Invalid r_software: {r_software}, must be in [0.1,10]")
         return 0.0
     
@@ -1974,13 +1974,10 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
                     # Build or reuse AutomationModel for frontier (uses current anchors)
                     automation_model = params.automation_model
                     L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, params)
-                    if L_opt is None or not np.isfinite(L_opt):
-                        coding_labor = compute_coding_labor(automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
-                    # TODO: is this redundant? what is going on here?
-                    else:
-                        # Match units with compute_coding_labor: apply parallel_penalty and normalization
-                        coding_labor = float((L_opt ** params.parallel_penalty) * params.coding_labor_normalization)
+                    # Match units with compute_coding_labor: apply parallel_penalty and normalization
+                    coding_labor = float((L_opt ** params.parallel_penalty) * params.coding_labor_normalization)
                 except Exception as e:
+                    assert False, "Falling back to simple CES due to optimal_ces error"
                     logger.warning(f"Falling back to simple CES due to optimal_ces error: {e}")
                     coding_labor = compute_coding_labor(automation_fraction, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization)
             else:
@@ -2893,6 +2890,9 @@ class ProgressModel:
         present_day_progress = np.interp(present_day, times, progress_values)
         present_day_progress_rate = np.interp(present_day, times, progress_rates)
         reference_sw_progress_rate = np.interp(cfg.SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR, times, sw_progress_rates)
+        present_day_sw_progress_rate = np.interp(present_day, times, sw_progress_rates)
+        present_day_research_effort = np.interp(present_day, times, research_efforts)
+        present_day_research_stock = np.interp(present_day, times, research_stock_values)
         # Interpolate human and AI labor at anchor time using log-space when positive
         if np.all(self.data.L_HUMAN > 0):
             present_day_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
@@ -2902,19 +2902,26 @@ class ProgressModel:
             present_day_inference_compute = _log_interp(present_day, self.data.time, self.data.inference_compute)
         else:
             present_day_inference_compute = np.interp(present_day, self.data.time, self.data.inference_compute)
-        
+        if np.all(self.data.experiment_compute > 0):
+            present_day_experiment_compute = _log_interp(present_day, self.data.time, self.data.experiment_compute)
+        else:
+            present_day_experiment_compute = np.interp(present_day, self.data.time, self.data.experiment_compute)
         self.human_only_results = {
             'times': times,
             'progress': progress_values,
             'research_stock': research_stock_values,
             'progress_rates': progress_rates,
             'research_efforts': research_efforts,
+            'reference_sw_progress_rate': reference_sw_progress_rate,
             'anchor_stats': {
                 'progress': present_day_progress,
                 'progress_rate': present_day_progress_rate,
-                'sw_progress_rate': reference_sw_progress_rate,
+                'sw_progress_rate': present_day_sw_progress_rate,
+                'experiment_compute': present_day_experiment_compute,
                 'human_labor': present_day_human_labor,
-                'inference_compute': present_day_inference_compute
+                'inference_compute': present_day_inference_compute,
+                'research_effort': present_day_research_effort,
+                'research_stock': present_day_research_stock
             },
             'input_time_series': {
                 'time': self.data.time,
@@ -2972,16 +2979,28 @@ class ProgressModel:
         self.compute_human_only_trajectory(time_range, initial_progress)
         # Then, scale r_software so that sw_progress_rate at anchor time is 1
         logger.info(f"reference year: {cfg.SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR}")
-        logger.info(f"reference sw_progress_rate: {self.human_only_results['anchor_stats']['sw_progress_rate']}")
+        logger.info(f"reference sw_progress_rate: {self.human_only_results['reference_sw_progress_rate']}")
         logger.info(f"desired software_progress_rate_at_reference_year: {self.params.software_progress_rate_at_reference_year}")
-        self.params.r_software = self.params.software_progress_rate_at_reference_year * self.params.r_software/self.human_only_results['anchor_stats']['sw_progress_rate']
+        self.params.r_software = self.params.software_progress_rate_at_reference_year * self.params.r_software/self.human_only_results['reference_sw_progress_rate']
         logger.info(f"new r_software: {self.params.r_software}")
         #Finally, recompute the human-only trajectory with the new r_software
         human_only_times, human_only_progress, _ = self.compute_human_only_trajectory(time_range, initial_progress)
-        logger.info(f"new reference sw_progress_rate: {self.human_only_results['anchor_stats']['sw_progress_rate']}")
+        logger.info(f"new reference sw_progress_rate: {self.human_only_results['reference_sw_progress_rate']}")
         _dt_human_only = time.perf_counter() - _t_human_only_start
         logger.info(f"Timing: human-only trajectory computed in {_dt_human_only:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
+        # Store the various facts about the present day, assuming no automation
+        present_day = self.params.present_day
+        present_day_progress = self.human_only_results['anchor_stats']['progress']
+        present_day_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
+        present_day_sw_progress_rate = self.human_only_results['anchor_stats']['sw_progress_rate']
+        present_day_research_effort = self.human_only_results['anchor_stats']['research_effort']
+        present_day_research_stock = self.human_only_results['anchor_stats']['research_stock']
+        present_day_human_labor = self.human_only_results['anchor_stats']['human_labor']
+        present_day_inference_compute = self.human_only_results['anchor_stats']['inference_compute']
+        present_day_experiment_compute = self.human_only_results['anchor_stats']['experiment_compute']
+        logger.info(f"present_day_human_labor: {present_day_human_labor}, present_day_inference_compute: {present_day_inference_compute}")
+
         # estimate horizon trajectory from METR data using human-only trajectory
         _t_horizon_est_start = time.perf_counter()
         try:
@@ -3014,12 +3033,6 @@ class ProgressModel:
             except Exception as e:
                 logger.warning(f"Failed to convert taste slope for progress-year mode: {e}")
 
-        # compute automation fraction at anchor time
-        present_day = self.params.present_day
-        present_day_progress = self.human_only_results['anchor_stats']['progress']
-        present_day_human_labor = self.human_only_results['anchor_stats']['human_labor']
-        present_day_inference_compute = self.human_only_results['anchor_stats']['inference_compute']
-        logger.info(f"present_day_human_labor: {present_day_human_labor}, present_day_inference_compute: {present_day_inference_compute}")
         # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
         _t_anchor_solver_start = time.perf_counter()
         anchor_aut_frac = solve_lower_anchor_via_automation_model(
@@ -3079,6 +3092,7 @@ class ProgressModel:
         coding_labors = []
         coding_labors_with_present_resources = []
         software_progress_rates = []
+        software_progress_rates_present_resources = []
         software_efficiency = []  # Integral of software_progress_rate
         human_only_research_efforts = []
         human_only_software_progress_rates = []
@@ -3089,6 +3103,7 @@ class ProgressModel:
         ai_coding_labor_mult_ref_present_day = []
         ai_research_stock_multipliers = []
         ai_software_progress_multipliers = []
+        ai_sw_progress_mult_ref_present_day = []
         ai_overall_progress_multipliers = []
         discounted_exp_compute = []
         horizon_lengths = []
@@ -3105,12 +3120,22 @@ class ProgressModel:
                 rates = progress_rate_at_time(t, state, self.data, self.params, initial_research_effort_val, initial_research_stock_val)
                 progress_rates.append(rates[0])
                 research_efforts.append(rates[1])
+
+                # INPUT TIME SERIES
+                L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
+                inference_compute = _log_interp(t, self.data.time, self.data.inference_compute)
+                experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
+                training_compute_growth_rate = _log_interp(t, self.data.time, self.data.training_compute_growth_rate)
+                # Compute discounted experiment compute
+                discounted_exp_compute_val = experiment_compute ** self.params.experiment_compute_exponent
+                discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
                 
-                # Compute automation fraction
+                
+                # AUTOMATION FRACTION
                 automation_fraction = compute_automation_fraction(progress, self.params)
                 automation_fractions.append(automation_fraction)
                 
-                # Compute AI research taste and aggregate research taste
+                # RESEARCH TASTE
                 ai_research_taste = compute_ai_research_taste(progress, self.params)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
@@ -3120,22 +3145,7 @@ class ProgressModel:
                 ai_research_taste_quantiles.append(ai_research_taste_quantile if np.isfinite(ai_research_taste_quantile) else 0.0)
                 aggregate_research_tastes.append(aggregate_research_taste)
                 
-                # Compute experiment capacity (research_effort / aggregate_research_taste)
-                current_research_effort = research_efforts[i]
-                exp_capacity = current_research_effort / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
-                experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
-                
-                # Interpolate input time series to current time
-                L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
-                inference_compute = _log_interp(t, self.data.time, self.data.inference_compute)
-                experiment_compute = _log_interp(t, self.data.time, self.data.experiment_compute)
-                training_compute_growth_rate = _log_interp(t, self.data.time, self.data.training_compute_growth_rate)
-                
-                # Compute discounted experiment compute
-                discounted_exp_compute_val = experiment_compute ** self.params.experiment_compute_exponent
-                discounted_exp_compute.append(discounted_exp_compute_val if np.isfinite(discounted_exp_compute_val) else 0.0)
-                
-                # Compute coding labor
+                # CODING LABOR
                 if getattr(self.params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
                     H = float(L_HUMAN)
                     C = float(inference_compute)
@@ -3146,28 +3156,39 @@ class ProgressModel:
                         L_opt_present_resources = automation_model.coding_labor_optimal_ces(present_day_human_labor, present_day_inference_compute, logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
                             assert False, "L_opt is None or not np.isfinite(L_opt)"
-                            coding_labor = compute_coding_labor(
-                                automation_fraction, inference_compute, L_HUMAN, 
-                                self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
-                            )
                         else:
-                            coding_labor = float((L_opt ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
-                            coding_labor_with_present_resources = float((L_opt_present_resources ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
+                            # TODO: why is this being converted to serial-equivalent?
+                            coding_labor = L_opt
+                            coding_labor_with_present_resources = L_opt_present_resources
+                            serial_coding_labor = float((L_opt ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
+                            serial_coding_labor_with_present_resources = float((L_opt_present_resources ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
                     except Exception as e:
-                        logger.warning(f"Falling back to simple CES in metrics due to optimal_ces error: {e}")
-                        assert False, "Falling back to simple CES in metrics due to optimal_ces error: {e}"
-                        coding_labor = compute_coding_labor(
-                            automation_fraction, inference_compute, L_HUMAN, 
-                            self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
-                        )
+                        assert False, f"Falling back to simple CES in metrics due to optimal_ces error: {e}"
                 else:
-                    coding_labor = compute_coding_labor(
+                    serial_coding_labor = compute_coding_labor(
                         automation_fraction, inference_compute, L_HUMAN, 
                         self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization
                     )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 coding_labors_with_present_resources.append(coding_labor_with_present_resources if np.isfinite(coding_labor_with_present_resources) else 0.0)
-                # Compute software progress rate
+                
+
+                # EXPERIMENT CAPACITY
+                current_research_effort = research_efforts[i]
+                exp_capacity = current_research_effort / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
+                experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
+
+                # RESEARCH EFFORT
+                research_effort_present_resources = compute_research_effort(
+                    present_day_experiment_compute, serial_coding_labor_with_present_resources, 
+                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
+                )
+
+                # SOFTWARE PROGRESS RATE
+                assert current_research_effort == compute_research_effort(
+                    experiment_compute, serial_coding_labor, 
+                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
+                )
                 current_research_effort = research_efforts[i]
                 software_rate = compute_software_progress_rate(
                     rs, current_research_effort, 
@@ -3176,8 +3197,15 @@ class ProgressModel:
                     self.params.r_software
                 )
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
+                software_rate_present_resources = compute_software_progress_rate(
+                    present_day_research_stock, research_effort_present_resources, 
+                    initial_research_stock_val,
+                    initial_research_effort_val,
+                    self.params.r_software
+                )
+                software_progress_rates_present_resources.append(software_rate_present_resources if np.isfinite(software_rate_present_resources) else 0.0)
                 
-                # Compute software efficiency (integral of software_progress_rate)
+                # SOFTWARE EFFICIENCY (OOMS)
                 if i == 0:
                     # Initialize software efficiency at 0
                     software_efficiency_val = 0.0
@@ -3186,76 +3214,9 @@ class ProgressModel:
                     dt = times[i] - times[i-1]
                     avg_rate = (software_progress_rates[i] + software_progress_rates[i-1]) / 2.0
                     software_efficiency_val = software_efficiency[i-1] + avg_rate * dt
-                
                 software_efficiency.append(software_efficiency_val if np.isfinite(software_efficiency_val) else 0.0)
                 
-                # Calculate human-only progress rate (with automation fraction = 0)
-                human_only_coding_labor = compute_coding_labor(0, inference_compute, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
-                human_only_aggregate_research_taste = compute_aggregate_research_taste(0, median_to_top_gap=self.params.median_to_top_taste_multiplier) # No AI research taste
-                human_only_research_effort = compute_research_effort(
-                    experiment_compute, human_only_coding_labor, 
-                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste
-                )
-                human_only_research_efforts.append(human_only_research_effort if np.isfinite(human_only_research_effort) else 0.0)
-                human_only_software_rate = compute_software_progress_rate(
-                    rs, human_only_research_effort,
-                    initial_research_stock_val,
-                    initial_research_effort_val,
-                    self.params.r_software
-                )
-                human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
-                human_only_overall_rate = compute_overall_progress_rate(
-                    human_only_software_rate, training_compute_growth_rate
-                )
-                
-                human_only_progress_rates.append(
-                    human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0
-                )
-                
-                # Calculate labor contributions to cognitive output
-                human_contrib = compute_coding_labor(0, inference_compute, L_HUMAN, self.params.rho_coding_labor, self.params.parallel_penalty, self.params.coding_labor_normalization, human_only=True)
-                ai_contrib = max(0.0, coding_labor - human_contrib)  # Ensure non-negative
-                
-                human_labor_contributions.append(human_contrib)
-                ai_labor_contributions.append(ai_contrib)
-
-                # Calculate automation multipliers on various quantities
-                # Avoid division by zero when parallel_penalty is 0
-                if self.params.parallel_penalty and self.params.parallel_penalty != 0:
-                    ai_coding_labor_multipliers.append((coding_labor / human_contrib)**(1.0/self.params.parallel_penalty) if ai_contrib > 0 else 1.0)
-                    ai_coding_labor_mult_ref_present_day.append((coding_labor_with_present_resources**(1.0/self.params.parallel_penalty) / present_day_human_labor) if ai_contrib > 0 else 1.0)
-                else:
-                    ai_coding_labor_multipliers.append(0.0)
-                ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
-                ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
-                ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
-
-                # Compute horizon length using the fitted trajectory function
-                horizon_length = 0.0  # Default fallback
-                if self.horizon_trajectory is not None:
-                    try:
-                        horizon_length = self.horizon_trajectory(progress)
-                        if not np.isfinite(horizon_length) or horizon_length < 0:
-                            horizon_length = 0.0
-                    except Exception as horizon_e:
-                        logger.warning(f"Error computing horizon at progress {progress}: {horizon_e}")
-                        horizon_length = 0.0
-                
-                horizon_lengths.append(horizon_length)
-                
-                # Compute effective compute as baseline_annual_compute_multiplier^progress
-                effective_compute_val = 0.0  # Default fallback
-                try:
-                    effective_compute_val = self.params.baseline_annual_compute_multiplier ** progress
-                    if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
-                        effective_compute_val = 0.0
-                except Exception as compute_e:
-                    logger.warning(f"Error computing effective compute at progress {progress}: {compute_e}")
-                    effective_compute_val = 0.0
-                
-                effective_compute.append(effective_compute_val)
-                
-                # Compute training compute (integral of training_compute_growth_rate)
+                # TRAINING COMPUTE (OOMS)
                 if i == 0:
                     # Initialize training compute at 0
                     training_compute_val = 0.0
@@ -3269,8 +3230,76 @@ class ProgressModel:
                 
                 training_compute.append(training_compute_val if np.isfinite(training_compute_val) else 0.0)
 
+                # EFFECTIVE COMPUTE
+                effective_compute_val = 0.0  # Default fallback
+                try:
+                    # commenting temporarily to test something.
+                    # effective_compute_val = self.params.baseline_annual_compute_multiplier ** progress
+                    if not np.isfinite(effective_compute_val) or effective_compute_val < 0:
+                        effective_compute_val = 0.0
+                except Exception as compute_e:
+                    assert False, f"Error computing effective compute at progress {progress}: {compute_e}"
+                    logger.warning(f"Error computing effective compute at progress {progress}: {compute_e}")
+                    effective_compute_val = 0.0
+                effective_compute.append(effective_compute_val)
+
+                # TIME HORIZON
+                horizon_length = 0.0  # Default fallback
+                if self.horizon_trajectory is not None:
+                    try:
+                        horizon_length = self.horizon_trajectory(progress)
+                        if not np.isfinite(horizon_length) or horizon_length < 0:
+                            horizon_length = 0.0
+                    except Exception as horizon_e:
+                        assert False, f"Error computing horizon at progress {progress}: {horizon_e}"
+                        logger.warning(f"Error computing horizon at progress {progress}: {horizon_e}")
+                        horizon_length = 0.0
+                horizon_lengths.append(horizon_length)
+
+                # INSTANTANEOUS HUMAN-ONLY METRICS
+                human_only_coding_labor = L_HUMAN
+                human_only_serial_coding_labor = L_HUMAN**self.params.parallel_penalty
+                human_only_aggregate_research_taste = compute_aggregate_research_taste(0, median_to_top_gap=self.params.median_to_top_taste_multiplier) # No AI research taste
+                human_only_research_effort = compute_research_effort(
+                    experiment_compute, human_only_serial_coding_labor, 
+                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, human_only_aggregate_research_taste
+                )
+                human_only_research_efforts.append(human_only_research_effort if np.isfinite(human_only_research_effort) else 0.0)
+                human_only_software_rate = compute_software_progress_rate(
+                    rs, human_only_research_effort,
+                    initial_research_stock_val,
+                    initial_research_effort_val,
+                    self.params.r_software
+                )
+                human_only_software_progress_rates.append(human_only_software_rate if np.isfinite(human_only_software_rate) else 0.0)
+                human_only_overall_rate = compute_overall_progress_rate(
+                    human_only_software_rate, training_compute_growth_rate
+                )
+                human_only_progress_rates.append(
+                    human_only_overall_rate if np.isfinite(human_only_overall_rate) else 0.0
+                )
+                
+                # Calculate labor contributions to cognitive output
+                human_contrib = L_HUMAN
+                ai_contrib = max(0.0, coding_labor - human_contrib)  # Ensure non-negative
+                
+                human_labor_contributions.append(human_contrib)
+                ai_labor_contributions.append(ai_contrib)
+
+                # AUTOMATION MULTIPLIERS
+                if self.params.parallel_penalty and self.params.parallel_penalty != 0:
+                    ai_coding_labor_multipliers.append(coding_labor / human_contrib if ai_contrib > 0 else 1.0)
+                    ai_coding_labor_mult_ref_present_day.append(coding_labor_with_present_resources / present_day_human_labor if ai_contrib > 0 else 1.0)
+                else:
+                    ai_coding_labor_multipliers.append(0.0)
+                ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
+                ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
+                ai_sw_progress_mult_ref_present_day.append(software_rate_present_resources / present_day_sw_progress_rate if present_day_sw_progress_rate > 0 else 0.0)
+                ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
+
                 
             except Exception as e:
+                assert False, f"Error calculating metrics at t={t}: {e}"
                 logger.warning(f"Error calculating metrics at t={t}: {e}")
                 # Use safe fallback values
                 if len(progress_rates) <= i:
@@ -3442,6 +3471,7 @@ class ProgressModel:
             'ai_coding_labor_mult_ref_present_day': ai_coding_labor_mult_ref_present_day,
             'ai_research_stock_multipliers': ai_research_stock_multipliers,
             'ai_software_progress_multipliers': ai_software_progress_multipliers,
+            'ai_sw_progress_mult_ref_present_day': ai_sw_progress_mult_ref_present_day,
             'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,

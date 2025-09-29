@@ -448,6 +448,12 @@ PLOT_METADATA = {
         'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_overall_progress_multipliers']
     },
+    'plot_ai_sw_progress_mult_ref_present_day': {
+        'title': 'AI Software Progress Multiplier (Ref Present Day)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'ai_sw_progress_mult_ref_present_day']
+    },
     'plot_all_ai_multipliers': {
         'title': 'All AI Multipliers',
         'x_axis': {'title': 'Time', 'type': 'linear'},
@@ -632,7 +638,8 @@ The cumulative OOMs of effective compute feeds back into the functions that dete
             {'function': 'plot_ai_software_progress_multiplier', 'position': (1, 2)},
             {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
             {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
-            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)}
+            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)},
+            {'function': 'plot_ai_sw_progress_mult_ref_present_day', 'position': (3, 2)}
         ],
         'explanation': """
 ## Additional Metrics and Multipliers
