@@ -3618,7 +3618,6 @@ class ProgressModel:
                     milestone['progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['ai_sw_progress_mult_ref_present_day'], dtype=float))
                 if 'effective_compute_ooms' not in milestone:
                     milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['progress'], dtype=float))
-        print(json.dumps(milestones, indent=4))
         return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:
