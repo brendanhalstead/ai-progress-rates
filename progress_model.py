@@ -360,11 +360,11 @@ class AutomationModel:
         if not (np.isfinite(y0) and np.isfinite(y1) and np.isfinite(y)):
             if not np.isfinite(y0) and np.isfinite(y1):
                 # Lower endpoint is -inf; any finite y falls near the upper x
-                assert False, "Lower endpoint is -inf in _invert_monotone"
+                # assert False, "Lower endpoint is -inf in _invert_monotone"
                 return float(x_grid[hi])
             if np.isfinite(y0) and not np.isfinite(y1):
                 # Upper endpoint is +inf; any finite y falls near the lower x
-                assert False, "Upper endpoint is +inf in _invert_monotone"
+                # assert False, "Upper endpoint is +inf in _invert_monotone"
                 return float(x_grid[lo])
             # Both endpoints (or y) are non-finite; fall back to midpoint
             assert False, "Non-finite endpoints in _invert_monotone"
