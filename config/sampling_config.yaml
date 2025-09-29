@@ -21,6 +21,7 @@ time_range: [2012.0, 2045.0]
 
 num_rollouts: 1000
 input_data: input_data.csv
+per_sample_timeout: 5
 
 parameters:
   # Superhuman coder time horizon + extrapolation

@@ -158,6 +158,12 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
             cmd += ["--time-range", str(float(tr[0])), str(float(tr[1]))]
     if "seed" in effective_cfg:
         cmd += ["--seed", str(int(effective_cfg["seed"]))]
+    # Optional per-sample timeout override
+    if "per_sample_timeout" in effective_cfg and effective_cfg["per_sample_timeout"] is not None:
+        try:
+            cmd += ["--per-sample-timeout", str(float(effective_cfg["per_sample_timeout"]))]
+        except Exception:
+            pass
 
     # Capture stdout/stderr to a log file and buffer for quick status
     log_path = tmp_dir / "job.log"
@@ -330,6 +336,8 @@ def run_monte_carlo():
             "initial_progress": payload.get("initial_progress", 0.0),
             "input_data": payload.get("input_data"),
             "parameters": payload.get("parameters", {}),
+            # Default timeout to 10s if not provided, to avoid stalls in web runs
+            "per_sample_timeout": payload.get("per_sample_timeout", 10),
         }
 
         # Remove problematic/null fields so the script falls back to its defaults
@@ -489,6 +497,7 @@ def export_sampling_config():
             "num_rollouts": payload.get("num_samples", payload.get("num_rollouts", 1000)),
             "input_data": payload.get("input_data") or None,
             "parameters": payload.get("parameters", {}),
+            "per_sample_timeout": payload.get("per_sample_timeout"),
         }
 
         # Basic validation
@@ -566,6 +575,7 @@ def import_sampling_config():
             "num_samples": num_rollouts,
             "input_data": data.get("input_data"),
             "parameters": params,
+            "per_sample_timeout": data.get("per_sample_timeout"),
         }
 
         return jsonify({"success": True, "config": ui_cfg})

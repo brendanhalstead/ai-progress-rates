@@ -39,6 +39,8 @@ import contextlib
 import io
 import importlib
 import logging
+import signal
+import multiprocessing as mp
 
 try:
     _tqdm = importlib.import_module("tqdm").tqdm  # type: ignore[attr-defined]
@@ -69,6 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-progress", type=float, default=0.0, help="Initial progress value")
     parser.add_argument("--seed", type=int, default=42, help="RNG seed")
     parser.add_argument("--output-dir", type=str, default=str(REPO_ROOT / "outputs"), help="Base output directory")
+    parser.add_argument("--per-sample-timeout", type=float, default=None, help="Max seconds to spend per rollout (None disables)")
     return parser.parse_args()
 
 
@@ -135,15 +138,7 @@ def _build_default_distribution_config() -> Dict[str, Any]:
     # Use uniform within PARAMETER_BOUNDS where available, else fixed at DEFAULT_PARAMETERS
     param_cfg: Dict[str, Any] = {}
     for name, default_val in cfg.DEFAULT_PARAMETERS.items():
-        if name == "automation_anchors":
-            # Computed internally per sample; do not sample
-            continue
-        bounds = cfg.PARAMETER_BOUNDS.get(name)
-        if bounds is not None:
-            param_cfg[name] = {"dist": "uniform", "min": bounds[0], "max": bounds[1], "clip_to_bounds": True}
-        else:
-            # categorical or missing bounds -> fixed at default
-            param_cfg[name] = {"dist": "fixed", "value": default_val}
+        param_cfg[name] = {"dist": "fixed", "value": default_val}
 
     # Also include categorical parameters if not already present explicitly
     if "horizon_extrapolation_type" not in param_cfg:
@@ -409,6 +404,96 @@ def _to_jsonable(obj: Any) -> Any:
     return str(obj)
 
 
+def _rollout_worker(conn, sampled_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float) -> None:
+    """Subprocess worker: runs one rollout and sends back results or error."""
+    try:
+        # Lazy imports in subprocess to avoid parent state issues
+        from progress_model import ProgressModel as _PM, Parameters as _Params, load_time_series_data as _load
+        data = _load(input_data_path)
+        params_obj = _Params(**sampled_params)
+        model = _PM(params_obj, data)
+        model.compute_progress_trajectory(time_range, initial_progress)
+        conn.send({"ok": True, "results": _to_jsonable(model.results)})
+    except Exception as e:  # pragma: no cover
+        conn.send({"ok": False, "error": str(e)})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _run_rollout_subprocess(sampled_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float, timeout_s: Optional[float]) -> Dict[str, Any]:
+    """Run one rollout in a child process; enforce timeout by termination.
+
+    Returns results dict on success. Raises TimeoutError on timeout. Raises Exception on failure.
+    """
+    ctx = mp.get_context("spawn")
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
+    proc = ctx.Process(target=_rollout_worker, args=(child_conn, sampled_params, input_data_path, time_range, initial_progress))
+    proc.daemon = False
+    proc.start()
+    child_conn.close()  # close in parent
+    try:
+        if timeout_s is None or timeout_s <= 0:
+            # Wait indefinitely
+            result = parent_conn.recv()
+        else:
+            if parent_conn.poll(timeout_s):
+                result = parent_conn.recv()
+            else:
+                # Timeout: kill child
+                proc.terminate()
+                proc.join(timeout=5)
+                if proc.is_alive():
+                    proc.kill()
+                raise TimeoutError(f"Rollout timed out after {timeout_s} seconds")
+        # Ensure the child is fully reaped (avoid zombies)
+        try:
+            proc.join(timeout=1)
+        except Exception:
+            pass
+        if not isinstance(result, dict) or not result.get("ok"):
+            err = None if not isinstance(result, dict) else result.get("error")
+            raise RuntimeError(err or "Unknown rollout failure")
+        return result["results"]
+    finally:
+        try:
+            parent_conn.close()
+        except Exception:
+            pass
+        try:
+            if proc.is_alive():
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+            proc.join(timeout=1)
+        except Exception:
+            pass
+
+def _run_with_timeout(seconds: Optional[float], func, *args, **kwargs):
+    """Run func(*args, **kwargs) with a wall-clock timeout in seconds using SIGALRM.
+
+    If seconds is None or <= 0, runs without a timeout. Raises TimeoutError on expiry.
+    """
+    if seconds is None or seconds <= 0:
+        return func(*args, **kwargs)
+
+    def _alarm_handler(signum, frame):
+        raise TimeoutError(f"Rollout timed out after {seconds} seconds")
+
+    previous_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    try:
+        # setitimer supports sub-second precision
+        signal.setitimer(signal.ITIMER_REAL, float(seconds))
+        return func(*args, **kwargs)
+    finally:
+        # Always cancel timer and restore previous handler
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -442,6 +527,13 @@ def main() -> None:
     else:
         initial_progress = float(user_cfg.get("initial_progress", 0.0))
 
+    # Per-sample timeout (seconds)
+    if _flag_provided("--per-sample-timeout"):
+        per_sample_timeout = float(args.per_sample_timeout) if args.per_sample_timeout is not None else None
+    else:
+        _cfg_timeout = user_cfg.get("per_sample_timeout")
+        per_sample_timeout = float(_cfg_timeout) if _cfg_timeout is not None else None
+
     # Prepare output directories
     rng = np.random.default_rng(seed)
     base_out = Path(args.output_dir)
@@ -471,6 +563,7 @@ def main() -> None:
     user_cfg["time_range"] = time_range
     user_cfg["num_samples"] = num_samples
     user_cfg["input_data"] = str(Path(input_data_path).resolve())
+    user_cfg["per_sample_timeout"] = per_sample_timeout
     input_cfg_path = run_dir / "input_distributions.yaml"
     input_cfg_path.write_text(yaml.safe_dump(user_cfg))
 
@@ -493,6 +586,7 @@ def main() -> None:
         "seed": int(seed),
         "input_data_path": str(Path(input_data_path).resolve()),
         "time_range": time_range,
+        "per_sample_timeout": per_sample_timeout,
     })
 
     # Sampling and rollouts
@@ -523,14 +617,24 @@ def main() -> None:
                 f_samples.flush()
 
                 # Persist rollout record
+                if per_sample_timeout is not None and per_sample_timeout > 0:
+                    rollout_results = results
+                else:
+                    rollout_results = _to_jsonable(model.results)
                 rollout_record = {
                     "sample_id": i,
                     "parameters": _to_jsonable(sampled_params),
-                    "results": _to_jsonable(model.results),
+                    "results": rollout_results,
                 }
                 f_rollouts.write(json.dumps(rollout_record) + "\n")
                 f_rollouts.flush()
 
+            except TimeoutError as e:
+                # Persist timeout info to keep alignment between files
+                f_samples.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "error": str(e)}) + "\n")
+                f_samples.flush()
+                f_rollouts.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "results": None, "error": str(e)}) + "\n")
+                f_rollouts.flush()
             except Exception as e:
                 # Persist failure info to keep alignment between files
                 f_samples.write(json.dumps({"sample_id": i, "parameters": None, "error": str(e)}) + "\n")
