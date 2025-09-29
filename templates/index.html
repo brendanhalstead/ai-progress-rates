@@ -82,19 +82,19 @@
             <div class="row g-2 mb-3" id="summaryCards" style="display: none">
               <div class="col-6">
                 <div class="summary-card">
-                  <div class="summary-label">SC Time (TCD-AI)</div>
+                  <div class="summary-label">TCD-AI Time</div>
                   <div class="summary-value" id="summary_sc_time">—</div>
                 </div>
               </div>
               <div class="col-6">
                 <div class="summary-card">
-                  <div class="summary-label">@AI2027 SC Time</div>
+                  <div class="summary-label">'AI 2027 SC' Time</div>
                   <div class="summary-value" id="summary_ai2027_sc_time">—</div>
                 </div>
               </div>
               <div class="col-6">
                 <div class="summary-card">
-                  <div class="summary-label">SW Progress Multiplier at SC (TCD-AI)</div>
+                  <div class="summary-label">SW Progress Multiplier at TCD-AI</div>
                   <div class="summary-value" id="summary_sc_rd_multiplier">
                     —
                   </div>
@@ -258,7 +258,7 @@
                           max="10"
                         />
                         <small class="text-muted"
-                          >Additional gap after saturation horizon to reach SC,
+                          >Additional gap after saturation horizon to reach TCD-AI,
                           measured in
                           <span id="gap_years_units_help"
                             >anchor-progress-years</span
@@ -273,7 +273,7 @@
                         style="display: none"
                       >
                         <label class="param-label"
-                          >Pre-gap SC Time Horizon:
+                          >Pre-gap TCD-AI Time Horizon:
                           <span id="pre_gap_sc_time_horizon_val"
                             >Loading...</span
                           >
@@ -293,7 +293,7 @@
                     </div>
                     <div class="mb-3" id="sc_time_horizon_group">
                       <label class="param-label"
-                        >80% Time Horizon at SC:
+                        >80% Time Horizon at TCD-AI:
                         <span id="sc_time_horizon_minutes_val">Loading...</span>
                         work months</label
                       >
@@ -304,7 +304,7 @@
                         step="0.1"
                       />
                       <small class="text-muted"
-                        >Time horizon corresponding to superhuman coder
+                        >Time horizon corresponding to AI that can automate all coding tasks
                         achievement</small
                       >
                     </div>
@@ -511,7 +511,7 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
-                        >SC Automation Level:
+                        >TCD-AI Automation Level:
                         <span id="automation_fraction_at_superhuman_coder_val"
                           >Loading...</span
                         ></label
@@ -523,8 +523,7 @@
                         step="0.01"
                       />
                       <small class="text-muted"
-                        >Fraction of SWE tasks automated at the moment SC is
-                        achieved</small
+                        >Fraction of SWE tasks that TCD-AI can automate</small
                       >
                     </div>
                   </div>
@@ -832,7 +831,7 @@
                     <div class="row">
                       <div class="col-6" id="sc_taste_fraction_group">
                         <label class="param-label"
-                          >SC Research Taste:
+                          >TCD-AI Research Taste:
                           <span id="ai_research_taste_at_superhuman_coder_val"
                             >Loading...</span
                           ></label
@@ -844,7 +843,7 @@
                           step="0.01"
                         />
                         <small class="text-muted"
-                          >Research Taste at SC (units: multiplier on research
+                          >Research Taste at TCD-AI (units: multiplier on research
                           effort)</small
                         >
                       </div>
@@ -854,7 +853,7 @@
                         style="display: none"
                       >
                         <label class="param-label"
-                          >SC Research Taste (SD):
+                          >TCD-AI Research Taste (SD):
                           <span
                             id="ai_research_taste_at_superhuman_coder_sd_val"
                             >Loading...</span
@@ -867,7 +866,7 @@
                           step="0.1"
                         />
                         <small class="text-muted"
-                          >SC taste in human-range standard deviations</small
+                          >TCD-AI taste in human-range standard deviations</small
                         >
                       </div>
                     </div>
@@ -1825,8 +1824,8 @@
             const isSC = input.id === "sc_time_horizon_minutes";
             if (workMonths > 12) {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
-                : 'Pre-gap SC Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
+                ? '80% Time Horizon at TCD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
+                : 'Pre-gap TCD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
               if (workYears >= 10) {
                 displayValue = workYears.toFixed(0);
               } else if (workYears >= 1) {
@@ -1836,8 +1835,8 @@
               }
             } else {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at SC: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
-                : 'Pre-gap SC Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
+                ? '80% Time Horizon at TCD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
+                : 'Pre-gap TCD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
               if (workMonths >= 10) {
                 displayValue = workMonths.toFixed(0);
               } else if (workMonths >= 1) {
@@ -3742,12 +3741,12 @@
             rho_experiment_capacity: "Progress Elasticity",
             alpha_experiment_capacity: "Compute Weight",
             software_progress_rate_at_reference_year: "Software Scale",
-            automation_fraction_at_superhuman_coder: "SC Automation Fraction:",
+            automation_fraction_at_superhuman_coder: "TCD-AI Automation Fraction:",
 
             swe_multiplier_at_present_day: "SWE Multiplier at Anchor Time",
             coding_labor_normalization: "Parallel Coding Labor Normalization",
             experiment_compute_exponent: "Experiment Compute Discounting",
-            ai_research_taste_at_superhuman_coder: "SC Research Taste",
+            ai_research_taste_at_superhuman_coder: "TCD-AI Research Taste",
             ai_research_taste_slope: "AI Research Taste Slope",
             sc_time_horizon_minutes: "Time Horizon to Superhuman Coder",
           };
@@ -3840,7 +3839,7 @@
               ? formatDecimalYearToMonthYear(summary.sc_time)
               : "—"
           );
-          // @AI2027 SC Time (formatted as month and year)
+          // AI2027 SC Time (formatted as month and year)
           $("#summary_ai2027_sc_time").text(
             summary.ai2027_sc_time != null
               ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)

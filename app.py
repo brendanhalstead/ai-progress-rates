@@ -1964,7 +1964,7 @@ def compute_model():
         summary['sc_progress_level'] = float(model.results['sc_progress_level'])
         summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
         logger.info(f"SC time: {summary['sc_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
-    # Add @AI2027 SC time if computed
+    # Add AI2027 SC time if computed
     if model.results.get('ai2027_sc_time') is not None:
         try:
             summary['ai2027_sc_time'] = float(model.results.get('ai2027_sc_time'))
