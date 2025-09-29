@@ -416,7 +416,7 @@ PLOT_METADATA = {
     'plot_cumulative_progress': {
         'title': 'Components of Effective Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'OOMs', 'type': 'linear'},
+        'y_axis': {'title': 'log(2022-FLOP)', 'type': 'linear'},
         'data_keys': ['times', 'effective_compute', 'training_compute']
     },
     'plot_progress_rate': {
