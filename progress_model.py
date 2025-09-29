@@ -3562,29 +3562,35 @@ class ProgressModel:
                 'target': cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty),
                 'interpolation_type': 'exponential',
             },
-            '5x-AI': {
+            '5x-AIR': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 5,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 5,
             },
-            '25x-AI': {
+            '25x-AIR': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 25,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 25
             },
-            '250x-AI': {
+            '250x-AIR': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 250,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 250
             },
-            '2000x-AI': {
+            '2000x-AIR': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 2000,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 2000
+            },
+            '10000x-AIR': {
+                'metric': 'ai_sw_progress_mult_ref_present_day',
+                'target': 10000,
+                'interpolation_type': 'exponential',
+                'progress_multiplier': 10000
             },
             '(Expensive) SAR': {
                 'metric': 'ai_research_taste',

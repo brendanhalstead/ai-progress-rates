@@ -3,8 +3,9 @@
 Sensitivity analysis for batch rollout outputs.
 
 Reads a run directory produced by scripts/batch_rollout.py (or a direct path to
-rollouts.jsonl), extracts the target `sc_time` and input parameters, and reports
-how each parameter relates to `sc_time` via:
+rollouts.jsonl), extracts a target (default `sc_time` or a milestone transition
+duration if `--transition-pair FROM:TO` is provided) and input parameters, and
+reports how each parameter relates to the target via:
 
 - Pearson and Spearman correlations for numeric parameters
 - One-way ANOVA and eta-squared effect size for categorical parameters
@@ -75,12 +76,16 @@ def _map_include_gap_to_binary(values: List[Any]) -> np.ndarray:
     return mapped
 
 
-def _collect_dataset(records: List[Dict[str, Any]]) -> Tuple[List[str], List[str], np.ndarray, Dict[str, List[Any]]]:
+def _collect_dataset(
+    records: List[Dict[str, Any]],
+    transition_pair: Optional[Tuple[str, str]] = None,
+    upper_dummy_year: float = 2200.0,
+) -> Tuple[List[str], List[str], np.ndarray, Dict[str, List[Any]]]:
     """
     From rollout records, build:
     - numeric_param_names: list of parameter names treated as numeric
     - categorical_param_names: list of parameter names treated as categorical
-    - y: np.ndarray of sc_time values
+    - y: np.ndarray of target values (sc_time or transition duration)
     - param_values_raw: dict param_name -> list of raw values (for correlation/ANOVA)
     """
     # Filter to usable records
@@ -90,10 +95,32 @@ def _collect_dataset(records: List[Dict[str, Any]]) -> Tuple[List[str], List[str
         results = rec.get("results")
         if not params or not results:
             continue
-        sc_time = results.get("sc_time") if isinstance(results, dict) else None
-        if sc_time is None or not isinstance(sc_time, (int, float)) or not np.isfinite(sc_time):
+        # Determine target y: either sc_time or milestone transition
+        y_val: Optional[float] = None
+        if transition_pair is None:
+            sc_time = results.get("sc_time") if isinstance(results, dict) else None
+            if sc_time is not None and isinstance(sc_time, (int, float)) and np.isfinite(sc_time):
+                y_val = float(sc_time)
+        else:
+            milestones = results.get("milestones") if isinstance(results, dict) else None
+            if isinstance(milestones, dict):
+                from_name, to_name = transition_pair
+                try:
+                    mf = milestones.get(from_name)
+                    mt = milestones.get(to_name)
+                    tf = float(mf.get("time")) if isinstance(mf, dict) and mf.get("time") is not None else None  # type: ignore[assignment]
+                    tt = float(mt.get("time")) if isinstance(mt, dict) and mt.get("time") is not None else None  # type: ignore[assignment]
+                except Exception:
+                    tf, tt = None, None
+                # Condition on lower milestone finite; allow upper to be missing by substituting dummy year
+                if tf is not None and np.isfinite(tf):
+                    to_time = tt if (tt is not None and np.isfinite(tt)) else float(upper_dummy_year)
+                    dur = float(to_time - float(tf))
+                    if np.isfinite(dur) and dur > 0.0:
+                        y_val = dur
+        if y_val is None:
             continue
-        usable.append((params, float(sc_time)))
+        usable.append((params, float(y_val)))
 
     if not usable:
         raise RuntimeError("No usable records with finite sc_time and parameters")
@@ -275,11 +302,11 @@ def _permutation_importance(
     return summary
 
 
-def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False) -> Dict[str, Any]:
+def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False, transition_pair: Optional[Tuple[str, str]] = None, upper_dummy_year: float = 2200.0) -> Dict[str, Any]:
     records = _read_rollouts_ndjson(rollouts_path)
     total_records = len(records)
 
-    numeric_names, categorical_names, y, param_values_raw = _collect_dataset(records)
+    numeric_names, categorical_names, y, param_values_raw = _collect_dataset(records, transition_pair=transition_pair, upper_dummy_year=float(upper_dummy_year))
 
     used_n = y.shape[0]
     dropped = total_records - used_n
@@ -343,10 +370,13 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
     permutation_summary = _permutation_importance(X_all, y, feature_groupings, num_folds=5)
 
+    target_label = "sc_time" if transition_pair is None else f"duration:{transition_pair[0]}->{transition_pair[1]}"
+
     result: Dict[str, Any] = {
         "num_records_total": total_records,
         "num_samples_used": used_n,
         "dropped_due_to_missing_or_invalid": dropped,
+        "target": target_label,
         "numeric_parameters": numeric_names,
         "categorical_parameters": categorical_names,
         "associations": correlations,
@@ -362,6 +392,11 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
     if make_plots:
         try:
             import matplotlib.pyplot as plt
+
+            def _safe_name(s: str) -> str:
+                return "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in s])
+
+            suffix = "_sc_time" if transition_pair is None else f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
 
             # Pearson correlation for numeric parameters (+ special-case include_gap)
             pearson_names = list(numeric_names)
@@ -379,9 +414,9 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names)
                 plt.xlabel('Pearson r with sc_time')
-                plt.title('Top numeric parameters by Pearson correlation')
+                plt.title(f"Top numeric parameters by Pearson correlation (target: {target_label})")
                 plt.gca().invert_yaxis()
-                plot_path = rollouts_path.parent / 'sensitivity_pearson_top.png'
+                plot_path = rollouts_path.parent / f'sensitivity_pearson_top{suffix}.png'
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150)
                 plt.close()
@@ -402,9 +437,9 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names)
                 plt.xlabel('Spearman rho with sc_time')
-                plt.title('Top numeric parameters by Spearman correlation')
+                plt.title(f"Top numeric parameters by Spearman correlation (target: {target_label})")
                 plt.gca().invert_yaxis()
-                plot_path = rollouts_path.parent / 'sensitivity_spearman_top.png'
+                plot_path = rollouts_path.parent / f'sensitivity_spearman_top{suffix}.png'
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150)
                 plt.close()
@@ -420,9 +455,9 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names)
                 plt.xlabel('Mean drop in R^2 when permuted')
-                plt.title('Top parameters by permutation importance (linear model)')
+                plt.title(f"Top parameters by permutation importance (linear model) (target: {target_label})")
                 plt.gca().invert_yaxis()
-                plot_path = rollouts_path.parent / 'sensitivity_permutation_top.png'
+                plot_path = rollouts_path.parent / f'sensitivity_permutation_top{suffix}.png'
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150)
                 plt.close()
@@ -440,6 +475,8 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--rollouts", type=str, help="Direct path to a rollouts.jsonl file")
     parser.add_argument("--out-json", type=str, default=None, help="Path to write JSON summary (default: run_dir/sensitivity_summary.json)")
     parser.add_argument("--plot", action="store_true", help="Save summary plots alongside outputs")
+    parser.add_argument("--transition-pair", type=str, default=None, help="Analyze duration for milestone pair FROM:TO instead of sc_time")
+    parser.add_argument("--upper-dummy-year", type=float, default=2200.0, help="If upper milestone missing, substitute this year for duration calculation")
     return parser.parse_args()
 
 
@@ -457,9 +494,19 @@ def main() -> None:
             raise FileNotFoundError(f"rollouts file not found: {rollouts_path}")
         out_json = Path(args.out_json) if args.out_json else (rollouts_path.parent / "sensitivity_summary.json")
 
-    result = analyze(rollouts_path, out_json=out_json, make_plots=args.plot)
+    tp: Optional[Tuple[str, str]] = None
+    if args.transition_pair:
+        if ":" not in args.transition_pair:
+            raise ValueError("--transition-pair must be formatted as FROM:TO")
+        left, right = [s.strip() for s in args.transition_pair.split(":", 1)]
+        if not left or not right:
+            raise ValueError("--transition-pair requires both FROM and TO names")
+        tp = (left, right)
+
+    result = analyze(rollouts_path, out_json=out_json, make_plots=args.plot, transition_pair=tp, upper_dummy_year=float(args.upper_dummy_year))
 
     # Print concise top-10 summary to stdout
+    print(f"Target: {result.get('target', 'sc_time')}")
     print(f"Loaded {result['num_samples_used']} usable samples (of {result['num_records_total']}).")
 
     # Numeric parameters - Pearson correlation (plus include_gap special-case)

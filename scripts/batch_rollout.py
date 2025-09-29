@@ -604,7 +604,12 @@ def main() -> None:
                 params_obj = Parameters(**sampled_params)
 
                 # Suppress stdout/stderr, warnings, and logging during simulation
-                with _suppress_noise():
+                # with _suppress_noise():
+                if per_sample_timeout is not None and per_sample_timeout > 0:
+                    # Use subprocess isolation when timeout is requested to avoid internal catches
+                    results = _run_rollout_subprocess(sampled_params, str(Path(input_data_path).resolve()), time_range, initial_progress, per_sample_timeout)
+                    model = None  # no in-process model
+                else:
                     model = ProgressModel(params_obj, data)
                     times, progress_values, research_stock_values = model.compute_progress_trajectory(time_range, initial_progress)
 
