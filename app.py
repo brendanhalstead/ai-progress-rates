@@ -270,10 +270,10 @@ def plot_cumulative_progress(fig, times, progress, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[progress.min(), progress.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -297,10 +297,10 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[(automation_fraction*100).min(), (automation_fraction*100).max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -337,10 +337,10 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[software_progress_rates.min(), software_progress_rates.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -379,10 +379,10 @@ def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondar
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -406,10 +406,10 @@ def plot_coding_labor_with_present_resources(fig, times, coding_labors_with_pres
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[coding_labors_with_present_resources.min(), coding_labors_with_present_resources.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -476,10 +476,10 @@ def plot_cognitive_components(fig, times, coding_labors, human_labor_contributio
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -504,10 +504,10 @@ def plot_research_stock(fig, times, research_stocks, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[research_stocks.min(), research_stocks.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -532,10 +532,10 @@ def plot_research_effort(fig, times, research_efforts, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[research_efforts.min(), research_efforts.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -560,10 +560,10 @@ def plot_experiment_capacity(fig, times, experiment_capacity, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[experiment_capacity.min(), experiment_capacity.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -616,10 +616,10 @@ def plot_ai_coding_labor_multiplier(fig, times, ai_coding_labor_multipliers, row
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_coding_labor_multipliers.min(), ai_coding_labor_multipliers.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -646,10 +646,10 @@ def plot_ai_coding_labor_mult_ref_present_day(fig, times, ai_coding_labor_mult_r
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_coding_labor_mult_ref_present_day.min(), ai_coding_labor_mult_ref_present_day.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -676,10 +676,10 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_research_stock_multipliers.min(), ai_research_stock_multipliers.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -706,10 +706,10 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_software_progress_multipliers.min(), ai_software_progress_multipliers.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -736,10 +736,10 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_overall_progress_multipliers.min(), ai_overall_progress_multipliers.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -804,10 +804,10 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_research_taste.min(), ai_research_taste.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -834,10 +834,10 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_research_taste_sd.min(), ai_research_taste_sd.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -866,10 +866,10 @@ def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row,
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[ai_research_taste_quantile.min(), ai_research_taste_quantile.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -896,10 +896,10 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[aggregate_research_taste.min(), aggregate_research_taste.max()],
-                          name='Superhuman Coder Time',
+                          name='TCD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'SC Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'SC Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'TCD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -1257,10 +1257,10 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
         fig.add_trace(
             go.Scatter(x=[times.min(), times.max()], 
                       y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
-                      name='SC Time Horizon',
+                      name='TCD-AI Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_formatted}<extra></extra>'),
+                      hovertemplate=f'TCD-AI Time Horizon: {sc_formatted}<extra></extra>'),
             row=row, col=col
         )
     
@@ -1371,10 +1371,10 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
         fig.add_trace(
             go.Scatter(x=[progress_values.min(), progress_values.max()], 
                       y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
-                      name='SC Time Horizon',
+                      name='TCD-AI Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Superhuman Coder Time Horizon: {sc_formatted}<extra></extra>'),
+                      hovertemplate=f'TCD-AI Time Horizon: {sc_formatted}<extra></extra>'),
             row=row, col=col
         )
     
@@ -1386,7 +1386,7 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                       name='Progress at SC',
                       line=dict(color='#ff7f0e', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Progress at Superhuman Coder: {progress_at_sc:.1f}<extra></extra>'),
+                      hovertemplate=f'Progress at TCD-AI: {progress_at_sc:.1f}<extra></extra>'),
             row=row, col=col
         )
     
@@ -2093,12 +2093,12 @@ def get_parameter_config():
                     'units': 'categorical'
                 },
                 'progress_at_sc': {
-                    'name': 'Progress at Superhuman Coder',
+                    'name': 'Progress at TCD-AI',
                     'description': 'Progress level where AI reaches superhuman coding ability (exponential mode)',
                     'units': 'dimensionless'
                 },
                 'sc_time_horizon_minutes': {
-                    'name': 'Time Horizon to Superhuman Coder',
+                    'name': 'Time Horizon to TCD-AI',
                     'description': 'Time horizon length corresponding to superhuman coder achievement',
                     'units': 'minutes'
                 },
@@ -2299,7 +2299,7 @@ def export_csv():
         
         # Write metadata header with SC information if available
         if results.get('sc_time') is not None:
-            writer.writerow(['# Superhuman Coder Level Reached at:', f"Time: {results['sc_time']:.4f}", f"Progress Level: {results.get('sc_progress_level', 'N/A'):.4f}" if results.get('sc_progress_level') is not None else 'Progress Level: N/A'])
+            writer.writerow(['# TCD-AI Level Reached at:', f"Time: {results['sc_time']:.4f}", f"Progress Level: {results.get('sc_progress_level', 'N/A'):.4f}" if results.get('sc_progress_level') is not None else 'Progress Level: N/A'])
             writer.writerow([])  # Empty row for separation
         
         # Write data
