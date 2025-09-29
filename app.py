@@ -2007,6 +2007,7 @@ def compute_model():
         'plots': plots,
         'tabs': tabs_info,
         'summary': summary,
+        'milestones': model.results['milestones'],
         # Surface computed exp capacity params so UI can display when using pseudoparameters
         'exp_capacity_params': {
             'rho': float(all_metrics.get('exp_capacity_params', {}).get('rho')) if all_metrics.get('exp_capacity_params') else None,

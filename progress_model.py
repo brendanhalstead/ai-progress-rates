@@ -1148,6 +1148,70 @@ def _log_interp(x: float, xp: np.ndarray, fp: np.ndarray) -> float:
     return np.exp(log_interpolated)
 
 
+def _find_exponential_crossing_time(
+    times: np.ndarray,
+    values: np.ndarray,
+    target: float,
+) -> Optional[float]:
+    """
+    Return the earliest time at which an exponentially growing series crosses a target.
+
+    Assumes the series between adjacent samples grows exponentially. When the target lies
+    between two samples (t0, v0) and (t1, v1), the crossing time t* is computed in log-space:
+
+        f = (ln(target) - ln(v0)) / (ln(v1) - ln(v0))
+        t* = t0 + f * (t1 - t0)
+
+    Falls back to linear interpolation if non-positive values prevent log-space math.
+
+    Args:
+        times: 1-D array of time points (monotonic ascending recommended)
+        values: 1-D array of series values at those times
+        target: Threshold to cross (typically > 0 for exponential interpolation)
+
+    Returns:
+        The crossing time as float, or None if no crossing occurs or inputs invalid.
+    """
+    try:
+        t = np.asarray(times, dtype=float)
+        v = np.asarray(values, dtype=float)
+        y = float(target)
+
+        if t.size == 0 or t.size != v.size or not np.isfinite(y):
+            return None
+
+        # Find the first index j where v[j] >= target
+        crossing_indices = np.where(v >= y)[0]
+        if crossing_indices.size == 0:
+            return None
+
+        j = int(crossing_indices[0])
+        if j == 0:
+            return float(t[0])
+
+        v0 = v[j - 1]
+        v1 = v[j]
+        t0 = t[j - 1]
+        t1 = t[j]
+
+        if (np.isfinite(v0) and np.isfinite(v1) and np.isfinite(t0) and np.isfinite(t1) and t1 != t0):
+            # Prefer log-space interpolation if possible
+            if v0 > 0 and v1 > 0 and y > 0 and v1 != v0:
+                frac = (np.log(y) - np.log(v0)) / (np.log(v1) - np.log(v0))
+                frac = float(min(max(frac, 0.0), 1.0))
+                return float(t0 + frac * (t1 - t0))
+            # Fallback to linear interpolation
+            if v1 != v0:
+                frac = (y - v0) / (v1 - v0)
+                frac = float(min(max(frac, 0.0), 1.0))
+                return float(t0 + frac * (t1 - t0))
+            # If values are equal, step to the right edge
+            return float(t1)
+
+        return None
+    except Exception:
+        return None
+
 def calculate_initial_research_stock(time_series_data: TimeSeriesData, params: Parameters, 
                                    initial_progress: float = 0.0) -> float:
     """
@@ -3358,45 +3422,23 @@ class ProgressModel:
         
         # Calculate software progress multiplier at SC
         if sc_time is not None:
-            self.sc_sw_multiplier = np.interp(sc_time, times, ai_software_progress_multipliers)
+            self.sc_sw_multiplier = _log_interp(sc_time, times, np.asarray(ai_sw_progress_mult_ref_present_day, dtype=float))
         else:
             sc_sw_multiplier = None
         
-        # Compute the time when ai_coding_labor_mult_ref_present_day first reaches the required threshold.
-        # Use robust crossing detection; return None if threshold is never reached.
+        # Compute the time when ai_coding_labor_mult_ref_present_day first reaches the required threshold
+        # using exponential (log-space) interpolation between adjacent samples.
         ai2027_sc_time = None
         try:
             if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
                 ai2027_sc_required_mult = (
                     cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty)
                 )
-                labor_mult_series = np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float)
-                time_series = np.asarray(times, dtype=float)
-                if (
-                    labor_mult_series.size == time_series.size
-                    and labor_mult_series.size > 0
-                    and np.isfinite(ai2027_sc_required_mult)
-                ):
-                    # Find first index where series crosses or equals the required multiplier
-                    crossing_indices = np.where(labor_mult_series >= ai2027_sc_required_mult)[0]
-                    if crossing_indices.size > 0:
-                        j = int(crossing_indices[0])
-                        if j == 0:
-                            ai2027_sc_time = float(time_series[0])
-                        else:
-                            x0 = labor_mult_series[j - 1]
-                            x1 = labor_mult_series[j]
-                            y0 = time_series[j - 1]
-                            y1 = time_series[j]
-                            if np.isfinite(x0) and np.isfinite(x1) and x1 != x0:
-                                frac = (ai2027_sc_required_mult - x0) / (x1 - x0)
-                                # Clamp to [0,1] to avoid slight numerical overshoots
-                                frac = min(max(frac, 0.0), 1.0)
-                                ai2027_sc_time = float(y0 + frac * (y1 - y0))
-                            else:
-                                ai2027_sc_time = float(y1)
-                    else:
-                        ai2027_sc_time = None
+                ai2027_sc_time = _find_exponential_crossing_time(
+                    np.asarray(times, dtype=float),
+                    np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float),
+                    float(ai2027_sc_required_mult),
+                )
         except Exception as e:
             logger.warning(f"Error computing ai2027_sc_time: {e}")
             
@@ -3500,13 +3542,84 @@ class ProgressModel:
                 'experiment_compute_exponent': self.params.experiment_compute_exponent,
             }
         }
-        
+        self.results['milestones'] = self.compute_milestones()
         # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
         # logger.info(f"Progress: {progress_values[0]:.3f} -> {progress_values[-1]:.3f}")
         # logger.info(f"Research Stock: {research_stock_values[0]:.3f} -> {research_stock_values[-1]:.3f}")
         # logger.info(f"Automation: {automation_fractions[0]:.3f} -> {automation_fractions[-1]:.3f}")
         
         return times, progress_values, research_stock_values
+    
+    def compute_milestones(self):
+        """
+        Compute milestones for the model.
+        """
+        milestones = {
+            'TCD-AI': {
+                'metric': 'progress',
+                'target': self.results['sc_progress_level'],
+                'interpolation_type': 'linear',
+                'effective_compute_ooms': self.results['sc_progress_level'],
+            },
+            'AI2027-SC': {
+                'metric': 'ai_coding_labor_mult_ref_present_day',
+                'target': cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty),
+                'interpolation_type': 'exponential',
+            },
+            '5x-AI': {
+                'metric': 'ai_sw_progress_mult_ref_present_day',
+                'target': 5,
+                'interpolation_type': 'exponential',
+                'progress_multiplier': 5,
+            },
+            '25x-AI': {
+                'metric': 'ai_sw_progress_mult_ref_present_day',
+                'target': 25,
+                'interpolation_type': 'exponential',
+                'progress_multiplier': 25
+            },
+            '250x-AI': {
+                'metric': 'ai_sw_progress_mult_ref_present_day',
+                'target': 250,
+                'interpolation_type': 'exponential',
+                'progress_multiplier': 250
+            },
+            '2000x-AI': {
+                'metric': 'ai_sw_progress_mult_ref_present_day',
+                'target': 2000,
+                'interpolation_type': 'exponential',
+                'progress_multiplier': 2000
+            },
+            '(Expensive) SAR': {
+                'metric': 'ai_research_taste',
+                'target': cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER,
+                'interpolation_type': 'exponential'
+            },
+            '(Expensive) SIAR': {
+                'metric': 'ai_research_taste',
+                'target': cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER**3,
+                'interpolation_type': 'exponential'
+            }
+        }
+        for milestone in milestones.values():
+            if milestone['interpolation_type'] == 'exponential':
+                time = _find_exponential_crossing_time(
+                    np.asarray(self.results['times'], dtype=float),
+                    np.asarray(self.results[milestone['metric']], dtype=float),
+                    float(milestone['target'])
+                )
+            else:
+                time = np.interp(milestone['target'], self.results[milestone['metric']], self.results['times'])
+                if np.interp(time, self.results['times'], self.results[milestone['metric']]) < milestone['target'] - 1e-4:
+                    time = None
+            if time is not None:
+                milestone['time'] = time
+                if 'progress_multiplier' not in milestone:
+                    milestone['progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['ai_sw_progress_mult_ref_present_day'], dtype=float))
+                if 'effective_compute_ooms' not in milestone:
+                    milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['progress'], dtype=float))
+        print(json.dumps(milestones, indent=4))
+        return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:
         """

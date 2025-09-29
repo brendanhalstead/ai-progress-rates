@@ -125,6 +125,16 @@
                   Scenarios
                 </button>
               </li>
+              <li class="nav-item">
+                <button
+                  class="nav-link"
+                  id="milestones-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#milestones-panel"
+                >
+                  Milestones
+                </button>
+              </li>
             </ul>
 
             <div class="tab-content">
@@ -1099,6 +1109,24 @@
                 <div id="dataPreview" class="mt-3" style="display: none">
                   <h6>Data Summary</h6>
                   <div id="dataSummary"></div>
+                </div>
+              </div>
+
+              <!-- Milestones Panel -->
+              <div class="tab-pane fade" id="milestones-panel">
+                <h5>Milestones</h5>
+                <div class="table-responsive">
+                  <table class="table table-sm table-striped align-middle">
+                    <thead>
+                      <tr>
+                        <th scope="col">Milestone</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">eFLOPs</th>
+                        <th scope="col">PM</th>
+                      </tr>
+                    </thead>
+                    <tbody id="milestonesTableBody"></tbody>
+                  </table>
                 </div>
               </div>
 
@@ -2096,7 +2124,7 @@
         // Apply fallbacks for invalid inputs
         if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
         if (!isFinite(endYear) || endYear < startYear) {
-          endYear = Math.max(startYear + 1, 2045);
+          endYear = Math.max(startYear + 1, 2050);
         }
         if (!isFinite(initialProgress)) initialProgress = 0.0;
 
@@ -2135,6 +2163,11 @@
               }
               if (response.summary) {
                 updateSummary(response.summary);
+              }
+              try {
+                updateMilestonesFromResponse(response);
+              } catch (e) {
+                console.warn("Failed to update milestones", e);
               }
               try {
                 updateComputedExpParams(response);
@@ -3283,7 +3316,7 @@
 
         const endYear = document.getElementById("end_year");
         if (endYear) {
-          endYear.value = endYear.value || 2045;
+          endYear.value = endYear.value || 2050;
           endYear.min = 2020;
           endYear.max = 2100;
         }
@@ -3663,7 +3696,7 @@
         // Fallback simulation settings
         const simSettings = {
           start_year: { value: 2012, min: 2000, max: 2050 },
-          end_year: { value: 2045, min: 2020, max: 2100 },
+          end_year: { value: 2050, min: 2020, max: 2100 },
           initial_progress: { value: 0.0, min: 0.0, max: 100 },
         };
 
@@ -3819,14 +3852,29 @@
               ? formatDecimalYearToMonthYear(summary.sc_time)
               : "—"
           );
+          $("#milestone_sc_time").text(
+            summary.sc_time != null
+              ? formatDecimalYearToMonthYear(summary.sc_time)
+              : "—"
+          );
           // AI2027 SC Time (formatted as month and year)
           $("#summary_ai2027_sc_time").text(
             summary.ai2027_sc_time != null
               ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
               : "—"
           );
+          $("#milestone_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
+              : "—"
+          );
           // SC R&D progress multiplier
           $("#summary_sc_rd_multiplier").text(
+            summary.sc_sw_multiplier != null
+              ? fmt(summary.sc_sw_multiplier, 2) + "x"
+              : "—"
+          );
+          $("#milestone_sc_rd_multiplier").text(
             summary.sc_sw_multiplier != null
               ? fmt(summary.sc_sw_multiplier, 2) + "x"
               : "—"
@@ -3897,6 +3945,69 @@
           }
         } catch (e) {
           console.warn("Failed to update summary", e);
+        }
+      }
+
+      function updateMilestonesFromResponse(response) {
+        try {
+          const tableBody = document.getElementById("milestonesTableBody");
+          if (!tableBody) return;
+          // Prefer explicit milestones field if present; otherwise try to derive minimal entries from summary
+          const milestones = response?.milestones || response?.results?.milestones || null;
+          tableBody.innerHTML = "";
+
+          const addRow = (name, timeVal, progressMult, effectiveCompute) => {
+            const tr = document.createElement("tr");
+            const tdName = document.createElement("td");
+            const tdTime = document.createElement("td");
+            const tdEC = document.createElement("td");
+            const tdMult = document.createElement("td");
+            tdName.textContent = name;
+            tdTime.textContent =
+              timeVal != null && isFinite(timeVal)
+                ? formatDecimalYearToMonthYear(timeVal)
+                : "—";
+            tdEC.textContent =
+              effectiveCompute != null && isFinite(effectiveCompute)
+                ? `1e${Number(effectiveCompute).toFixed(1)}`
+                : "—";
+            tdMult.textContent =
+              progressMult != null && isFinite(progressMult)
+                ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                : "—";
+            tr.appendChild(tdName);
+            tr.appendChild(tdTime);
+            tr.appendChild(tdEC);
+            tr.appendChild(tdMult);
+            tableBody.appendChild(tr);
+          };
+
+          // Build entries and sort by time (ascending); missing times go last
+          const entries = [];
+          if (milestones && typeof milestones === "object") {
+            Object.entries(milestones).forEach(([name, info]) => {
+              entries.push({
+                name,
+                time: info?.time,
+                pm: info?.progress_multiplier,
+                ec: info?.effective_compute_ooms,
+              });
+            });
+          } else {
+            const summary = response?.summary || {};
+            entries.push({ name: "TCD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null });
+            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null });
+          }
+
+          entries.sort((a, b) => {
+            const at = a && a.time != null && isFinite(a.time) ? a.time : Infinity;
+            const bt = b && b.time != null && isFinite(b.time) ? b.time : Infinity;
+            return at - bt;
+          });
+
+          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec));
+        } catch (e) {
+          console.warn("Failed to render milestones table", e);
         }
       }
 
