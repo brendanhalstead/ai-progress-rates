@@ -1878,7 +1878,7 @@ def params_to_dict(params: Parameters):
 
         'coding_labor_normalization': params.coding_labor_normalization,
         'coding_labor_mode': getattr(params, 'coding_labor_mode', 'simple_ces'),
-        'optimal_ces_theta': getattr(params, 'optimal_ces_theta', 1.0),
+        'coding_automation_efficiency_slope': getattr(params, 'coding_automation_efficiency_slope', 1.0),
         'optimal_ces_eta_init': getattr(params, 'optimal_ces_eta_init', 1.0),
         'optimal_ces_grid_size': getattr(params, 'optimal_ces_grid_size', 4096),
         'experiment_compute_exponent': params.experiment_compute_exponent,
@@ -2083,7 +2083,7 @@ def get_parameter_config():
                     'description': 'Select between simple CES and optimal frontier CES',
                     'units': 'categorical'
                 },
-                'optimal_ces_theta': {
+                'coding_automation_efficiency_slope': {
                     'name': 'Automation Efficiency Slope',
                     'description': 'Slope of automation multiplier above threshold (η ∝ E^θ)',
                     'units': 'dimensionless'

@@ -394,7 +394,7 @@ class AutomationModel:
             log_Eaut = idx_progress * log_base
 
             rho = float(params.rho_coding_labor)
-            theta = float(params.optimal_ces_theta)
+            theta = float(params.coding_automation_efficiency_slope)
             # Use FTE-per-GPU as baseline eta; allow multiplicative tweak via optimal_ces_eta_init
             eta_init = float(self.initial_FTE_per_GPU) * float(params.optimal_ces_eta_init)
             if not (rho < 1 and abs(rho) > 1e-18 and theta > 0 and eta_init > 0):
@@ -432,7 +432,7 @@ class AutomationModel:
     def _ensure_frontier(self, params) -> Optional[_FrontierPrecomp]:
         signature = (
             float(params.rho_coding_labor),
-            float(params.optimal_ces_theta),
+            float(params.coding_automation_efficiency_slope),
             float(params.optimal_ces_eta_init),
             int(params.optimal_ces_grid_size),
             tuple(self.anchor_points),
@@ -579,7 +579,7 @@ class Parameters:
 
     # Coding labor mode and optimal CES params (see AUTOMATION_SUGGESTION.md)
     coding_labor_mode: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('coding_labor_mode', 'simple_ces'))
-    optimal_ces_theta: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_theta', 1.0))
+    coding_automation_efficiency_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('coding_automation_efficiency_slope', 1.0))
     optimal_ces_eta_init: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
     optimal_ces_grid_size: int = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
     
@@ -703,8 +703,8 @@ class Parameters:
             self.coding_labor_mode = 'simple_ces'
         # Sanitize optimal CES parameters
         try:
-            if not np.isfinite(self.optimal_ces_theta) or self.optimal_ces_theta <= 0:
-                self.optimal_ces_theta = float(cfg.DEFAULT_PARAMETERS.get('optimal_ces_theta', 1.0))
+            if not np.isfinite(self.coding_automation_efficiency_slope) or self.coding_automation_efficiency_slope <= 0:
+                self.coding_automation_efficiency_slope = float(cfg.DEFAULT_PARAMETERS.get('coding_automation_efficiency_slope', 1.0))
             if not np.isfinite(self.optimal_ces_eta_init) or self.optimal_ces_eta_init <= 0:
                 self.optimal_ces_eta_init = float(cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
             if not np.isfinite(self.optimal_ces_grid_size) or int(self.optimal_ces_grid_size) < 256:

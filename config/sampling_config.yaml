@@ -79,6 +79,10 @@ parameters:
     dist: shifted_lognormal
     ci80: [1, 5.4]
     shift: 1.0
+  coding_automation_efficiency_slope:
+    dist: lognormal
+    ci80: [0.67, 6]  
+
 # Below set to roughly match 10th percentile = 0.3, 90th = 0.8
   parallel_penalty:
     dist: beta
@@ -96,7 +100,7 @@ parameters:
   # Research taste dynamics
   ai_research_taste_at_superhuman_coder_sd:
     dist: normal
-    ci80: [-2.5, 4.5]
+    ci80: [-3.5, 3.5]
   ai_research_taste_slope:
     dist: lognormal
     ci80: [0.5, 6.5]

@@ -146,7 +146,7 @@ PARAMETER_BOUNDS = {
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': (1.1, 20.0),
     # Optimal CES coding labor parameters
-    'optimal_ces_theta': (0.01, 10.0),
+    'coding_automation_efficiency_slope': (0.01, 10.0),
     'optimal_ces_eta_init': (1e-12, 1e12),
     'optimal_ces_grid_size': (256, 16384),
     # coding labor mode (categorical; bounds unused by UI collector)
@@ -203,13 +203,13 @@ DEFAULT_PARAMETERS = {
     'r_software': 2.40,
     'software_progress_rate_at_reference_year': 0.79,
     'automation_fraction_at_superhuman_coder': 1.0,
-    'swe_multiplier_at_present_day': 1.35,
+    'swe_multiplier_at_present_day': 1.6,
     'automation_interp_type': "linear",
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
     'ai_research_taste_at_superhuman_coder': 0.95,
-    'ai_research_taste_at_superhuman_coder_sd': 1,  # Optional: specify SC taste in SD-within-human-range
+    'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
@@ -240,7 +240,7 @@ DEFAULT_PARAMETERS = {
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
     # Optimal CES coding labor configuration
     'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
-    'optimal_ces_theta': 1.0,
+    'coding_automation_efficiency_slope': 2.0,
     'optimal_ces_eta_init': 0.05,
     'optimal_ces_grid_size': 4096,
 }
