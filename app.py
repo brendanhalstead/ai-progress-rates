@@ -273,7 +273,7 @@ def plot_cumulative_progress(fig, times, progress, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -300,7 +300,7 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -340,7 +340,7 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -382,7 +382,7 @@ def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondar
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -409,7 +409,7 @@ def plot_coding_labor_with_present_resources(fig, times, coding_labors_with_pres
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -479,7 +479,7 @@ def plot_cognitive_components(fig, times, coding_labors, human_labor_contributio
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -507,7 +507,7 @@ def plot_research_stock(fig, times, research_stocks, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -535,7 +535,7 @@ def plot_research_effort(fig, times, research_efforts, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -563,7 +563,7 @@ def plot_experiment_capacity(fig, times, experiment_capacity, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -619,7 +619,7 @@ def plot_ai_coding_labor_multiplier(fig, times, ai_coding_labor_multipliers, row
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -649,7 +649,7 @@ def plot_ai_coding_labor_mult_ref_present_day(fig, times, ai_coding_labor_mult_r
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -679,7 +679,7 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -709,7 +709,7 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -739,7 +739,7 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -811,7 +811,7 @@ def plot_ai_sw_progress_mult_ref_present_day(fig, times, ai_sw_progress_mult_ref
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -837,7 +837,7 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -867,7 +867,7 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -899,7 +899,7 @@ def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row,
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -929,7 +929,7 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>SC Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
                 row=row, col=col
             )
 

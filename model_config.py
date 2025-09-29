@@ -642,11 +642,25 @@ The cumulative OOMs of effective compute feeds back into the functions that dete
             {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
             {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
             {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)},
-            {'function': 'plot_ai_sw_progress_mult_ref_present_day', 'position': (3, 2)}
+            
         ],
         'explanation': """
 ## Additional Metrics and Multipliers
 Under construction, don't trust these.
+        """
+    },
+    'ai_sw_progress_mult_ref_present_day': {
+        'id': 'ai-sw-progress-mult-ref-present-day',
+        'name': 'AI R&D Progress Multiplier',
+        'rows': 1, 'cols': 1,
+        'subplot_titles': [''],
+        'plots': [
+            {'function': 'plot_ai_sw_progress_mult_ref_present_day', 'position': (1, 1)}
+        ],
+        'explanation': """
+## AI Software Progress Multiplier (Ref Present Day)
+
+This large-format graph shows how AI-driven software progress translates into a multiplier relative to present-day human-only progress, referenced to the current level of human labor. It mirrors the visual style of the Time Horizons tab for clarity and emphasis.
         """
     }
 } 
