@@ -2051,7 +2051,7 @@ def get_parameter_config():
                     'units': 'categorical'
                 },
                 'optimal_ces_theta': {
-                    'name': 'Optimal CES θ',
+                    'name': 'Automation Efficiency Slope',
                     'description': 'Slope of automation multiplier above threshold (η ∝ E^θ)',
                     'units': 'dimensionless'
                 },

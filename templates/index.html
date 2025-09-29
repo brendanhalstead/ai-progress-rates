@@ -102,68 +102,7 @@
               </div>
             </div>
             
-            <!-- Coding Labor Mode and Optimal CES Settings -->
-            <div class="param-group">
-              <div
-                class="d-flex justify-content-between align-items-center mb-2"
-              >
-                <h6 class="text-muted mb-0">Coding Labor Mode and Optimal CES</h6>
-                <button
-                  class="btn btn-sm btn-outline-secondary"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#optimalCesParams"
-                  aria-expanded="false"
-                  aria-controls="optimalCesParams"
-                >
-                  <i class="fas fa-chevron-down"></i>
-                </button>
-              </div>
-              <div class="collapse" id="optimalCesParams">
-                <div class="mb-3">
-                  <label class="param-label" for="coding_labor_mode">Coding Labor Mode:</label>
-                  <select class="form-select form-select-sm" id="coding_labor_mode">
-                    <option value="simple_ces">Simple CES</option>
-                    <option value="optimal_ces">Optimal Frontier CES</option>
-                  </select>
-                  <small class="text-muted">Choose between the legacy simple CES and the optimized frontier CES implementation.</small>
-                </div>
-                <div class="mb-3">
-                  <label class="param-label" for="optimal_ces_theta">
-                    Optimal CES θ: <span id="optimal_ces_theta_val">Loading...</span>
-                  </label>
-                  <input
-                    type="range"
-                    class="range-input form-range"
-                    id="optimal_ces_theta"
-                    step="0.01"
-                  />
-                  <small class="text-muted">Slope of automation multiplier above threshold (η ∝ E^θ).</small>
-                </div>
-                <div class="mb-3">
-                  <label class="param-label" for="optimal_ces_eta_init">Optimal CES η_init</label>
-                  <input
-                    type="number"
-                    class="form-control form-control-sm"
-                    id="optimal_ces_eta_init"
-                    step="any"
-                  />
-                  <small class="text-muted">Automation multiplier at the threshold. Use scientific notation if needed (e.g., 1e-6).</small>
-                </div>
-                <div class="mb-3">
-                  <label class="param-label" for="optimal_ces_grid_size">
-                    Optimal CES Grid Size: <span id="optimal_ces_grid_size_val">Loading...</span>
-                  </label>
-                  <input
-                    type="range"
-                    class="range-input form-range"
-                    id="optimal_ces_grid_size"
-                    step="1"
-                  />
-                  <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
-                </div>
-              </div>
-            </div>
+            
             <!-- Navigation Tabs -->
             <ul class="nav nav-tabs mb-3" id="controlTabs">
               <li class="nav-item">
@@ -332,7 +271,7 @@
                       <h6 class="text-muted mb-2">Manual Horizon Fitting</h6>
                       <div class="mb-2">
                         <label class="param-label"
-                          >Anchor Time:
+                          >Present Day:
                           <span id="present_day_val">Loading...</span></label
                         >
                         <input
@@ -492,7 +431,7 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
-                        >SWE Multiplier at Anchor Time:
+                        >SWE Multiplier at Present Day:
                         <span id="swe_multiplier_at_present_day_val"
                           >Loading...</span
                         ></label
@@ -526,9 +465,30 @@
                         >Fraction of SWE tasks that TCD-AI can automate</small
                       >
                     </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="optimal_ces_eta_init">Initial Automation Efficiency (FTE per H100be)</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm"
+                        id="optimal_ces_eta_init"
+                        step="any"
+                      />
+                      <small class="text-muted">Efficiency of tasks when first possible to automate.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="optimal_ces_theta">
+                        Automation Efficiency Slope: <span id="optimal_ces_theta_val">Loading...</span>
+                      </label>
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="optimal_ces_theta"
+                        step="0.01"
+                      />
+                      <small class="text-muted">Number of OOMs of automation efficiency gained with each additional OOM of effective compute.</small>
+                    </div>
                   </div>
                 </div>
-
                 <!-- Parallel Coding Labor Parameters -->
                 <div class="param-group">
                   <div
@@ -986,6 +946,26 @@
                     </button>
                   </div>
                   <div class="collapse" id="simulationSettingsParams">
+                    <div class="mb-3">
+                      <label class="param-label" for="coding_labor_mode">Coding Labor Mode:</label>
+                      <select class="form-select form-select-sm" id="coding_labor_mode">
+                        <option value="simple_ces">Simple CES</option>
+                        <option value="optimal_ces">Optimal Frontier CES</option>
+                      </select>
+                      <small class="text-muted">Choose between the legacy simple CES and the optimized frontier CES implementation.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="optimal_ces_grid_size">
+                        Optimal CES Grid Size: <span id="optimal_ces_grid_size_val">Loading...</span>
+                      </label>
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="optimal_ces_grid_size"
+                        step="1"
+                      />
+                      <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
+                    </div>
                     <div class="row">
                       <div class="col-4">
                         <label class="param-label">Start Year</label>
@@ -3743,7 +3723,7 @@
             software_progress_rate_at_reference_year: "Software Scale",
             automation_fraction_at_superhuman_coder: "TCD-AI Automation Fraction:",
 
-            swe_multiplier_at_present_day: "SWE Multiplier at Anchor Time",
+            swe_multiplier_at_present_day: "SWE Multiplier at Present Day",
             coding_labor_normalization: "Parallel Coding Labor Normalization",
             experiment_compute_exponent: "Experiment Compute Discounting",
             ai_research_taste_at_superhuman_coder: "TCD-AI Research Taste",
