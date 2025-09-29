@@ -1077,7 +1077,7 @@ def parse_args() -> argparse.Namespace:
     # Histogram options
     parser.add_argument("--bins", type=int, default=50, help="Number of histogram bins for sc_hist mode")
     # Milestone options
-    parser.add_argument("--milestone", type=str, default=None, help="Milestone name for milestone_time_hist mode (e.g., 'TCD-AI')")
+    parser.add_argument("--milestone", type=str, default=None, help="Milestone name for milestone_time_hist mode (e.g., 'ACD-AI')")
     parser.add_argument("--list-milestones", action="store_true", help="List milestone names found in the rollouts file and exit (works for milestone_time_hist and milestone_transition_box)")
     # Milestone transition boxplot options
     parser.add_argument("--pairs", type=str, default=None, help="Comma-separated milestone pairs for transition durations, formatted as FROM:TO (e.g., 'SC:SAR,SAR:SIAR,SIAR:ASI')")
