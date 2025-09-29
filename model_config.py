@@ -632,9 +632,27 @@ The cumulative OOMs of effective compute feeds back into the functions that dete
 - AI research taste.
         """
     },
+    'ai_sw_progress_mult_ref_present_day': {
+        'id': 'ai-sw-progress-mult-ref-present-day',
+        'name': 'AI R&D Progress Multiplier',
+        'rows': 1, 'cols': 1,
+        'subplot_titles': [''],
+        'plots': [
+            {'function': 'plot_ai_sw_progress_mult_ref_present_day', 'position': (1, 1)}
+        ],
+        'explanation': """
+## AI Software Progress Multiplier (Ref Present Day)
+
+This graph shows the factor by which today's software efficiency growth rate would be improved (compared to the current human-only software efficiency growth rate) if the frontier AI systems at a given time were deployed within today's leading AI company.
+This is meant to be a clean measure of AI R&D capabilities, and depends on three things:
+- the experiment selection skill level of the AIs
+- the SWE automation fraction of the AIs
+- the AI's distribution of automation efficiency levels across tasks (FTE per H100be)
+        """
+    },
     'other_metrics': {
         'id': 'other-metrics',
-        'name': 'Other Metrics',
+        'name': 'Other Metrics / Debug',
         'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_ai_coding_labor_multiplier', 'position': (1, 1)},
@@ -647,20 +665,6 @@ The cumulative OOMs of effective compute feeds back into the functions that dete
         'explanation': """
 ## Additional Metrics and Multipliers
 Under construction, don't trust these.
-        """
-    },
-    'ai_sw_progress_mult_ref_present_day': {
-        'id': 'ai-sw-progress-mult-ref-present-day',
-        'name': 'AI R&D Progress Multiplier',
-        'rows': 1, 'cols': 1,
-        'subplot_titles': [''],
-        'plots': [
-            {'function': 'plot_ai_sw_progress_mult_ref_present_day', 'position': (1, 1)}
-        ],
-        'explanation': """
-## AI Software Progress Multiplier (Ref Present Day)
-
-This large-format graph shows how AI-driven software progress translates into a multiplier relative to present-day human-only progress, referenced to the current level of human labor. It mirrors the visual style of the Time Horizons tab for clarity and emphasis.
         """
     }
 } 
