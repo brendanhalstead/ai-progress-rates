@@ -79,25 +79,21 @@
         <div class="col-lg-4 left-panel">
           <div class="control-panel">
             <!-- Summary Cards -->
-            <div class="row g-2 mb-3" id="summaryCards" style="display: none">
-              <div class="col-6">
-                <div class="summary-card">
-                  <div class="summary-label">TCD-AI Time</div>
-                  <div class="summary-value" id="summary_sc_time">—</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="summary-card">
-                  <div class="summary-label">'AI 2027 SC' Time</div>
-                  <div class="summary-value" id="summary_ai2027_sc_time">—</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="summary-card">
-                  <div class="summary-label">SW Progress Multiplier at TCD-AI</div>
-                  <div class="summary-value" id="summary_sc_rd_multiplier">
-                    —
-                  </div>
+            <div class="row g-2 mb-3" id="milestonesTop">
+              <div class="col-12">
+                <h5>Milestones</h5>
+                <div class="table-responsive">
+                  <table class="table table-sm table-striped align-middle">
+                    <thead>
+                      <tr>
+                        <th scope="col">Milestone</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">eFLOPs</th>
+                        <th scope="col">PM</th>
+                      </tr>
+                    </thead>
+                    <tbody id="milestonesTableBody"></tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -123,16 +119,6 @@
                   data-bs-target="#data-panel"
                 >
                   Scenarios
-                </button>
-              </li>
-              <li class="nav-item">
-                <button
-                  class="nav-link"
-                  id="milestones-tab"
-                  data-bs-toggle="tab"
-                  data-bs-target="#milestones-panel"
-                >
-                  Milestones
                 </button>
               </li>
             </ul>
@@ -1112,23 +1098,7 @@
                 </div>
               </div>
 
-              <!-- Milestones Panel -->
-              <div class="tab-pane fade" id="milestones-panel">
-                <h5>Milestones</h5>
-                <div class="table-responsive">
-                  <table class="table table-sm table-striped align-middle">
-                    <thead>
-                      <tr>
-                        <th scope="col">Milestone</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">eFLOPs</th>
-                        <th scope="col">PM</th>
-                      </tr>
-                    </thead>
-                    <tbody id="milestonesTableBody"></tbody>
-                  </table>
-                </div>
-              </div>
+              
 
               <!-- Parameter Estimation Panel -->
               <div class="tab-pane fade" id="estimation-panel">
