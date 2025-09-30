@@ -208,7 +208,7 @@ DEFAULT_PARAMETERS = {
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
-    'ai_research_taste_at_superhuman_coder': 0.95,
+    # 'ai_research_taste_at_superhuman_coder': 0.95,
     'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,

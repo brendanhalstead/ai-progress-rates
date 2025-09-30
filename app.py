@@ -1901,7 +1901,7 @@ def params_to_dict(params: Parameters):
         'include_gap': getattr(params, 'include_gap', 'no gap'),
         'gap_years': float(getattr(params, 'gap_years', 0.0)),
         # Research taste distribution parameter
-        'median_to_top_taste_multiplier': getattr(params, 'median_to_top_taste_multiplier', None),
+        'median_to_top_taste_multiplier': getattr(params, 'median_to_top_taste_multiplier', 3.25),
     }
     
     # Add calculated SC information if available from the current session

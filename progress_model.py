@@ -538,7 +538,7 @@ class Parameters:
     automation_interp_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
-    ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
+    #ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
     ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
@@ -986,7 +986,6 @@ def compute_exp_capacity_params_from_anchors(inf_labor_asymptote: float, inf_com
     experiment_compute_exponent = compute_experiment_compute_exponent_from_anchor(inf_compute_asymptote, inf_labor_asymptote, compute_anchor, rho)
     serial_coding_labor = current_coding_labor ** parallel_penalty
     alpha_experiment_capacity = compute_alpha_experiment_capacity_from_asymptotes(inf_labor_asymptote, inf_compute_asymptote, experiment_compute_exponent, current_exp_compute, serial_coding_labor, rho)
-    # import pdb; pdb.set_trace()
     return rho, alpha_experiment_capacity, experiment_compute_exponent
 
 def compute_research_effort(experiment_compute: float, serial_coding_labor: float, alpha_experiment_capacity: float, rho: float, experiment_compute_exponent: float, aggregate_research_taste: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE) -> float:
@@ -1819,14 +1818,14 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     """
     # Create taste distribution with default parameters
     try:
-        taste_distribution = TasteDistribution()
+        taste_distribution = TasteDistribution(median_to_top_gap=params.median_to_top_taste_multiplier)
     except Exception as e:
         logger.warning(f"Error creating TasteDistribution: {e}")
         # Fallback to exponential schedule
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
     
     # Extract parameters
-    taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    # taste_at_sc = params.ai_research_taste_at_superhuman_coder
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope  # SD per progress unit
     
@@ -1840,9 +1839,9 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_sc
         
         # Clamp taste_at_sc to valid range to avoid log(0) issues
-        taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
+        # taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
-        target_sd = taste_distribution.get_sd_of_taste(taste_at_sc_clamped)
+        target_sd = params.ai_research_taste_at_superhuman_coder_sd
         # Adjust offset to maintain the anchor point with unpenalized slope
         offset = target_sd - slope * progress_at_sc
         
@@ -3086,11 +3085,11 @@ class ProgressModel:
             try:
                 anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
                 if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0:
-                    # Convert from SD/progress-year to SD/progress-unit by multiplying by (1 year / anchor_progress_rate progress-units)
+                    # Convert from SDs/progress-year to SDs/progress-unit by multiplying by (1 year / anchor_progress_rate progress-units)
                     # which simplifies to dividing by anchor_progress_rate
                     original_slope = self.params.ai_research_taste_slope
                     converted_slope = original_slope / anchor_progress_rate
-                    logger.info(f"Converting taste slope from {original_slope:.6f} SD/progress-year to {converted_slope:.6f} SD/progress-unit (anchor rate: {anchor_progress_rate:.6f})")
+                    logger.info(f"Converting taste slope from {original_slope:.6f} SDs/progress-year to {converted_slope:.6f} SDs/progress-unit (anchor rate: {anchor_progress_rate:.6f})")
                     self.params.ai_research_taste_slope = converted_slope
                 else:
                     logger.warning(f"Invalid anchor_progress_rate for taste slope conversion: {anchor_progress_rate}")

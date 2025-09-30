@@ -1690,18 +1690,18 @@
             );
             if (textNode) {
               if (selected === "SDs per effective OOM") {
-                textNode.textContent = 'SD/effective-OOM';
+                textNode.textContent = 'SDs/effective-OOM';
               } else if (selected === "SDs per progress-year") {
-                textNode.textContent = 'SD/progress-year';
+                textNode.textContent = 'SDs/progress-year';
               }
             }
           } else {
             // Fallback: update the last text content
             const html = labelElement.innerHTML;
             if (selected === "SDs per effective OOM") {
-              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/effective-OOM');
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/effective-OOM');
             } else if (selected === "SDs per progress-year") {
-              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/progress-year');
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/progress-year');
             }
           }
         }
