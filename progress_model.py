@@ -3590,12 +3590,12 @@ class ProgressModel:
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 10000
             },
-            '(Expensive) SAR': {
+            '(Expensive, threshold only considers taste) SAR': {
                 'metric': 'ai_research_taste',
                 'target': cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER,
                 'interpolation_type': 'exponential'
             },
-            '(Expensive) SIAR': {
+            '(Expensive, threshold only considers taste) SIAR': {
                 'metric': 'ai_research_taste',
                 'target': cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER**3,
                 'interpolation_type': 'exponential'
