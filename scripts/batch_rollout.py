@@ -57,6 +57,7 @@ import model_config as cfg
 from progress_model import (
     ProgressModel, Parameters, load_time_series_data
 )
+from time_series_generator import generate_time_series_from_dict
 
 # Track which parameters we have already warned about for CI-first precedence
 _ci_first_warned_params: Set[str] = set()
@@ -404,12 +405,24 @@ def _to_jsonable(obj: Any) -> Any:
     return str(obj)
 
 
-def _rollout_worker(conn, sampled_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float) -> None:
+def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float) -> None:
     """Subprocess worker: runs one rollout and sends back results or error."""
     try:
         # Lazy imports in subprocess to avoid parent state issues
         from progress_model import ProgressModel as _PM, Parameters as _Params, load_time_series_data as _load
-        data = _load(input_data_path)
+        from time_series_generator import generate_time_series_from_dict as _gen_ts
+
+        # Load base time series data
+        base_data = _load(input_data_path)
+
+        # Check if time series parameters are present; if so, generate new time series
+        if sampled_ts_params:
+            # Generate time series with uncertainty
+            data = _gen_ts(sampled_ts_params, input_data_path, base_data)
+        else:
+            # Use base data as-is
+            data = base_data
+
         params_obj = _Params(**sampled_params)
         model = _PM(params_obj, data)
         model.compute_progress_trajectory(time_range, initial_progress)
@@ -423,14 +436,14 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], input_data_path: str, 
             pass
 
 
-def _run_rollout_subprocess(sampled_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float, timeout_s: Optional[float]) -> Dict[str, Any]:
+def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float, timeout_s: Optional[float]) -> Dict[str, Any]:
     """Run one rollout in a child process; enforce timeout by termination.
 
     Returns results dict on success. Raises TimeoutError on timeout. Raises Exception on failure.
     """
     ctx = mp.get_context("spawn")
     parent_conn, child_conn = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_rollout_worker, args=(child_conn, sampled_params, input_data_path, time_range, initial_progress))
+    proc = ctx.Process(target=_rollout_worker, args=(child_conn, sampled_params, sampled_ts_params, input_data_path, time_range, initial_progress))
     proc.daemon = False
     proc.start()
     child_conn.close()  # close in parent
@@ -576,6 +589,7 @@ def main() -> None:
 
     # Avoid holding everything in memory: stream as NDJSON
     param_dists: Dict[str, Any] = user_cfg.get("parameters", {})
+    ts_param_dists: Dict[str, Any] = user_cfg.get("time_series_parameters", {})
 
     # print(param_dists["saturation_horizon_minutes"])
 
@@ -600,6 +614,16 @@ def main() -> None:
                 sampled_params.setdefault("horizon_extrapolation_type", cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE)
                 sampled_params.setdefault("taste_schedule_type", cfg.DEFAULT_TASTE_SCHEDULE_TYPE)
 
+                # Sample time series parameters if present
+                sampled_ts_params = _sample_parameter_dict(ts_param_dists, rng) if ts_param_dists else {}
+
+                # Generate time series with uncertainty if time series parameters are present
+                if sampled_ts_params:
+                    rollout_data = generate_time_series_from_dict(sampled_ts_params, input_data_path, data)
+                else:
+                    # Use base data as-is
+                    rollout_data = data
+
                 # Prepare constructor kwargs
                 params_obj = Parameters(**sampled_params)
 
@@ -607,16 +631,17 @@ def main() -> None:
                 # with _suppress_noise():
                 if per_sample_timeout is not None and per_sample_timeout > 0:
                     # Use subprocess isolation when timeout is requested to avoid internal catches
-                    results = _run_rollout_subprocess(sampled_params, str(Path(input_data_path).resolve()), time_range, initial_progress, per_sample_timeout)
+                    results = _run_rollout_subprocess(sampled_params, sampled_ts_params, str(Path(input_data_path).resolve()), time_range, initial_progress, per_sample_timeout)
                     model = None  # no in-process model
                 else:
-                    model = ProgressModel(params_obj, data)
+                    model = ProgressModel(params_obj, rollout_data)
                     times, progress_values, research_stock_values = model.compute_progress_trajectory(time_range, initial_progress)
 
-                # Persist sample record
+                # Persist sample record (include both parameter types)
                 sample_record = {
                     "sample_id": i,
                     "parameters": _to_jsonable(sampled_params),
+                    "time_series_parameters": _to_jsonable(sampled_ts_params),
                 }
                 f_samples.write(json.dumps(sample_record) + "\n")
                 f_samples.flush()
@@ -629,6 +654,7 @@ def main() -> None:
                 rollout_record = {
                     "sample_id": i,
                     "parameters": _to_jsonable(sampled_params),
+                    "time_series_parameters": _to_jsonable(sampled_ts_params),
                     "results": rollout_results,
                 }
                 f_rollouts.write(json.dumps(rollout_record) + "\n")
@@ -636,15 +662,15 @@ def main() -> None:
 
             except TimeoutError as e:
                 # Persist timeout info to keep alignment between files
-                f_samples.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "error": str(e)}) + "\n")
+                f_samples.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "time_series_parameters": _to_jsonable(sampled_ts_params), "error": str(e)}) + "\n")
                 f_samples.flush()
-                f_rollouts.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "results": None, "error": str(e)}) + "\n")
+                f_rollouts.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "time_series_parameters": _to_jsonable(sampled_ts_params), "results": None, "error": str(e)}) + "\n")
                 f_rollouts.flush()
             except Exception as e:
                 # Persist failure info to keep alignment between files
-                f_samples.write(json.dumps({"sample_id": i, "parameters": None, "error": str(e)}) + "\n")
+                f_samples.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "error": str(e)}) + "\n")
                 f_samples.flush()
-                f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "results": None, "error": str(e)}) + "\n")
+                f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "results": None, "error": str(e)}) + "\n")
                 f_rollouts.flush()
             # Manual progress update when tqdm is unavailable
             if _tqdm is None:
