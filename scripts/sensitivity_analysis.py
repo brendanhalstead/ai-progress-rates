@@ -91,9 +91,15 @@ def _collect_dataset(
     # Filter to usable records
     usable: List[Tuple[Dict[str, Any], float]] = []
     for rec in records:
-        params = rec.get("parameters")
+        params = rec.get("parameters", {})
+        ts_params = rec.get("time_series_parameters", {})
         results = rec.get("results")
-        if not params or not results:
+        if not results:
+            continue
+        # Merge time series parameters into params for analysis
+        # This allows sensitivity analysis to consider both types of parameters
+        all_params = {**params, **ts_params} if params or ts_params else None
+        if not all_params:
             continue
         # Determine target y: either sc_time or milestone transition
         y_val: Optional[float] = None
@@ -120,7 +126,7 @@ def _collect_dataset(
                         y_val = dur
         if y_val is None:
             continue
-        usable.append((params, float(y_val)))
+        usable.append((all_params, float(y_val)))
 
     if not usable:
         raise RuntimeError("No usable records with finite sc_time and parameters")
