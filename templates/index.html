@@ -1002,20 +1002,12 @@
                   </div>
                 </div>
                 <div class="row">
-                  <div class="col-6">
+                  <div class="col-12">
                     <button
                       class="btn btn-primary w-100"
                       onclick="computeModel()"
                     >
                       Update Model
-                    </button>
-                  </div>
-                  <div class="col-6">
-                    <button
-                      class="btn btn-secondary w-100"
-                      onclick="resetToDefaults()"
-                    >
-                      Reset
                     </button>
                   </div>
                 </div>
@@ -1684,18 +1676,18 @@
             );
             if (textNode) {
               if (selected === "SDs per effective OOM") {
-                textNode.textContent = 'SD/effective-OOM';
+                textNode.textContent = 'SDs/effective-OOM';
               } else if (selected === "SDs per progress-year") {
-                textNode.textContent = 'SD/progress-year';
+                textNode.textContent = 'SDs/progress-year';
               }
             }
           } else {
             // Fallback: update the last text content
             const html = labelElement.innerHTML;
             if (selected === "SDs per effective OOM") {
-              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/effective-OOM');
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/effective-OOM');
             } else if (selected === "SDs per progress-year") {
-              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SD/progress-year');
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/progress-year');
             }
           }
         }
@@ -3975,17 +3967,6 @@
         }
       }
 
-      function resetToDefaults() {
-        // Reset to defaults using the most appropriate method
-        if (parameterConfig && parameterConfig.defaults) {
-          console.log("Resetting to parameter config defaults");
-          initializeParameterControls();
-          computeModel();
-        } else {
-          console.log("Resetting using /api/default-data");
-          loadDefaultData();
-        }
-      }
 
       let constraintCounter = 0;
 
