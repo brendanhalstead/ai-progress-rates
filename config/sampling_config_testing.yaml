@@ -1,0 +1,40 @@
+# Sampling configuration for scripts/batch_rollout.py
+#
+# You can pass this file with:
+#   python scripts/batch_rollout.py --config config/sampling_config.yaml \
+#     --num-samples 2000 --input-data input_data.csv --time-range 2015 2035 --seed 123
+#
+# Notes:
+# - Distributions supported: fixed, uniform, normal, lognormal, shifted_lognormal, beta, choice
+# - normal supports optional min/max with clip_to_bounds: true
+# - lognormal uses parameters in log space: mu, sigma; supports min/max with clip_to_bounds
+# - beta draws in [0,1] then scales to [min,max]
+# - choice supports optional probabilities p
+# - 80% CI-first: For normal/lognormal, if ci80 is provided as [low, high] OR ci80_low/ci80_high are provided,
+#   they TAKE PRECEDENCE over mean/sd (normal) or mu/sigma (lognormal). If both are present, mean/sd or mu/sigma
+#   are ignored and a warning is emitted once per parameter.
+
+seed: 3
+initial_progress: 0.0
+# If omitted on CLI, this is used; otherwise CLI --time-range overrides
+time_range: [2012.0, 2050.0]
+
+num_rollouts: 100
+input_data: input_data.csv
+per_sample_timeout: 5
+
+parameters: {}
+
+# Input time series uncertainty
+# These parameters control the generation of time series data with uncertainty
+time_series_parameters:
+  constant_training_compute_growth_rate:
+    dist: normal
+    ci80: [0.55, 0.65]  # Training compute growth rate before slowdown
+  slowdown_year:
+    dist: uniform
+    min: 2026.0
+    max: 2030.0
+  post_slowdown_training_compute_growth_rate:
+    dist: normal
+    ci80: [0.15, 0.35]  # Training compute growth rate after slowdown
