@@ -13,20 +13,6 @@
   --card-shadow: 0 10px 20px rgba(0, 0, 0, 0.08), 0 6px 6px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="dark"] {
-  --bg-color: #0f172a;
-  --surface-color: #111827;
-  --text-color: #e5e7eb;
-  --muted-text-color: #9ca3af;
-  --border-color: #1f2937;
-  --primary: #7c8cea;
-  --primary-600: #6c7fef;
-  --primary-700: #5b70e0;
-  --nav-bg: #0b1220;
-  --nav-text: #e5e7eb;
-  --card-shadow: 0 10px 20px rgba(0, 0, 0, 0.35), 0 6px 6px rgba(0, 0, 0, 0.28);
-}
-
 html, body {
   height: 100%;
 }
@@ -124,10 +110,6 @@ body {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="dark"] .param-group .btn-outline-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.06);
-}
-
 .param-group .btn-outline-secondary i { transition: transform 0.2s ease-in-out; }
 .param-group .btn-outline-secondary[aria-expanded="false"] i { transform: rotate(-90deg); }
 .param-group .collapse { transition: all 0.2s ease-in-out; }
@@ -157,10 +139,6 @@ body {
   box-shadow: var(--card-shadow);
 }
 
-[data-theme="dark"] .summary-card {
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-}
-
 .summary-label {
   font-size: 0.8rem;
   opacity: 0.9;
@@ -182,13 +160,6 @@ body {
 .left-panel::-webkit-scrollbar-track, .right-panel::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
 .left-panel::-webkit-scrollbar-thumb, .right-panel::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
 .left-panel::-webkit-scrollbar-thumb:hover, .right-panel::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-
-[data-theme="dark"] .left-panel::-webkit-scrollbar-track, 
-[data-theme="dark"] .right-panel::-webkit-scrollbar-track { background: #0b1220; }
-[data-theme="dark"] .left-panel::-webkit-scrollbar-thumb, 
-[data-theme="dark"] .right-panel::-webkit-scrollbar-thumb { background: #374151; }
-[data-theme="dark"] .left-panel::-webkit-scrollbar-thumb:hover, 
-[data-theme="dark"] .right-panel::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
 /* Forms */
 .form-control, .form-select {
@@ -276,11 +247,6 @@ body {
 .tab-explanation blockquote p {
   margin-bottom: 0;
   font-style: italic;
-}
-
-/* Dark theme adjustments */
-[data-theme="dark"] .tab-explanation blockquote {
-  background-color: rgba(124, 140, 234, 0.1);
 }
 
 /* Responsive design */
