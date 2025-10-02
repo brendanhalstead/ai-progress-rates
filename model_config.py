@@ -30,7 +30,7 @@ PARALLEL_PENALTY_MAX = 1.0
 # OTHER RANDOM CONSTANTS
 # =============================================================================
 
-LABOR_MULT_EXTRA_FOR_AI2027_SC = 20
+LABOR_MULT_EXTRA_FOR_AI2027_SC = 10
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
