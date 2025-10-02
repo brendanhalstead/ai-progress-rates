@@ -1993,6 +1993,16 @@ def compute_model():
     # Add beta_software (inverse of r_software) if available
     if model.results.get('beta_software') is not None:
         summary['beta_software'] = float(model.results['beta_software'])
+    
+    # Add top taste percentile metrics if available
+    if model.results.get('top_taste_percentile') is not None:
+        summary['top_taste_percentile'] = float(model.results['top_taste_percentile'])
+    if model.results.get('top_taste_num_sds') is not None:
+        summary['top_taste_num_sds'] = float(model.results['top_taste_num_sds'])
+    if model.results.get('f_multiplier_per_sd') is not None:
+        summary['f_multiplier_per_sd'] = float(model.results['f_multiplier_per_sd'])
+    if model.results.get('slope_times_log_f') is not None:
+        summary['slope_times_log_f'] = float(model.results['slope_times_log_f'])
 
     # Add instantaneous anchor doubling time (years) if available
     if model.results.get('instantaneous_anchor_doubling_time_years') is not None:

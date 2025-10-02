@@ -3480,6 +3480,33 @@ class ProgressModel:
         except Exception as e:
             logger.warning(f"Failed computing taste slope conversions: {e}")
         
+        # Compute top taste percentile metrics for display
+        top_taste_percentile = cfg.TOP_PERCENTILE
+        top_taste_value = None
+        top_taste_num_sds = None
+        f_multiplier_per_sd = None
+        slope_times_log_f = None
+        
+        try:
+            # Get taste value at top percentile (e.g., 99th percentile if TOP_PERCENTILE = 0.01)
+            top_taste_value = self.taste_distribution.get_taste_at_quantile(1.0 - top_taste_percentile)
+            
+            # Get how many standard deviations this represents
+            top_taste_num_sds = self.taste_distribution.get_sd_of_taste(top_taste_value)
+            
+            # Compute f: multiplier per standard deviation
+            # f = median_to_top_taste_multiplier^(1/num_sds)
+            if top_taste_num_sds is not None and np.isfinite(top_taste_num_sds) and top_taste_num_sds > 0:
+                f_multiplier_per_sd = self.params.median_to_top_taste_multiplier ** (1.0 / top_taste_num_sds)
+                
+                # Compute s * log10(f), where s is ai_research_taste_slope (SDs per effective OOM)
+                if (ai_taste_slope_per_effective_oom is not None and 
+                    np.isfinite(ai_taste_slope_per_effective_oom) and 
+                    f_multiplier_per_sd > 0):
+                    slope_times_log_f = ai_taste_slope_per_effective_oom * np.log10(f_multiplier_per_sd)
+        except Exception as e:
+            logger.warning(f"Failed computing top taste metrics: {e}")
+        
         # RESCALE SOFTWARE EFFICIENCY TO REFLECT PRESENT-DAY BASELINE
         software_efficiency = software_efficiency - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, software_efficiency)
         training_compute = training_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, training_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
@@ -3538,6 +3565,10 @@ class ProgressModel:
             },
             'r_software': self.params.r_software,  # Calibrated r_software value
             'beta_software': 1.0 / self.params.r_software if self.params.r_software != 0 else None,  # Beta (inverse of r_software)
+            'top_taste_percentile': top_taste_percentile,  # Top percentile (e.g., 0.01 for 99th percentile)
+            'top_taste_num_sds': top_taste_num_sds,  # Number of SDs the top percentile represents
+            'f_multiplier_per_sd': f_multiplier_per_sd,  # Multiplier per standard deviation
+            'slope_times_log_f': slope_times_log_f,  # s * log10(f), where s is SDs per effective OOM
         }
         self.results['milestones'] = self.compute_milestones()
         # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
