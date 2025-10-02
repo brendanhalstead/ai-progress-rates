@@ -3535,7 +3535,9 @@ class ProgressModel:
                 'rho': self.params.rho_experiment_capacity,
                 'alpha': self.params.alpha_experiment_capacity,
                 'experiment_compute_exponent': self.params.experiment_compute_exponent,
-            }
+            },
+            'r_software': self.params.r_software,  # Calibrated r_software value
+            'beta_software': 1.0 / self.params.r_software if self.params.r_software != 0 else None,  # Beta (inverse of r_software)
         }
         self.results['milestones'] = self.compute_milestones()
         # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")

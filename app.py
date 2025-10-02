@@ -1986,6 +1986,14 @@ def compute_model():
     if model.results.get('anchor_progress_rate') is not None:
         summary['anchor_progress_rate'] = float(model.results['anchor_progress_rate'])
 
+    # Add r_software (calibrated value) if available
+    if model.results.get('r_software') is not None:
+        summary['r_software'] = float(model.results['r_software'])
+    
+    # Add beta_software (inverse of r_software) if available
+    if model.results.get('beta_software') is not None:
+        summary['beta_software'] = float(model.results['beta_software'])
+
     # Add instantaneous anchor doubling time (years) if available
     if model.results.get('instantaneous_anchor_doubling_time_years') is not None:
         summary['instantaneous_anchor_doubling_time_years'] = float(model.results['instantaneous_anchor_doubling_time_years'])

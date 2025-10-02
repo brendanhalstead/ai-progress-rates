@@ -893,6 +893,13 @@
                       <small class="text-muted" id="software_progress_rate_at_reference_year_range"
                         >Loading range...</small
                       >
+                      <div class="mt-1">
+                        <small class="text-muted"
+                          >Calibrated r_software:
+                          <span id="r_software_val">—</span>, β:
+                          <span id="beta_software_val">—</span></small
+                        >
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3721,6 +3728,20 @@
           $("#summary_anchor_progress_rate").text(
             summary.anchor_progress_rate != null
               ? fmt(summary.anchor_progress_rate, 3)
+              : "—"
+          );
+
+          // Calibrated r_software value
+          $("#r_software_val").text(
+            summary.r_software != null
+              ? fmt(summary.r_software, 4)
+              : "—"
+          );
+
+          // Beta (inverse of r_software)
+          $("#beta_software_val").text(
+            summary.beta_software != null
+              ? fmt(summary.beta_software, 4)
               : "—"
           );
 
