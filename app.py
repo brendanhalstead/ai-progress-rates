@@ -1902,6 +1902,7 @@ def params_to_dict(params: Parameters):
         'gap_years': float(getattr(params, 'gap_years', 0.0)),
         # Research taste distribution parameter
         'median_to_top_taste_multiplier': getattr(params, 'median_to_top_taste_multiplier', 3.25),
+        'top_percentile': getattr(params, 'top_percentile', 0.999),
     }
     
     # Add calculated SC information if available from the current session
@@ -2229,6 +2230,11 @@ def get_parameter_config():
                     'name': 'Median to Top Taste Multiplier',
                     'description': 'Ratio of top percentile researcher taste to median researcher taste',
                     'units': 'ratio'
+                },
+                'top_percentile': {
+                    'name': 'Top ResearcherPercentile',
+                    'description': 'Quantile for the "top" researcher considered in the human range (e.g., 0.999 = 99.9th percentile)',
+                    'units': 'quantile (0-1)'
                 }
             }
         }
@@ -2673,7 +2679,8 @@ def get_default_data():
             # Baseline Annual Compute Multiplier
             'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
             # Research taste distribution parameter
-            'median_to_top_taste_multiplier': params.median_to_top_taste_multiplier
+            'median_to_top_taste_multiplier': params.median_to_top_taste_multiplier,
+            'top_percentile': params.top_percentile
         }
     })
 

@@ -36,7 +36,7 @@ AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 
 # Research Taste Distribution Parameters (Log-Normal)
-TOP_PERCENTILE = 0.001                    # fraction classed as "top" researchers
+TOP_PERCENTILE = 0.999                    # quantile classed as "top" researchers (0.999 = 99.9th percentile)
 MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration (UI-level options)
@@ -145,6 +145,7 @@ PARAMETER_BOUNDS = {
     'parallel_penalty': (0.0, 1.0),
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': (1.1, 20.0),
+    'top_percentile': (0.5, 0.99999),
     # Optimal CES coding labor parameters
     'coding_automation_efficiency_slope': (0.01, 10.0),
     'optimal_ces_eta_init': (1e-12, 1e12),
@@ -238,6 +239,7 @@ DEFAULT_PARAMETERS = {
     'parallel_penalty': 0.52,
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
+    'top_percentile': TOP_PERCENTILE,
     # Optimal CES coding labor configuration
     'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
     'coding_automation_efficiency_slope': 2.0,

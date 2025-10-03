@@ -42,8 +42,8 @@ class TasteDistribution:
     
     The distribution is modeled as T ~ LogNormal(μ, σ²), where the parameters
     are derived from empirical anchors:
-    - top_percentile: fraction of researchers classified as "top"
-    - median_to_top_gap: ratio of threshold taste to median taste  
+    - top_percentile: quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)
+    - median_to_top_gap: ratio of threshold taste to median taste
     - baseline_mean: company-wide mean taste
     
     Example usage:
@@ -68,9 +68,9 @@ class TasteDistribution:
                  baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE):
         """
         Initialize the taste distribution with empirical anchors.
-        
+
         Args:
-            top_percentile: Fraction of researchers classified as "top"
+            top_percentile: Quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)
             median_to_top_gap: Ratio of threshold taste to median taste
             baseline_mean: Company-wide mean taste
         """
@@ -91,7 +91,8 @@ class TasteDistribution:
             raise ValueError(f"baseline_mean must be > 0, got {baseline_mean}")
         
         # Compute log-normal distribution parameters
-        z_p = norm.ppf(1 - top_percentile)
+        # top_percentile is now the quantile (e.g., 0.999), so we use it directly
+        z_p = norm.ppf(top_percentile)
         self.sigma = math.log(median_to_top_gap) / z_p
         self.mu = math.log(baseline_mean) - 0.5 * self.sigma ** 2
         
@@ -572,6 +573,7 @@ class Parameters:
 
     # Research taste distribution parameter
     median_to_top_taste_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['median_to_top_taste_multiplier'])
+    top_percentile: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['top_percentile'])
 
     # Benchmarks and gaps mode
     include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
@@ -604,7 +606,7 @@ class Parameters:
         # If SD-specification is provided, convert to raw taste via TasteDistribution
         if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
             try:
-                taste_distribution_tmp = TasteDistribution(median_to_top_gap=self.median_to_top_taste_multiplier)
+                taste_distribution_tmp = TasteDistribution(top_percentile=self.top_percentile, median_to_top_gap=self.median_to_top_taste_multiplier)
                 converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_superhuman_coder_sd))
                 if np.isfinite(converted_taste):
                     self.ai_research_taste_at_superhuman_coder = float(converted_taste)
@@ -1818,7 +1820,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     """
     # Create taste distribution with default parameters
     try:
-        taste_distribution = TasteDistribution(median_to_top_gap=params.median_to_top_taste_multiplier)
+        taste_distribution = TasteDistribution(top_percentile=params.top_percentile, median_to_top_gap=params.median_to_top_taste_multiplier)
     except Exception as e:
         logger.warning(f"Error creating TasteDistribution: {e}")
         # Fallback to exponential schedule
@@ -2294,7 +2296,7 @@ class ProgressModel:
         self._horizon_params = None
         
         # Initialize taste distribution for working with research taste
-        self.taste_distribution = TasteDistribution(median_to_top_gap=self.params.median_to_top_taste_multiplier)
+        self.taste_distribution = TasteDistribution(top_percentile=self.params.top_percentile, median_to_top_gap=self.params.median_to_top_taste_multiplier)
     
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
@@ -3481,15 +3483,15 @@ class ProgressModel:
             logger.warning(f"Failed computing taste slope conversions: {e}")
         
         # Compute top taste percentile metrics for display
-        top_taste_percentile = cfg.TOP_PERCENTILE
+        top_taste_percentile = self.params.top_percentile
         top_taste_value = None
         top_taste_num_sds = None
         f_multiplier_per_sd = None
         slope_times_log_f = None
-        
+
         try:
-            # Get taste value at top percentile (e.g., 99th percentile if TOP_PERCENTILE = 0.01)
-            top_taste_value = self.taste_distribution.get_taste_at_quantile(1.0 - top_taste_percentile)
+            # Get taste value at top percentile (e.g., 99.9th percentile if top_percentile = 0.999)
+            top_taste_value = self.taste_distribution.get_taste_at_quantile(top_taste_percentile)
             
             # Get how many standard deviations this represents
             top_taste_num_sds = self.taste_distribution.get_sd_of_taste(top_taste_value)

@@ -837,6 +837,25 @@
                     <div class="row mt-2">
                       <div class="col-12">
                         <label class="param-label"
+                          >Top Percentile Threshold:
+                          <span id="top_percentile_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="top_percentile"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)</small
+                        >
+                      </div>
+                    </div>
+                    <div class="row mt-2">
+                      <div class="col-12">
+                        <label class="param-label"
                           >Median to Top Taste Multiplier:
                           <span id="median_to_top_taste_multiplier_val"
                             >Loading...</span
@@ -1208,6 +1227,7 @@
         "parallel_penalty",
         "ai_research_taste_at_superhuman_coder_sd",
         "ai_research_taste_slope",
+        "top_percentile",
         "median_to_top_taste_multiplier",
         "taste_schedule_type",
         "sc_time_horizon_minutes",
@@ -1669,6 +1689,16 @@
           input.id.includes("research_stock")
         ) {
           displayValue = value.toFixed(2);
+        } else if (input.id === "top_percentile") {
+          // Show actual percentile value (convert from negated log scale)
+          const actualValue = usePreciseInputs ? value : (1.0 - Math.pow(10, -value));
+          console.log("top_percentile display: sliderValue=" + value + ", actualValue=" + actualValue);
+          // Use toPrecision for values very close to 1 to avoid rounding to 1.0000
+          if (actualValue > 0.9999) {
+            displayValue = actualValue.toPrecision(5);
+          } else {
+            displayValue = actualValue.toFixed(4);
+          }
         } else if (input.id === "coding_labor_normalization") {
           // Show actual value; respect precise mode
           const actualValue = usePreciseInputs ? value : Math.pow(10, value);
@@ -1792,7 +1822,13 @@
               value = parseFloat(element.val());
 
               // Special handling for parameters that are log-scaled in slider mode
-              if (id === "coding_labor_normalization") {
+              if (id === "top_percentile") {
+                // For top_percentile, use negated log scale on (1 - value) to make high percentiles easier to select
+                // Convert from slider (-log of 1-percentile) to actual percentile
+                const logValue = value;
+                value = 1.0 - Math.pow(10, -logValue);
+                console.log("top_percentile collection: logValue=" + logValue + ", actualValue=" + value);
+              } else if (id === "coding_labor_normalization") {
                 // In precise mode, numeric input is actual value; otherwise transform from log slider value
                 if (!usePreciseInputs) value = Math.pow(10, value);
               } else if (
@@ -2563,8 +2599,11 @@
                 if (element.length) {
                   let value = response.parameters[key];
 
-                  // Only convert cognitive output normalization to log scale for display
-                  if (key === "coding_labor_normalization") {
+                  // Only convert certain parameters to log scale for display
+                  if (key === "top_percentile") {
+                    // Convert to negated log scale on (1 - percentile) for display
+                    value = -Math.log10(Math.max(1.0 - value, 1e-6));
+                  } else if (key === "coding_labor_normalization") {
                     // Convert to log scale for display
                     value = Math.log10(Math.max(value, 1e-5));
                   }
@@ -2967,7 +3006,14 @@
                 const [min, max] = bounds;
 
                 // Special handling for certain parameters
-                if (paramName === "coding_labor_normalization") {
+                if (paramName === "top_percentile") {
+                  // This slider uses log scale on (1 - percentile), so convert bounds and default
+                  // Note: We negate the log scale so higher percentiles are on the right
+                  slider.min = -Math.log10(1.0 - min); // More negative for lower percentiles
+                  slider.max = -Math.log10(Math.max(1.0 - max, 1e-6)); // Less negative for higher percentiles
+                  slider.value = -Math.log10(Math.max(1.0 - defaultValue, 1e-6));
+                  console.log("top_percentile slider init:", {min: slider.min, max: slider.max, value: slider.value, defaultValue: defaultValue});
+                } else if (paramName === "coding_labor_normalization") {
                   // This slider uses log scale, so convert bounds and default
                   slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
                   slider.max = Math.log10(max);
@@ -3298,7 +3344,10 @@
 
         // Special handling for values that are log-scaled in slider mode
         if (!usePreciseInputs) {
-          if (key === "coding_labor_normalization") {
+          if (key === "top_percentile") {
+            // Convert from actual percentile to negated log scale on (1 - percentile)
+            newValue = -Math.log10(Math.max(1.0 - value, 1e-6));
+          } else if (key === "coding_labor_normalization") {
             newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
           } else if (
             key === "sc_time_horizon_minutes" ||
@@ -3321,7 +3370,10 @@
 
           // Apply log scale conversion to bounds for slider mode only
           if (!usePreciseInputs) {
-            if (key === "coding_labor_normalization") {
+            if (key === "top_percentile") {
+              minVal = -Math.log10(1.0 - bounds[0]);
+              maxVal = -Math.log10(Math.max(1.0 - bounds[1], 1e-6));
+            } else if (key === "coding_labor_normalization") {
               minVal = Math.log10(Math.max(bounds[0], 1e-5));
               maxVal = Math.log10(bounds[1]);
             } else if (
