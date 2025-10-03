@@ -46,8 +46,8 @@ DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per progress-year"
 
 # Default AI research taste slope values for different modes
 TASTE_SLOPE_DEFAULTS = {
-    "SDs per effective OOM": 1.18,
-    "SDs per progress-year": 1.8
+    "SDs per effective OOM": 1.76,
+    "SDs per progress-year": 2.5
 }
 
 # Horizon Extrapolation Configuration
