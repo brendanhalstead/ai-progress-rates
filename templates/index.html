@@ -44,6 +44,14 @@
                 >
                 <button
                   class="btn btn-outline-light me-2"
+                  id="toggleThemeBtn"
+                  title="Toggle theme"
+                  onclick="toggleTheme()"
+                >
+                  <i class="fas fa-moon"></i>
+                </button>
+                <button
+                  class="btn btn-outline-light me-2"
                   onclick="exportResults()"
                 >
                   Export CSV
@@ -851,14 +859,6 @@
                         <small class="text-muted"
                           >Ratio of top percentile researcher taste to median researcher taste</small
                         >
-                        <div class="mt-1">
-                          <small class="text-muted"
-                            >Top percentile: <span id="top_taste_percentile_val">—</span>
-                            (<span id="top_taste_num_sds_val">—</span> SDs),
-                            f: <span id="f_multiplier_per_sd_val">—</span>,
-                            s·log₁₀(f): <span id="slope_times_log_f_val">—</span> OOMs of taste / OOM of effective compute</small
-                          >
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -901,13 +901,6 @@
                       <small class="text-muted" id="software_progress_rate_at_reference_year_range"
                         >Loading range...</small
                       >
-                      <div class="mt-1">
-                        <small class="text-muted"
-                          >Calibrated r:
-                          <span id="r_software_val">—</span>, β:
-                          <span id="beta_software_val">—</span> OOMs of research stock / OOM of software efficiency</small
-                        >
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1033,7 +1026,7 @@
                   >
                     <option value="default">OpenBrain, no pause</option>
                     <option value="updated_default">
-                      [software-only] OpenBrain, no pause
+                      [updated?] OpenBrain, no pause
                     </option>
                     <option value="truncated_default">
                       [truncated] OpenBrain, no pause
@@ -1178,6 +1171,105 @@
     </div>
 
     <script>
+      // Theme handling
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("theme", theme);
+        const icon = document.querySelector("#toggleThemeBtn i");
+        if (icon) {
+          icon.className = theme === "dark" ? "fas fa-sun" : "fas fa-moon";
+        }
+        // Update Plotly background/foreground to match theme
+        try {
+          const isDark = theme === "dark";
+          const bg = isDark ? "#0f172a" : "white";
+          const fg = isDark ? "#e5e7eb" : "#2b2d42";
+          const hoverBg = isDark ? "#111827" : "white";
+          const hoverBorder = isDark ? "#334155" : "#e0e0e0";
+          // Update all visible plots
+          if (window.plotIds && window.plotData) {
+            Object.keys(window.plotIds).forEach((key) => {
+              if (key.endsWith("_created")) return;
+              const pid = window.plotIds[key];
+              if (!pid) return;
+              const plotEl = document.getElementById(pid);
+              if (!plotEl || !plotEl._fullLayout) return; // Skip if plot not fully initialized
+              // Get current layout to preserve axis settings that were applied after initial creation
+              const currentLayout = plotEl.layout || {};
+              const layout = {
+                paper_bgcolor: bg,
+                plot_bgcolor: bg,
+                font: { ...(currentLayout.font || {}), color: fg },
+                title: {
+                  ...(currentLayout.title || {}),
+                  font: { ...(currentLayout.title?.font || {}), color: fg },
+                },
+                hoverlabel: {
+                  ...(currentLayout.hoverlabel || {}),
+                  bgcolor: hoverBg,
+                  bordercolor: hoverBorder,
+                  font: {
+                    ...(currentLayout.hoverlabel?.font || {}),
+                    color: fg,
+                  },
+                },
+              };
+              if (Array.isArray(currentLayout.annotations)) {
+                layout.annotations = currentLayout.annotations.map((a) => ({
+                  ...a,
+                  font: { ...(a.font || {}), color: fg },
+                }));
+              }
+              // Only update theme-related properties, preserve axis ranges and other settings
+              Plotly.relayout(plotEl, layout);
+            });
+          } else {
+            // Single plot mode fallback
+            const el = document.getElementById("plotDiv");
+            if (el && el._fullLayout) {
+              // Skip if plot not fully initialized
+              // Get current layout to preserve axis settings
+              const currentLayout = el.layout || {};
+              const ly = {
+                paper_bgcolor: bg,
+                plot_bgcolor: bg,
+                font: { ...(currentLayout.font || {}), color: fg },
+                title: {
+                  ...(currentLayout.title || {}),
+                  font: { ...(currentLayout.title?.font || {}), color: fg },
+                },
+                hoverlabel: {
+                  ...(currentLayout.hoverlabel || {}),
+                  bgcolor: hoverBg,
+                  bordercolor: hoverBorder,
+                  font: {
+                    ...(currentLayout.hoverlabel?.font || {}),
+                    color: fg,
+                  },
+                },
+              };
+              if (Array.isArray(currentLayout.annotations)) {
+                ly.annotations = currentLayout.annotations.map((a) => ({
+                  ...a,
+                  font: { ...(a.font || {}), color: fg },
+                }));
+              }
+              // Only update theme-related properties, preserve axis ranges and other settings
+              Plotly.relayout(el, ly);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to apply theme to Plotly", e);
+        }
+      }
+      function toggleTheme() {
+        const current = localStorage.getItem("theme") || "light";
+        setTheme(current === "light" ? "dark" : "light");
+      }
+      (function initTheme() {
+        const saved = localStorage.getItem("theme");
+        if (saved) setTheme(saved);
+      })();
       // Global parameter configuration from server
       let parameterConfig = null;
       // Global precise input mode toggle
@@ -2148,27 +2240,31 @@
                   plotLayout.height = undefined; // Let it use container dimensions
                 }
 
-                // Apply light theme styling
-                plotLayout.paper_bgcolor = "white";
-                plotLayout.plot_bgcolor = "white";
+                // Apply theme-aware backgrounds without overriding axis settings
+                const theme =
+                  document.documentElement.getAttribute("data-theme") ||
+                  "light";
+                const isDark = theme === "dark";
+                plotLayout.paper_bgcolor = isDark ? "#0f172a" : "white";
+                plotLayout.plot_bgcolor = isDark ? "#0f172a" : "white";
                 plotLayout.font = {
                   ...(plotLayout.font || {}),
-                  color: "#2b2d42",
+                  color: isDark ? "#e5e7eb" : "#2b2d42",
                 };
                 plotLayout.title = {
                   ...(plotLayout.title || {}),
                   font: {
                     ...(plotLayout.title?.font || {}),
-                    color: "#2b2d42",
+                    color: isDark ? "#e5e7eb" : "#2b2d42",
                   },
                 };
                 plotLayout.hoverlabel = {
                   ...(plotLayout.hoverlabel || {}),
-                  bgcolor: "white",
-                  bordercolor: "#e0e0e0",
+                  bgcolor: isDark ? "#111827" : "white",
+                  bordercolor: isDark ? "#334155" : "#e0e0e0",
                   font: {
                     ...(plotLayout.hoverlabel?.font || {}),
-                    color: "#2b2d42",
+                    color: isDark ? "#e5e7eb" : "#2b2d42",
                   },
                 };
                 Plotly.newPlot(plotId, plots[tab.id].data, plotLayout, {
@@ -2320,27 +2416,30 @@
                         plotLayout.height = undefined; // Let it use container dimensions
                       }
 
-                      // Apply light theme styling
-                      plotLayout.paper_bgcolor = "white";
-                      plotLayout.plot_bgcolor = "white";
+                      const theme2 =
+                        document.documentElement.getAttribute("data-theme") ||
+                        "light";
+                      const isDark2 = theme2 === "dark";
+                      plotLayout.paper_bgcolor = isDark2 ? "#0f172a" : "white";
+                      plotLayout.plot_bgcolor = isDark2 ? "#0f172a" : "white";
                       plotLayout.font = {
                         ...(plotLayout.font || {}),
-                        color: "#2b2d42",
+                        color: isDark2 ? "#e5e7eb" : "#2b2d42",
                       };
                       plotLayout.title = {
                         ...(plotLayout.title || {}),
                         font: {
                           ...(plotLayout.title?.font || {}),
-                          color: "#2b2d42",
+                          color: isDark2 ? "#e5e7eb" : "#2b2d42",
                         },
                       };
                       plotLayout.hoverlabel = {
                         ...(plotLayout.hoverlabel || {}),
-                        bgcolor: "white",
-                        bordercolor: "#e0e0e0",
+                        bgcolor: isDark2 ? "#111827" : "white",
+                        bordercolor: isDark2 ? "#334155" : "#e0e0e0",
                         font: {
                           ...(plotLayout.hoverlabel?.font || {}),
-                          color: "#2b2d42",
+                          color: isDark2 ? "#e5e7eb" : "#2b2d42",
                         },
                       };
                       Plotly.newPlot(
@@ -2448,27 +2547,29 @@
               plotLayout.height = undefined; // Let it use container dimensions
             }
 
-            // Apply light theme styling
-            plotLayout.paper_bgcolor = "white";
-            plotLayout.plot_bgcolor = "white";
+            const theme =
+              document.documentElement.getAttribute("data-theme") || "light";
+            const isDark = theme === "dark";
+            plotLayout.paper_bgcolor = isDark ? "#0f172a" : "white";
+            plotLayout.plot_bgcolor = isDark ? "#0f172a" : "white";
             plotLayout.font = {
               ...(plotLayout.font || {}),
-              color: "#2b2d42",
+              color: isDark ? "#e5e7eb" : "#2b2d42",
             };
             plotLayout.title = {
               ...(plotLayout.title || {}),
               font: {
                 ...(plotLayout.title?.font || {}),
-                color: "#2b2d42",
+                color: isDark ? "#e5e7eb" : "#2b2d42",
               },
             };
             plotLayout.hoverlabel = {
               ...(plotLayout.hoverlabel || {}),
-              bgcolor: "white",
-              bordercolor: "#e0e0e0",
+              bgcolor: isDark ? "#111827" : "white",
+              bordercolor: isDark ? "#334155" : "#e0e0e0",
               font: {
                 ...(plotLayout.hoverlabel?.font || {}),
-                color: "#2b2d42",
+                color: isDark ? "#e5e7eb" : "#2b2d42",
               },
             };
             Plotly.newPlot("plotDiv", plotData.data, plotLayout, {
@@ -2494,27 +2595,29 @@
             plotLayout.height = undefined; // Let it use container dimensions
           }
 
-          // Apply light theme styling
-          plotLayout.paper_bgcolor = "white";
-          plotLayout.plot_bgcolor = "white";
+          const theme2 =
+            document.documentElement.getAttribute("data-theme") || "light";
+          const isDark2 = theme2 === "dark";
+          plotLayout.paper_bgcolor = isDark2 ? "#0f172a" : "white";
+          plotLayout.plot_bgcolor = isDark2 ? "#0f172a" : "white";
           plotLayout.font = {
             ...(plotLayout.font || {}),
-            color: "#2b2d42",
+            color: isDark2 ? "#e5e7eb" : "#2b2d42",
           };
           plotLayout.title = {
             ...(plotLayout.title || {}),
             font: {
               ...(plotLayout.title?.font || {}),
-              color: "#2b2d42",
+              color: isDark2 ? "#e5e7eb" : "#2b2d42",
             },
           };
           plotLayout.hoverlabel = {
             ...(plotLayout.hoverlabel || {}),
-            bgcolor: "white",
-            bordercolor: "#e0e0e0",
+            bgcolor: isDark2 ? "#111827" : "white",
+            bordercolor: isDark2 ? "#334155" : "#e0e0e0",
             font: {
               ...(plotLayout.hoverlabel?.font || {}),
-              color: "#2b2d42",
+              color: isDark2 ? "#e5e7eb" : "#2b2d42",
             },
           };
           Plotly.react("plotDiv", plotData.data, plotLayout, {
@@ -3736,45 +3839,6 @@
           $("#summary_anchor_progress_rate").text(
             summary.anchor_progress_rate != null
               ? fmt(summary.anchor_progress_rate, 3)
-              : "—"
-          );
-
-          // Calibrated r_software value
-          $("#r_software_val").text(
-            summary.r_software != null
-              ? fmt(summary.r_software, 4)
-              : "—"
-          );
-
-          // Beta (inverse of r_software)
-          $("#beta_software_val").text(
-            summary.beta_software != null
-              ? fmt(summary.beta_software, 4)
-              : "—"
-          );
-
-          // Top taste percentile metrics
-          $("#top_taste_percentile_val").text(
-            summary.top_taste_percentile != null
-              ? (summary.top_taste_percentile * 100).toFixed(1) + "%"
-              : "—"
-          );
-          
-          $("#top_taste_num_sds_val").text(
-            summary.top_taste_num_sds != null
-              ? fmt(summary.top_taste_num_sds, 2)
-              : "—"
-          );
-          
-          $("#f_multiplier_per_sd_val").text(
-            summary.f_multiplier_per_sd != null
-              ? fmt(summary.f_multiplier_per_sd, 3)
-              : "—"
-          );
-          
-          $("#slope_times_log_f_val").text(
-            summary.slope_times_log_f != null
-              ? fmt(summary.slope_times_log_f, 3)
               : "—"
           );
 
