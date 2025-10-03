@@ -214,7 +214,7 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
-    'sc_time_horizon_minutes': 124560000,
+    'sc_time_horizon_minutes': 6224000,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
@@ -234,7 +234,7 @@ DEFAULT_PARAMETERS = {
     # benchmarks and gaps mode
     'include_gap': 'no gap',
     'gap_years': 1.5,
-    'pre_gap_sc_time_horizon': 575500.0,
+    'pre_gap_sc_time_horizon': 124600.0,
     # penalty on parallel coding labor contribution in exp capacity
     'parallel_penalty': 0.52,
     # Research taste distribution parameter
