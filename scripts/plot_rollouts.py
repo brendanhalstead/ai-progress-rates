@@ -50,9 +50,18 @@ def _resolve_rollouts_path(run_dir: Optional[str], rollouts_path: Optional[str])
     return p
 
 
-def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int]:
+def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int, Optional[float]]:
+    """Read SC arrival times from rollouts.
+
+    Returns:
+        sc_times: list of SC arrival times (only for rollouts that achieved SC)
+        num_no_sc: count of rollouts where SC was not achieved
+        typical_sim_end: typical simulation end time (for display purposes), or None
+    """
     sc_times: List[float] = []
     num_no_sc: int = 0
+    sim_end_times: List[float] = []
+
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -65,8 +74,16 @@ def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int]:
             results = rec.get("results")
             if not isinstance(results, dict):
                 continue
+
+            # Track simulation end time
+            times_array = results.get("times")
+            if times_array is not None and len(times_array) > 0:
+                try:
+                    sim_end_times.append(float(times_array[-1]))
+                except Exception:
+                    pass
+
             sc_time = results.get("sc_time")
-            # Count rollouts with missing/non-finite sc_time as "No SC"
             try:
                 x = float(sc_time) if sc_time is not None else np.nan
             except (TypeError, ValueError):
@@ -75,7 +92,10 @@ def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int]:
                 sc_times.append(x)
             else:
                 num_no_sc += 1
-    return sc_times, num_no_sc
+
+    # Use median simulation end time for display
+    typical_sim_end = float(np.median(sim_end_times)) if sim_end_times else None
+    return sc_times, num_no_sc, typical_sim_end
 
 
 def _decimal_year_to_date_string(decimal_year: float) -> str:
@@ -431,9 +451,18 @@ def _list_milestone_names(rollouts_file: Path) -> List[str]:
     return sorted(names)
 
 
-def _read_milestone_times(rollouts_file: Path, milestone_name: str) -> Tuple[List[float], int]:
+def _read_milestone_times(rollouts_file: Path, milestone_name: str) -> Tuple[List[float], int, Optional[float]]:
+    """Read milestone arrival times from rollouts.
+
+    Returns:
+        times: list of arrival times (only for rollouts that achieved the milestone)
+        num_not_achieved: count of rollouts where milestone was not achieved
+        typical_sim_end: typical simulation end time (for display purposes), or None
+    """
     times: List[float] = []
     num_not_achieved: int = 0
+    sim_end_times: List[float] = []
+
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -449,6 +478,15 @@ def _read_milestone_times(rollouts_file: Path, milestone_name: str) -> Tuple[Lis
             milestones = results.get("milestones")
             if not isinstance(milestones, dict):
                 continue
+
+            # Track simulation end time
+            times_array = results.get("times")
+            if times_array is not None and len(times_array) > 0:
+                try:
+                    sim_end_times.append(float(times_array[-1]))
+                except Exception:
+                    pass
+
             info = milestones.get(milestone_name)
             if not isinstance(info, dict):
                 continue
@@ -461,7 +499,10 @@ def _read_milestone_times(rollouts_file: Path, milestone_name: str) -> Tuple[Lis
                 times.append(x)
             else:
                 num_not_achieved += 1
-    return times, num_not_achieved
+
+    # Use median simulation end time for display
+    typical_sim_end = float(np.median(sim_end_times)) if sim_end_times else None
+    return times, num_not_achieved, typical_sim_end
 
 
 def _parse_milestone_pairs(pairs_arg: Optional[str]) -> List[Tuple[str, str]]:
@@ -488,19 +529,23 @@ def _read_milestone_transition_durations(
     pairs: List[Tuple[str, str]],
     filter_milestone: Optional[str] = None,
     filter_by_year: Optional[float] = None,
-) -> Tuple[List[str], List[List[float]], List[int], int]:
+) -> Tuple[List[str], List[List[float]], List[int], List[int], List[int], Optional[float]]:
     """For each pair (A,B), compute finite durations B.time - A.time.
 
     Returns:
         labels: ["A to B", ...]
-        durations_per_pair: list of finite durations arrays (years)
-        num_not_achieved_per_pair: count of rollouts where duration is undefined or infinite
-        total_rollouts: number of rollout records processed
+        durations_per_pair: list of finite durations arrays (years, only where both achieved in order)
+        num_b_not_achieved_per_pair: count where A achieved but B not achieved
+        num_b_before_a_per_pair: count where both achieved but B came before A
+        total_a_achieved_per_pair: number of rollouts where A was achieved for each pair
+        typical_max_duration: typical maximum possible duration (sim_end - earliest A time)
     """
     labels: List[str] = [f"{a} to {b}" for a, b in pairs]
     durations_per_pair: List[List[float]] = [[] for _ in pairs]
-    num_not_achieved: List[int] = [0 for _ in pairs]
-    total = 0
+    num_b_not_achieved: List[int] = [0 for _ in pairs]
+    num_b_before_a: List[int] = [0 for _ in pairs]
+    total_a_achieved: List[int] = [0 for _ in pairs]
+    max_durations: List[float] = []
 
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -517,6 +562,17 @@ def _read_milestone_transition_durations(
             milestones = results.get("milestones")
             if not isinstance(milestones, dict):
                 continue
+
+            # Get simulation end time
+            times_array = results.get("times")
+            if times_array is not None and len(times_array) > 0:
+                try:
+                    simulation_end = float(times_array[-1])
+                except Exception:
+                    simulation_end = None
+            else:
+                simulation_end = None
+
             # Filter by milestone-by-year if requested
             if filter_milestone is not None and filter_by_year is not None:
                 m = milestones.get(filter_milestone)
@@ -530,8 +586,6 @@ def _read_milestone_transition_durations(
                         pass_filter = False
                 if not pass_filter:
                     continue
-
-            total += 1
 
             # Extract milestone times for this rollout once
             times_map: Dict[str, Optional[float]] = {}
@@ -551,17 +605,38 @@ def _read_milestone_transition_durations(
             for idx, (a, b) in enumerate(pairs):
                 ta = times_map.get(a)
                 tb = times_map.get(b)
-                if ta is None or tb is None:
-                    num_not_achieved[idx] += 1
+
+                if ta is None:
+                    # If first milestone not achieved, skip entirely (don't count)
                     continue
+
+                # Count this rollout for this pair (A was achieved)
+                total_a_achieved[idx] += 1
+
+                # Track max possible duration for this transition
+                if simulation_end is not None and simulation_end > ta:
+                    max_durations.append(float(simulation_end - ta))
+
+                if tb is None:
+                    # Second milestone not achieved
+                    num_b_not_achieved[idx] += 1
+                    continue
+
                 dur = float(tb - ta)
-                if not np.isfinite(dur) or dur <= 0.0:
-                    # Treat non-positive or non-finite as not achieved/undefined for this purpose
-                    num_not_achieved[idx] += 1
+                if not np.isfinite(dur):
+                    # Treat non-finite as B not achieved
+                    num_b_not_achieved[idx] += 1
                     continue
+
+                if dur <= 0.0:
+                    # B came before or at same time as A
+                    num_b_before_a[idx] += 1
+                    continue
+
                 durations_per_pair[idx].append(dur)
 
-    return labels, durations_per_pair, num_not_achieved, total
+    typical_max_duration = float(np.median(max_durations)) if max_durations else None
+    return labels, durations_per_pair, num_b_not_achieved, num_b_before_a, total_a_achieved, typical_max_duration
 
 
 def _read_milestone_scatter_data(
@@ -728,41 +803,36 @@ def _get_year_tick_values_and_labels(ymin: float, ymax: float) -> Tuple[List[flo
 def plot_milestone_transition_boxplot(
     labels: List[str],
     durations_per_pair: List[List[float]],
-    num_not_achieved_per_pair: List[int],
+    num_b_not_achieved_per_pair: List[int],
+    num_b_before_a_per_pair: List[int],
+    total_per_pair: List[int],
     out_path: Path,
     title: Optional[str] = None,
     ymin_years: Optional[float] = None,
     ymax_years: Optional[float] = None,
     exclude_inf_from_stats: bool = False,
-    inf_years_cap: float = 100.0,
+    inf_years_cap: Optional[float] = None,
+    inf_years_display: float = 100.0,
     condition_text: Optional[str] = None,
 ) -> None:
     if len(labels) == 0:
         raise ValueError("No milestone pairs provided")
-    if len(labels) != len(durations_per_pair) or len(labels) != len(num_not_achieved_per_pair):
+    if len(labels) != len(durations_per_pair) or len(labels) != len(num_b_not_achieved_per_pair) or len(labels) != len(num_b_before_a_per_pair):
         raise ValueError("Mismatched inputs for boxplot")
 
     # Prepare data groups. Finite groups are the true finite durations.
-    # plot_groups are what will be fed to the boxplot: include capped
-    # 'Not achieved' points unless excluded.
+    # Boxes only show achieved durations, issues shown as separate scatter points.
     finite_groups: List[np.ndarray] = []
-    plot_groups: List[np.ndarray] = []
     global_min = np.inf
     global_max = 0.0
-    for arr, ninf in zip(durations_per_pair, num_not_achieved_per_pair):
+    for arr in durations_per_pair:
         a = np.asarray(arr, dtype=float)
         if a.size:
             a = a[np.isfinite(a) & (a > 0)]
         finite_groups.append(a)
-        if exclude_inf_from_stats:
-            group = a
-        else:
-            extra = np.full(int(ninf), float(inf_years_cap)) if int(ninf) > 0 else np.asarray([], dtype=float)
-            group = np.concatenate([a, extra]) if a.size or extra.size else np.asarray([], dtype=float)
-        plot_groups.append(group)
-        if group.size:
-            global_min = min(global_min, float(group.min()))
-            global_max = max(global_max, float(group.max()))
+        if a.size:
+            global_min = min(global_min, float(a.min()))
+            global_max = max(global_max, float(a.max()))
 
     if not np.isfinite(global_min):
         raise ValueError("No finite durations found to plot")
@@ -770,16 +840,19 @@ def plot_milestone_transition_boxplot(
     # Axis limits
     ymin = float(ymin_years) if ymin_years is not None else 10 ** np.floor(np.log10(global_min)) / 10.0
     ymax_candidate = float(ymax_years) if ymax_years is not None else 10 ** np.ceil(np.log10(max(global_max, global_min * 10)))
-    # Ensure y-axis includes the cap for plotted 'Not achieved' points
-    ymax_candidate = max(ymax_candidate, float(inf_years_cap))
+    # Ensure y-axis includes the display point for 'Not achieved' points
+    ymax_candidate = max(ymax_candidate, float(inf_years_display))
     ymax = max(ymax_candidate, ymin * 10.0)
 
     plt.figure(figsize=(16, 8))
     ax = plt.gca()
 
-    # Boxplot
+    # Adjust plot area to leave room for stats panel on right
+    plt.subplots_adjust(right=0.68)
+
+    # Boxplot - only show achieved durations in the boxes
     bp = plt.boxplot(
-        plot_groups,
+        finite_groups,
         labels=labels,
         showfliers=True,
         patch_artist=True,
@@ -804,23 +877,6 @@ def plot_milestone_transition_boxplot(
 
     plt.title(title or "Time Spent in Each Milestone Transition (calendar years)")
 
-    # If excluded from stats/plot, we still show points at the cap as a visual cue
-    if exclude_inf_from_stats:
-        x_positions = np.arange(1, len(labels) + 1, dtype=float)
-        y_points: List[float] = []
-        x_points: List[float] = []
-        sizes: List[float] = []
-        for xi, ninf in zip(x_positions, num_not_achieved_per_pair):
-            if int(ninf) <= 0:
-                continue
-            count = int(ninf)
-            y_points.extend([float(inf_years_cap)] * count)
-            x_points.extend([float(xi)] * count)
-            sizes.extend([12.0] * count)
-        if x_points:
-            plt.scatter(x_points, y_points, s=sizes, color='black', alpha=0.5, zorder=3, label='Not achieved (capped)')
-            plt.legend(loc='upper left')
-
     # Stats panel
     x_text = 1.03
     y_text = 0.98
@@ -828,20 +884,33 @@ def plot_milestone_transition_boxplot(
     if condition_text:
         panel_lines.append(f"Condition: {condition_text}")
         panel_lines.append("")
-    for lbl, arr, ninf, grp in zip(labels, finite_groups, num_not_achieved_per_pair, plot_groups):
+
+    for lbl, arr, n_not_achieved, n_before, total_a in zip(labels, finite_groups, num_b_not_achieved_per_pair, num_b_before_a_per_pair, total_per_pair):
         panel_lines.append(lbl)
-        # Use the same data that feeds the boxplot for consistency
-        with_inf = arr if exclude_inf_from_stats else grp
-        if with_inf.size == 0:
-            panel_lines.append("  10th: n/a")
-            panel_lines.append("  50th: n/a")
-            panel_lines.append("  90th: n/a")
+        # Only use achieved data for stats
+        if arr.size == 0:
+            panel_lines.append("  (none achieved in order)")
             panel_lines.append("")
             continue
-        q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
+
+        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+
         panel_lines.append(f"  10th: {_format_years_value(float(q10))}")
         panel_lines.append(f"  50th: {_format_years_value(float(q50))}")
         panel_lines.append(f"  90th: {_format_years_value(float(q90))}")
+
+        # Show issue counts as percentages
+        pct_achieved = 100.0 * arr.size / total_a if total_a > 0 else 0.0
+        panel_lines.append(f"  ({pct_achieved:.1f}% achieved in order)")
+        if n_not_achieved > 0:
+            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+            pct_not_achieved = 100.0 * n_not_achieved / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"  ({pct_not_achieved:.1f}% {milestone_b} not achieved)")
+        if n_before > 0:
+            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+            milestone_a = lbl.split(" to ")[0] if " to " in lbl else "first"
+            pct_before = 100.0 * n_before / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"  ({pct_before:.1f}% {milestone_b} before {milestone_a})")
         panel_lines.append("")
 
     txt = "\n".join(panel_lines)
@@ -850,11 +919,18 @@ def plot_milestone_transition_boxplot(
     ax_inset.text(0.0, 1.0, txt, va='top', ha='left', fontsize=12, family='monospace', bbox=dict(facecolor=(1,1,1,0.7), edgecolor='0.7'))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.tight_layout()
     plt.savefig(out_path)
     plt.close()
 
-def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out_path: Path, bins: int = 50, title: Optional[str] = None, milestone_label: Optional[str] = None) -> None:
+def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out_path: Path, bins: int = 50, title: Optional[str] = None, milestone_label: Optional[str] = None, sim_end: Optional[float] = None) -> None:
+    """Plot histogram of milestone arrival times.
+
+    Args:
+        times: list of arrival times (only for rollouts that achieved the milestone)
+        num_not_achieved: count of rollouts where milestone was not achieved
+        milestone_label: name of the milestone for labeling
+        sim_end: typical simulation end time for labeling "not achieved" bar
+    """
     total_n = int(len(times) + max(0, num_not_achieved))
     if total_n == 0:
         raise ValueError("No rollouts found to plot")
@@ -882,51 +958,75 @@ def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out
             xs = np.linspace(data.min(), data.max(), 512)
             try:
                 kde = gaussian_kde(data)
-                kde_counts = kde(xs) * max(len(data), 1) * bin_width
+                kde_counts = kde(xs) * len(data) * bin_width
                 plt.plot(xs, kde_counts, color="tab:orange", linewidth=2.25, label="Gaussian KDE")
             except Exception:
                 kde_counts = np.asarray([], dtype=float)
 
-        # Place the Not Achieved bar just to the right of the last numeric bin
-        no_x = float(bin_edges[-1] + bin_width / 2.0)
+        # Place the Not Achieved bar at the simulation end time if available
+        if sim_end is not None:
+            no_x = float(sim_end)
+        else:
+            no_x = float(bin_edges[-1] + bin_width / 2.0)
     else:
-        # Only Not Achieved data: choose an arbitrary position for the single bar
-        no_x = 1.0
+        # Only Not Achieved data: use sim_end if available, else arbitrary position
+        if sim_end is not None:
+            no_x = float(sim_end)
+            bin_width = 1.0
+        else:
+            no_x = 1.0
+            bin_width = 1.0
+
+    # Calculate ymax for annotations
+    ymax_hist = float(np.max(counts) if counts.size else 0.0)
+    ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
+    ymax = max(ymax_hist, ymax_kde, float(num_not_achieved), 1.0)
 
     # Draw the Not Achieved bar if needed
+    sim_end_year = int(np.round(sim_end)) if sim_end is not None else None
     if num_not_achieved > 0:
-        ax.bar(no_x, num_not_achieved, width=bin_width, edgecolor="black", alpha=0.6, label="Not achieved")
-        left = float(bin_edges[0]) if len(data) > 0 else 0.0
-        right = float(no_x + bin_width)
+        ax.bar(no_x, num_not_achieved, width=bin_width, edgecolor="black", alpha=0.6, color="tab:red")
+        left = float(bin_edges[0]) if len(data) > 0 else (no_x - bin_width)
+        right = float(no_x + bin_width / 2.0)
+        ax.set_xlim(left, right)
+    elif len(data) > 0:
+        # No "not achieved" bar, but we have data - set xlim based on bins
+        left = float(bin_edges[0])
+        right = float(bin_edges[-1])
         ax.set_xlim(left, right)
 
-    # Percentiles and annotations (including Not Achieved as +inf)
+    # Percentiles and annotations (including not achieved as simulation end)
     if total_n > 0:
-        with_inf = data
-        if num_not_achieved > 0:
-            with_inf = np.concatenate([data, np.full(int(num_not_achieved), np.inf)])
-        q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
-        ymax_hist = float(np.max(counts) if counts.size else 0.0)
-        ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
-        ymax = max(ymax_hist, ymax_kde, float(num_not_achieved), 1.0)
         y_annot = ymax * 0.95
 
-        def _pos_and_label(qv: float) -> Tuple[float, str]:
-            if np.isfinite(qv):
+        # Create combined data including "not achieved" at simulation end
+        if num_not_achieved > 0 and sim_end is not None:
+            combined_data = np.concatenate([data, np.full(num_not_achieved, sim_end)])
+        else:
+            combined_data = data
+
+        if len(combined_data) > 0:
+            q10, q50, q90 = np.quantile(combined_data, [0.1, 0.5, 0.9])
+
+            # Determine position and label for each percentile
+            def _percentile_pos_label(qv: float) -> Tuple[float, str]:
+                # If percentile is at or beyond simulation end, it's "not achieved"
+                if sim_end is not None and qv >= sim_end - 0.01:  # small tolerance
+                    sim_end_year = int(np.round(sim_end))
+                    return float(no_x), f"Not achieved by {sim_end_year}"
                 return float(qv), _decimal_year_to_date_string(float(qv))
-            return float(no_x), "Not achieved"
 
-        x10, lbl10 = _pos_and_label(q10)
-        x50, lbl50 = _pos_and_label(q50)
-        x90, lbl90 = _pos_and_label(q90)
+            x10, lbl10 = _percentile_pos_label(q10)
+            x50, lbl50 = _percentile_pos_label(q50)
+            x90, lbl90 = _percentile_pos_label(q90)
 
-        plt.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
-        plt.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
-        plt.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+            plt.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+            plt.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+            plt.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
 
-        plt.text(x10, y_annot, f"P10: {lbl10}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
-        plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
-        plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x10, y_annot, f"P10: {lbl10}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
 
     plt.xlabel("Arrival Time (decimal year)")
     plt.ylabel("Count")
@@ -934,6 +1034,7 @@ def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out
     plt.title(ttl)
     plt.grid(True, axis="y", alpha=0.25)
     plt.legend(loc="upper left")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout()
     plt.savefig(out_path)
@@ -980,7 +1081,14 @@ def plot_horizon_at_sc_histogram(values: List[float], out_path: Path, bins: int 
     plt.close()
 
 
-def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path, bins: int = 50, title: Optional[str] = None) -> None:
+def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path, bins: int = 50, title: Optional[str] = None, sim_end: Optional[float] = None) -> None:
+    """Plot histogram of SC arrival times.
+
+    Args:
+        sc_times: list of SC arrival times (only for rollouts that achieved SC)
+        num_no_sc: count of rollouts where SC was not achieved
+        sim_end: typical simulation end time for labeling "not achieved" bar
+    """
     total_n = int(len(sc_times) + max(0, num_no_sc))
     if total_n == 0:
         raise ValueError("No rollouts found to plot")
@@ -1004,67 +1112,246 @@ def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path
             label="Histogram",
         )
         bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
-        # KDE overlay on finite data only
         if len(data) >= 2:
             xs = np.linspace(data.min(), data.max(), 512)
             try:
                 kde = gaussian_kde(data)
-                kde_counts = kde(xs) * max(len(data), 1) * bin_width
+                kde_counts = kde(xs) * len(data) * bin_width
                 plt.plot(xs, kde_counts, color="tab:orange", linewidth=2.25, label="Gaussian KDE")
             except Exception:
                 kde_counts = np.asarray([], dtype=float)
 
-        # Place the No SC bar just to the right of the last numeric bin
-        nosc_x = float(bin_edges[-1] + bin_width / 2.0)
+        # Place the No SC bar at the simulation end time if available
+        if sim_end is not None:
+            nosc_x = float(sim_end)
+        else:
+            nosc_x = float(bin_edges[-1] + bin_width / 2.0)
     else:
-        # Only No SC data: choose an arbitrary position for the single bar
-        nosc_x = 1.0
+        # Only No SC data: use sim_end if available, else arbitrary position
+        if sim_end is not None:
+            nosc_x = float(sim_end)
+            bin_width = 1.0
+        else:
+            nosc_x = 1.0
+            bin_width = 1.0
+
+    # Calculate ymax for annotations
+    ymax_hist = float(np.max(counts) if counts.size else 0.0)
+    ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
+    ymax = max(ymax_hist, ymax_kde, float(num_no_sc), 1.0)
 
     # Draw the No SC bar if needed
+    sim_end_year = int(np.round(sim_end)) if sim_end is not None else None
     if num_no_sc > 0:
-        ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, label="No SC")
-        # Ensure x-limits include the No SC bar, but keep default tick locator/formatter
-        left = float(bin_edges[0]) if len(data) > 0 else 0.0
-        right = float(nosc_x + bin_width)
+        ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, color="tab:red")
+        left = float(bin_edges[0]) if len(data) > 0 else (nosc_x - bin_width)
+        right = float(nosc_x + bin_width / 2.0)
+        ax.set_xlim(left, right)
+    elif len(data) > 0:
+        # No "no SC" bar, but we have data - set xlim based on bins
+        left = float(bin_edges[0])
+        right = float(bin_edges[-1])
         ax.set_xlim(left, right)
 
-    # Percentiles and annotations (including No SC as +inf)
+    # Percentiles and annotations (including not achieved as simulation end)
     if total_n > 0:
-        with_inf = data
-        if num_no_sc > 0:
-            with_inf = np.concatenate([data, np.full(int(num_no_sc), np.inf)])
-        q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
-        ymax_hist = float(np.max(counts) if counts.size else 0.0)
-        ymax_kde = float(np.max(kde_counts) if kde_counts.size else 0.0)
-        ymax = max(ymax_hist, ymax_kde, float(num_no_sc), 1.0)
         y_annot = ymax * 0.95
 
-        def _pos_and_label(qv: float) -> Tuple[float, str]:
-            if np.isfinite(qv):
+        # Create combined data including "not achieved" at simulation end
+        if num_no_sc > 0 and sim_end is not None:
+            combined_data = np.concatenate([data, np.full(num_no_sc, sim_end)])
+        else:
+            combined_data = data
+
+        if len(combined_data) > 0:
+            q10, q50, q90 = np.quantile(combined_data, [0.1, 0.5, 0.9])
+
+            # Determine position and label for each percentile
+            def _percentile_pos_label(qv: float) -> Tuple[float, str]:
+                # If percentile is at or beyond simulation end, it's "not achieved"
+                if sim_end is not None and qv >= sim_end - 0.01:  # small tolerance
+                    sim_end_year = int(np.round(sim_end))
+                    return float(nosc_x), f"Not achieved by {sim_end_year}"
                 return float(qv), _decimal_year_to_date_string(float(qv))
-            return float(nosc_x), "No SC"
 
-        x10, lbl10 = _pos_and_label(q10)
-        x50, lbl50 = _pos_and_label(q50)
-        x90, lbl90 = _pos_and_label(q90)
+            x10, lbl10 = _percentile_pos_label(q10)
+            x50, lbl50 = _percentile_pos_label(q50)
+            x90, lbl90 = _percentile_pos_label(q90)
 
-        plt.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
-        plt.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
-        plt.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+            plt.axvline(x10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+            plt.axvline(x50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+            plt.axvline(x90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
 
-        plt.text(x10, y_annot, f"P10: {lbl10}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
-        plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
-        plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x10, y_annot, f"P10: {lbl10}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
+            plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
 
     plt.xlabel("SC Time (decimal year)")
     plt.ylabel("Count")
     plt.title(title or "Distribution of SC Times")
     plt.grid(True, axis="y", alpha=0.25)
     plt.legend(loc="upper left")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout()
     plt.savefig(out_path)
     plt.close()
+
+
+def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str], out_path: Path, title: Optional[str] = None) -> None:
+    """Plot overlaid PDFs for multiple milestones."""
+    plt.figure(figsize=(12, 7))
+
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray']
+
+    global_min = np.inf
+    global_max = -np.inf
+
+    stats_lines = []
+
+    for idx, milestone_name in enumerate(milestone_names):
+        times, num_not_achieved, sim_end = _read_milestone_times(rollouts_file, milestone_name)
+
+        if len(times) < 2:
+            print(f"Warning: Not enough data for {milestone_name} to create KDE, skipping")
+            continue
+
+        data = np.asarray(times, dtype=float)
+        global_min = min(global_min, float(data.min()))
+        global_max = max(global_max, float(data.max()))
+
+        # Calculate percentiles (including not achieved as sim_end)
+        if num_not_achieved > 0 and sim_end is not None:
+            combined_data = np.concatenate([data, np.full(num_not_achieved, sim_end)])
+        else:
+            combined_data = data
+
+        q10, q50 = np.quantile(combined_data, [0.1, 0.5])
+
+        # Create KDE
+        try:
+            kde = gaussian_kde(data)
+            xs = np.linspace(data.min(), data.max(), 512)
+            # Normalize to get PDF (divide by total count to get density that integrates to 1)
+            pdf_values = kde(xs)
+
+            color = colors[idx % len(colors)]
+            plt.plot(xs, pdf_values, linewidth=2.5, label=milestone_name, color=color)
+
+            # Store stats for display
+            stats_lines.append(f"{milestone_name}: P10={q10:.1f}, P50={q50:.1f}")
+        except Exception as e:
+            print(f"Warning: Could not create KDE for {milestone_name}: {e}")
+            continue
+
+    plt.xlabel("Arrival Time (decimal year)")
+    plt.ylabel("Probability Density")
+    plt.title(title or "Milestone Arrival Time Distributions")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc='upper left')
+
+    # Add statistics text in top right
+    stats_text = "\n".join(stats_lines)
+    plt.text(0.98, 0.98, stats_text,
+             transform=plt.gca().transAxes, fontsize=10,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(facecolor='white', alpha=0.9, edgecolor='gray'),
+             family='monospace')
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
+    """Generate all standard plots for a batch rollout.
+
+    Creates:
+    - Milestone time histograms for key milestones
+    - Milestone transition boxplot for key transitions
+    - Overlaid PDF plot showing arrival distributions for key milestones
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Milestone time histograms
+    milestones = [
+        "ACD-AI",
+        "5x-AIR",
+        "AI2027-SC",
+        "(Expensive, threshold only considers taste) SAR",
+        "25x-AIR",
+        "(Expensive, threshold only considers taste) SIAR",
+        "250x-AIR"
+    ]
+
+    for milestone in milestones:
+        # Create safe filename from milestone name
+        safe_name = milestone.replace("(Expensive, threshold only considers taste) ", "").replace("-", "_").replace("x", "x")
+        out_path = output_dir / f"milestone_time_hist_{safe_name}.png"
+
+        times, num_not_achieved, sim_end = _read_milestone_times(rollouts_file, milestone)
+
+        if not times and num_not_achieved == 0:
+            print(f"Warning: No data found for milestone '{milestone}', skipping histogram")
+            continue
+
+        plot_milestone_time_histogram(
+            times,
+            num_not_achieved,
+            out_path,
+            bins=50,
+            title=f"Distribution of {milestone} Times",
+            sim_end=sim_end
+        )
+        print(f"Saved {out_path}")
+
+    # Milestone transition boxplot
+    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:25x-AIR,25x-AIR:250x-AIR"
+    pairs = _parse_milestone_pairs(pairs_str)
+    out_path = output_dir / "milestone_transition_box.png"
+
+    labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
+        rollouts_file,
+        pairs,
+        filter_milestone=None,
+        filter_by_year=None
+    )
+
+    if labels:
+        plot_milestone_transition_boxplot(
+            labels,
+            durations,
+            num_b_not_achieved,
+            num_b_before_a,
+            total_per_pair,
+            out_path,
+            ymin_years=None,
+            ymax_years=None,
+            exclude_inf_from_stats=False,
+            inf_years_cap=typical_max,
+            inf_years_display=100.0,
+            title="Milestone Transition Durations"
+        )
+        print(f"Saved {out_path}")
+    else:
+        print("Warning: No transition data found, skipping boxplot")
+
+    # Overlaid PDF plot for key milestones
+    overlay_milestones = [
+        "ACD-AI",
+        "AI2027-SC",
+        "25x-AIR",
+        "250x-AIR"
+    ]
+    out_path = output_dir / "milestone_pdfs_overlay.png"
+    plot_milestone_pdfs_overlay(
+        rollouts_file,
+        overlay_milestones,
+        out_path,
+        title="Milestone Arrival Time Distributions"
+    )
+    print(f"Saved {out_path}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1074,6 +1361,7 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--rollouts", type=str, default=None, help="Path directly to a rollouts.jsonl file")
     parser.add_argument("--out", type=str, default=None, help="Output image path (PNG). Defaults vary by --mode")
     parser.add_argument("--mode", type=str, choices=["sc_hist", "horizon_trajectories", "horizon_at_sc_hist", "milestone_time_hist", "milestone_transition_box", "milestone_scatter"], default="sc_hist", help="Which plot to generate")
+    parser.add_argument("--batch-all", action="store_true", help="Generate all standard plots (ignores --mode and --out)")
     # Histogram options
     parser.add_argument("--bins", type=int, default=50, help="Number of histogram bins for sc_hist mode")
     # Milestone options
@@ -1107,6 +1395,14 @@ def main() -> None:
     rollouts_path = _resolve_rollouts_path(args.run_dir, args.rollouts)
 
     default_dir = rollouts_path.parent
+
+    # Handle batch-all mode
+    if args.batch_all:
+        print(f"Generating all standard plots from {rollouts_path}")
+        batch_plot_all(rollouts_path, default_dir)
+        print("Batch plotting complete.")
+        return
+
     if args.out is not None:
         out_path = Path(args.out)
     else:
@@ -1127,7 +1423,7 @@ def main() -> None:
                 out_path = default_dir / ("horizon_trajectories_stop_at_sc.png" if args.stop_at_sc else "horizon_trajectories.png")
 
     if args.mode == "sc_hist":
-        sc_times, num_no_sc = _read_sc_times(rollouts_path)
+        sc_times, num_no_sc, sim_end = _read_sc_times(rollouts_path)
         if (len(sc_times) + num_no_sc) > 0 and len(sc_times) > 0:
             arr = np.asarray(sc_times, dtype=float)
             print(f"Loaded {len(arr)} finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
@@ -1139,7 +1435,7 @@ def main() -> None:
             print(f"P10/Median/P90 (incl. No SC): {_fmt_q(q10)} / {_fmt_q(q50)} / {_fmt_q(q90)}")
         elif (len(sc_times) + num_no_sc) > 0:
             print(f"Loaded 0 finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
-        plot_sc_time_histogram(sc_times, num_no_sc=num_no_sc, out_path=out_path, bins=int(args.bins))
+        plot_sc_time_histogram(sc_times, num_no_sc=num_no_sc, out_path=out_path, bins=int(args.bins), sim_end=sim_end)
         print(f"Saved histogram to: {out_path}")
         return
 
@@ -1166,7 +1462,7 @@ def main() -> None:
             return
         if not args.milestone:
             raise ValueError("--milestone is required for milestone_time_hist mode (use --list-milestones to inspect names)")
-        times, num_na = _read_milestone_times(rollouts_path, args.milestone)
+        times, num_na, sim_end = _read_milestone_times(rollouts_path, args.milestone)
         if (len(times) + num_na) > 0 and len(times) > 0:
             arr = np.asarray(times, dtype=float)
             print(f"Loaded {len(arr)} finite '{args.milestone}' arrival times (+{num_na} Not achieved) from {rollouts_path}")
@@ -1178,7 +1474,7 @@ def main() -> None:
             print(f"P10/Median/P90 (incl. Not achieved): {_fmt_q(q10)} / {_fmt_q(q50)} / {_fmt_q(q90)}")
         elif (len(times) + num_na) > 0:
             print(f"Loaded 0 finite '{args.milestone}' arrival times (+{num_na} Not achieved) from {rollouts_path}")
-        plot_milestone_time_histogram(times, num_not_achieved=num_na, out_path=out_path, bins=int(args.bins), milestone_label=args.milestone)
+        plot_milestone_time_histogram(times, num_not_achieved=num_na, out_path=out_path, bins=int(args.bins), milestone_label=args.milestone, sim_end=sim_end)
         print(f"Saved histogram to: {out_path}")
         return
 
@@ -1195,30 +1491,37 @@ def main() -> None:
         pairs = _parse_milestone_pairs(args.pairs)
         if not pairs:
             raise ValueError("--pairs is required for milestone_transition_box mode (use --list-milestones to inspect names)")
-        labels, durations, num_na_per_pair, total = _read_milestone_transition_durations(
+        labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
             rollouts_path,
             pairs,
             filter_milestone=(args.filter_milestone if args.filter_milestone else None),
             filter_by_year=(float(args.filter_by_year) if args.filter_by_year is not None else None),
         )
-        print(f"Processed {total} rollouts from {rollouts_path}")
-        for lbl, arr, ninf in zip(labels, durations, num_na_per_pair):
+        for lbl, arr, n_not_achieved, n_before, total_a in zip(labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair):
             arr_np = np.asarray(arr, dtype=float)
             if arr_np.size:
                 q10, q50, q90 = np.quantile(arr_np, [0.1, 0.5, 0.9])
-                print(f"{lbl}: n={arr_np.size} finite, +{ninf} Not achieved | P10/Median/P90 (years): {q10:.3f} / {q50:.3f} / {q90:.3f}")
+                print(f"{lbl}: n={arr_np.size} achieved in order | P10/Median/P90 (years): {q10:.3f} / {q50:.3f} / {q90:.3f}")
+                if n_not_achieved > 0:
+                    milestone_b = lbl.split(" to ")[1] if " to " in lbl else "B"
+                    print(f"  +{n_not_achieved}/{total_a} {milestone_b} not achieved")
+                if n_before > 0:
+                    print(f"  +{n_before}/{total_a} out of order")
             else:
-                print(f"{lbl}: n=0 finite, +{ninf} Not achieved")
+                print(f"{lbl}: n=0 achieved in order (total where A achieved: {total_a})")
         plot_milestone_transition_boxplot(
             labels,
             durations,
-            num_na_per_pair,
+            num_b_not_achieved,
+            num_b_before_a,
+            total_per_pair,
             out_path=out_path,
             title=None,
             ymin_years=(float(args.ymin_years) if args.ymin_years is not None else None),
             ymax_years=(float(args.ymax_years) if args.ymax_years is not None else None),
             exclude_inf_from_stats=bool(args.exclude_inf_from_stats),
-            inf_years_cap=float(args.inf_years),
+            inf_years_cap=typical_max,
+            inf_years_display=float(args.inf_years),
             condition_text=(f"{args.filter_milestone} achieved by {args.filter_by_year}" if args.filter_milestone and args.filter_by_year is not None else None),
         )
         print(f"Saved transition boxplot to: {out_path}")
