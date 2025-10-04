@@ -1,6 +1,0 @@
----
-description:
-globs:
-alwaysApply: true
----
-Always be sure that the Python virtual environment located at ./venv is activated when running Python scripts.
