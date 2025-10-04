@@ -715,7 +715,18 @@ def main() -> None:
         except Exception as e:
             print(f"    WARNING: plot_rollouts (horizon_trajectories) failed: {e}")
 
-        # 3. Sensitivity analysis
+        # 3. Batch plot all milestone histograms and transitions
+        try:
+            print("  - Generating batch plots (milestone histograms and transitions)...")
+            subprocess.run(
+                [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--batch-all"],
+                cwd=str(REPO_ROOT),
+                check=True
+            )
+        except Exception as e:
+            print(f"    WARNING: batch plot_rollouts failed: {e}")
+
+        # 4. Sensitivity analysis
         try:
             print("  - Running sensitivity analysis...")
             subprocess.run(
@@ -726,7 +737,7 @@ def main() -> None:
         except Exception as e:
             print(f"    WARNING: sensitivity_analysis failed: {e}")
 
-        # 4. SC by quarter table
+        # 5. SC by quarter table
         try:
             print("  - Generating SC-by-quarter table...")
             subprocess.run(
