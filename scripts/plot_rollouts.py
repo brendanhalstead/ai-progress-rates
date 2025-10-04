@@ -901,7 +901,7 @@ def plot_milestone_transition_boxplot(
         plt.scatter(x_before, y_before, s=12.0, color='orange', alpha=0.4, zorder=3, label='Second before first', marker='s')
         legend_added = True
     if legend_added:
-        plt.legend(loc='upper left')
+        plt.legend(loc='lower left')
 
     # Stats panel
     x_text = 1.03
@@ -925,15 +925,18 @@ def plot_milestone_transition_boxplot(
         panel_lines.append(f"  50th: {_format_years_value(float(q50))}")
         panel_lines.append(f"  90th: {_format_years_value(float(q90))}")
 
-        # Show issue counts if any
-        panel_lines.append(f"  ({arr.size}/{total_a} achieved in order)")
+        # Show issue counts as percentages
+        pct_achieved = 100.0 * arr.size / total_a if total_a > 0 else 0.0
+        panel_lines.append(f"  ({pct_achieved:.1f}% achieved in order)")
         if n_not_achieved > 0:
             milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
-            panel_lines.append(f"  ({n_not_achieved}/{total_a} {milestone_b} not achieved)")
+            pct_not_achieved = 100.0 * n_not_achieved / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"  ({pct_not_achieved:.1f}% {milestone_b} not achieved)")
         if n_before > 0:
             milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
             milestone_a = lbl.split(" to ")[0] if " to " in lbl else "first"
-            panel_lines.append(f"  ({n_before}/{total_a} {milestone_b} before {milestone_a})")
+            pct_before = 100.0 * n_before / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"  ({pct_before:.1f}% {milestone_b} before {milestone_a})")
         panel_lines.append("")
 
     txt = "\n".join(panel_lines)
