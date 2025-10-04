@@ -847,6 +847,9 @@ def plot_milestone_transition_boxplot(
     plt.figure(figsize=(16, 8))
     ax = plt.gca()
 
+    # Adjust plot area to leave room for stats panel on right
+    plt.subplots_adjust(right=0.68)
+
     # Boxplot - only show achieved durations in the boxes
     bp = plt.boxplot(
         finite_groups,
@@ -873,35 +876,6 @@ def plot_milestone_transition_boxplot(
     plt.grid(True, which="both", axis="y", alpha=0.25)
 
     plt.title(title or "Time Spent in Each Milestone Transition (calendar years)")
-
-    # Show issue points as scatter at the display cap
-    x_positions = np.arange(1, len(labels) + 1, dtype=float)
-
-    # Red points for "B not achieved"
-    y_not_achieved: List[float] = []
-    x_not_achieved: List[float] = []
-    for xi, n_not_achieved in zip(x_positions, num_b_not_achieved_per_pair):
-        if int(n_not_achieved) > 0:
-            y_not_achieved.extend([float(inf_years_display)] * int(n_not_achieved))
-            x_not_achieved.extend([float(xi)] * int(n_not_achieved))
-
-    # Orange points for "B before A"
-    y_before: List[float] = []
-    x_before: List[float] = []
-    for xi, n_before in zip(x_positions, num_b_before_a_per_pair):
-        if int(n_before) > 0:
-            y_before.extend([float(inf_years_display) * 0.85] * int(n_before))  # Slightly lower
-            x_before.extend([float(xi)] * int(n_before))
-
-    legend_added = False
-    if x_not_achieved:
-        plt.scatter(x_not_achieved, y_not_achieved, s=12.0, color='red', alpha=0.4, zorder=3, label='Second milestone not achieved', marker='x')
-        legend_added = True
-    if x_before:
-        plt.scatter(x_before, y_before, s=12.0, color='orange', alpha=0.4, zorder=3, label='Second before first', marker='s')
-        legend_added = True
-    if legend_added:
-        plt.legend(loc='lower left')
 
     # Stats panel
     x_text = 1.03
@@ -945,7 +919,6 @@ def plot_milestone_transition_boxplot(
     ax_inset.text(0.0, 1.0, txt, va='top', ha='left', fontsize=12, family='monospace', bbox=dict(facecolor=(1,1,1,0.7), edgecolor='0.7'))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.tight_layout()
     plt.savefig(out_path)
     plt.close()
 
@@ -1225,12 +1198,79 @@ def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path
     plt.close()
 
 
+def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str], out_path: Path, title: Optional[str] = None) -> None:
+    """Plot overlaid PDFs for multiple milestones."""
+    plt.figure(figsize=(12, 7))
+
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray']
+
+    global_min = np.inf
+    global_max = -np.inf
+
+    stats_lines = []
+
+    for idx, milestone_name in enumerate(milestone_names):
+        times, num_not_achieved, sim_end = _read_milestone_times(rollouts_file, milestone_name)
+
+        if len(times) < 2:
+            print(f"Warning: Not enough data for {milestone_name} to create KDE, skipping")
+            continue
+
+        data = np.asarray(times, dtype=float)
+        global_min = min(global_min, float(data.min()))
+        global_max = max(global_max, float(data.max()))
+
+        # Calculate percentiles (including not achieved as sim_end)
+        if num_not_achieved > 0 and sim_end is not None:
+            combined_data = np.concatenate([data, np.full(num_not_achieved, sim_end)])
+        else:
+            combined_data = data
+
+        q10, q50 = np.quantile(combined_data, [0.1, 0.5])
+
+        # Create KDE
+        try:
+            kde = gaussian_kde(data)
+            xs = np.linspace(data.min(), data.max(), 512)
+            # Normalize to get PDF (divide by total count to get density that integrates to 1)
+            pdf_values = kde(xs)
+
+            color = colors[idx % len(colors)]
+            plt.plot(xs, pdf_values, linewidth=2.5, label=milestone_name, color=color)
+
+            # Store stats for display
+            stats_lines.append(f"{milestone_name}: P10={q10:.1f}, P50={q50:.1f}")
+        except Exception as e:
+            print(f"Warning: Could not create KDE for {milestone_name}: {e}")
+            continue
+
+    plt.xlabel("Arrival Time (decimal year)")
+    plt.ylabel("Probability Density")
+    plt.title(title or "Milestone Arrival Time Distributions")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc='upper left')
+
+    # Add statistics text in top right
+    stats_text = "\n".join(stats_lines)
+    plt.text(0.98, 0.98, stats_text,
+             transform=plt.gca().transAxes, fontsize=10,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(facecolor='white', alpha=0.9, edgecolor='gray'),
+             family='monospace')
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
 def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     """Generate all standard plots for a batch rollout.
 
     Creates:
     - Milestone time histograms for key milestones
     - Milestone transition boxplot for key transitions
+    - Overlaid PDF plot showing arrival distributions for key milestones
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1296,6 +1336,22 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
     else:
         print("Warning: No transition data found, skipping boxplot")
+
+    # Overlaid PDF plot for key milestones
+    overlay_milestones = [
+        "ACD-AI",
+        "AI2027-SC",
+        "25x-AIR",
+        "250x-AIR"
+    ]
+    out_path = output_dir / "milestone_pdfs_overlay.png"
+    plot_milestone_pdfs_overlay(
+        rollouts_file,
+        overlay_milestones,
+        out_path,
+        title="Milestone Arrival Time Distributions"
+    )
+    print(f"Saved {out_path}")
 
 
 def parse_args() -> argparse.Namespace:
