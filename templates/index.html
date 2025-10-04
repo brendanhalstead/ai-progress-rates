@@ -1,0 +1,4148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Capabilities Model</title>
+
+    <!-- External Libraries -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+
+    <style>
+      /* Using external stylesheet at /static/styles.css */
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row">
+        <!-- Header -->
+        <div class="col-12">
+          <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+            <div class="container-fluid">
+              <span class="navbar-brand mb-0 h1">AI Capabilities Model</span>
+              <div class="navbar-nav ms-auto">
+                <a class="btn btn-outline-light me-2" href="/monte-carlo"
+                  >Monte Carlo</a
+                >
+                <button
+                  class="btn btn-outline-light me-2"
+                  onclick="exportResults()"
+                >
+                  Export CSV
+                </button>
+                <button
+                  class="btn btn-outline-light"
+                  onclick="exportMETRData()"
+                >
+                  Export Progress-Adjusted METR Data
+                </button>
+              </div>
+            </div>
+          </nav>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- Left Panel: Controls -->
+        <div class="col-lg-4 left-panel">
+          <div class="control-panel">
+            <!-- Summary Cards -->
+            <div class="row g-2 mb-3" id="milestonesTop">
+              <div class="col-12">
+                <h5>Capability Milestones</h5>
+                <div class="table-responsive">
+                  <table class="table table-sm table-striped align-middle">
+                    <thead>
+                      <tr>
+                        <th scope="col">Milestone</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">2022-FLOP</th>
+                        <th scope="col">PM</th>
+                      </tr>
+                    </thead>
+                    <tbody id="milestonesTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+            
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs mb-3" id="controlTabs">
+              <li class="nav-item">
+                <button
+                  class="nav-link active"
+                  id="params-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#params-panel"
+                >
+                  Parameters
+                </button>
+              </li>
+              <li class="nav-item">
+                <button
+                  class="nav-link"
+                  id="data-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#data-panel"
+                >
+                  Scenarios
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content">
+              <!-- Parameters Panel -->
+              <div class="tab-pane fade show active" id="params-panel">
+                <h5>Model Parameters</h5>
+                <div class="d-flex justify-content-end align-items-center mb-2">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="preciseInputMode"
+                    />
+                    <label
+                      class="form-check-label"
+                      for="preciseInputMode"
+                      title="Type exact values with high precision"
+                      >Precise input mode</label
+                    >
+                  </div>
+                </div>
+
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">Time Horizon Extrapolation</h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#timeHorizonParams"
+                      aria-expanded="false"
+                      aria-controls="timeHorizonParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="timeHorizonParams">
+                    <div class="mb-3">
+                      <div class="form-check form-switch mb-2">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="include_gap"
+                        />
+                        <label
+                          class="form-check-label"
+                          for="include_gap"
+                          >Include Gap</label
+                        >
+                      </div>
+                      <div
+                        class="mb-2"
+                        id="gap_years_group"
+                        style="display: none"
+                      >
+                        <label class="param-label"
+                          >Gap Size: <span id="gap_years_val">Loading...</span>
+                          <span id="gap_years_units"
+                            >anchor-progress-years</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="gap_years"
+                          step="0.1"
+                          min="0"
+                          max="10"
+                        />
+                        <small class="text-muted"
+                          >Additional gap after saturation horizon to reach ACD-AI,
+                          measured in
+                          <span id="gap_years_units_help"
+                            >anchor-progress-years</span
+                          >
+                          (≈ <span id="gap_years_converted_val">—</span> OOMs of
+                          effective compute)</small
+                        >
+                      </div>
+                      <div
+                        class="mb-3"
+                        id="pre_gap_sc_time_horizon_group"
+                        style="display: none"
+                      >
+                        <label class="param-label"
+                          >Pre-gap ACD-AI Time Horizon:
+                          <span id="pre_gap_sc_time_horizon_val"
+                            >Loading...</span
+                          >
+                          work months</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="pre_gap_sc_time_horizon"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >Task length beyond which the time horizon is no
+                          longer meaningful.</small
+                        >
+                      </div>
+                    </div>
+                    <div class="mb-3" id="sc_time_horizon_group">
+                      <label class="param-label"
+                        >80% Time Horizon at ACD-AI:
+                        <span id="sc_time_horizon_minutes_val">Loading...</span>
+                        work months</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="sc_time_horizon_minutes"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Time horizon corresponding to AI that can automate all coding tasks
+                        achievement</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Horizon Extrapolation Type:</label
+                      >
+                      <select
+                        class="form-select form-select-sm"
+                        id="horizon_extrapolation_type"
+                      >
+                        <option value="exponential">Exponential</option>
+                        <option value="decaying doubling time">
+                          Decaying Doubling Time
+                        </option>
+                      </select>
+                      <small class="text-muted"
+                        >Method for extrapolating time horizon as a function of
+                        effective compute</small
+                      >
+                    </div>
+
+                    <!-- Manual Horizon Fitting Parameters -->
+                    <div class="mb-3">
+                      <h6 class="text-muted mb-2">Manual Horizon Fitting</h6>
+                      <div class="mb-2">
+                        <label class="param-label"
+                          >Present Day:
+                          <span id="present_day_val">Loading...</span></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="present_day"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Reference time point for manual horizon fitting
+                          (2020-2030)</small
+                        >
+                      </div>
+                      <div class="mb-2">
+                        <div class="form-check form-switch">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="auto_fit_present_horizon"
+                          />
+                          <label
+                            class="form-check-label"
+                            for="auto_fit_present_horizon"
+                            >Auto-fit Anchor Horizon</label
+                          >
+                        </div>
+                        <label class="param-label"
+                          >Anchor Horizon:
+                          <span id="present_horizon_val">Loading...</span>
+                          mins</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="present_horizon"
+                          step="0.01"
+                          disabled
+                        />
+                        <small class="text-muted"
+                          >Time horizon length at present day</small
+                        >
+                      </div>
+                      <div class="mb-2">
+                        <div class="form-check form-switch">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="auto_fit_present_doubling_time"
+                          />
+                          <label
+                            class="form-check-label"
+                            for="auto_fit_present_doubling_time"
+                            >Auto-fit Anchor Doubling Time</label
+                          >
+                        </div>
+                        <label class="param-label"
+                          >Anchor Doubling Time:
+                          <span id="present_doubling_time_val">Loading...</span>
+                          months</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="present_doubling_time"
+                          step="0.01"
+                          disabled
+                        />
+                        <small class="text-muted"
+                          >Months required to double time horizon from present
+                          value. The time horizon is extrapolated as a function
+                          of effective compute, so this value is converted to
+                          effective OOMs using the human-only effective compute
+                          growth rate at present day.</small
+                        >
+                        <div class="mt-1">
+                          <small class="text-muted"
+                            >Instantaneous doubling time at anchor:
+                            <span id="instantaneous_anchor_doubling_time_val"
+                              >—</span
+                            >
+                            months</small
+                          >
+                        </div>
+                      </div>
+                      <div class="mb-2" id="doubling_difficulty_growth_rate_group">
+                        <div class="form-check form-switch">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="auto_fit_doubling_difficulty_growth_rate"
+                          />
+                          <label
+                            class="form-check-label"
+                            for="auto_fit_doubling_difficulty_growth_rate"
+                            >Auto-fit Doubling Difficulty Growth Rate</label
+                          >
+                        </div>
+                        <label class="param-label"
+                          >Doubling Difficulty Growth Rate:
+                          <span id="doubling_difficulty_growth_rate_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="doubling_difficulty_growth_rate"
+                          step="0.001"
+                          disabled
+                        />
+                        <small class="text-muted"
+                          >Controls the aggressiveness of the superexponential
+                          function. The OOMs of effective compute required for
+                          each successive doubling of time horizon decreases by
+                          this amount.</small
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Coding Automation Anchors -->
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">Coding Automation Anchors</h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#codingAutomationParams"
+                      aria-expanded="false"
+                      aria-controls="codingAutomationParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="codingAutomationParams">
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Automation Interpolation Type:</label
+                      >
+                      <select
+                        class="form-select form-select-sm"
+                        id="automation_interp_type"
+                      >
+                        <option value="exponential">
+                          Exponential (log-space)
+                        </option>
+                        <option value="linear">Linear</option>
+                      </select>
+                      <small class="text-muted"
+                        >Method for interpolating automation between
+                        anchors</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >SWE Multiplier at Present Day:
+                        <span id="swe_multiplier_at_present_day_val"
+                          >Loading...</span
+                        ></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="swe_multiplier_at_present_day"
+                        step="0.01"
+                      />
+                      <small
+                        class="text-muted"
+                        id="swe_multiplier_present_day_text"
+                        >Coding labor multiplier at present day</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >ACD-AI Automation Level:
+                        <span id="automation_fraction_at_superhuman_coder_val"
+                          >Loading...</span
+                        ></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="automation_fraction_at_superhuman_coder"
+                        step="0.01"
+                      />
+                      <small class="text-muted"
+                        >Fraction of SWE tasks that ACD-AI can automate</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="optimal_ces_eta_init">Initial Automation Efficiency (FTE per H100be)</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm"
+                        id="optimal_ces_eta_init"
+                        step="any"
+                      />
+                      <small class="text-muted">Efficiency of tasks when first possible to automate.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="coding_automation_efficiency_slope">
+                        Automation Efficiency Slope: <span id="coding_automation_efficiency_slope_val">Loading...</span>
+                      </label>
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="coding_automation_efficiency_slope"
+                        step="0.01"
+                      />
+                      <small class="text-muted">Number of OOMs of automation efficiency gained with each additional OOM of effective compute.</small>
+                    </div>
+                  </div>
+                </div>
+                <!-- Parallel Coding Labor Parameters -->
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">
+                      Parallel Coding Labor CES Parameters
+                    </h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#cognitiveOutputParams"
+                      aria-expanded="false"
+                      aria-controls="cognitiveOutputParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="cognitiveOutputParams">
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Task Substitutibility (ρ_coding_labor):
+                        <span id="rho_coding_labor_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="rho_coding_labor"
+                        step="0.05"
+                      />
+                      <small class="text-muted"
+                        >Substitutability between automated and non-automated
+                        SWE tasks.</small
+                      >
+                      <small class="text-muted" id="rho_coding_labor_range"
+                        >Loading range...</small
+                      >
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Parallel Coding Labor Normalization:
+                        <span id="coding_labor_normalization_val"
+                          >Loading...</span
+                        ></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="coding_labor_normalization"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Scale factor for parallel coding labor output (log
+                        scale: 10^value)</small
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">
+                      Experiment Capacity CES Parameters
+                    </h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#experimentCapacityParams"
+                      aria-expanded="false"
+                      aria-controls="experimentCapacityParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="experimentCapacityParams">
+                    <div class="mb-2 d-flex justify-content-end">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="directCesToggle"
+                        />
+                        <label
+                          class="form-check-label"
+                          for="directCesToggle"
+                          title="Toggle between direct CES parameters and intuitive pseudoparameters"
+                          >Direct input CES parameters</label
+                        >
+                      </div>
+                    </div>
+                    <div id="expCesDirectGroup">
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Experiment Input Substitutibility
+                          (ρ_experiment_capacity):
+                          <span id="rho_experiment_capacity_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="rho_experiment_capacity"
+                          step="0.05"
+                        />
+                        <small class="text-muted"
+                          >Substitutability between exp. compute and parallel
+                          coding labor.</small
+                        >
+                        <small
+                          class="text-muted"
+                          id="rho_experiment_capacity_range"
+                          >Loading range...</small
+                        >
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Experiment Compute Weight (α):
+                          <span id="alpha_experiment_capacity_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="alpha_experiment_capacity"
+                          step="0.05"
+                        />
+                        <small class="text-muted"
+                          >Higher values favor experiment compute over parallel
+                          coding labor</small
+                        >
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Experiment Compute Discounting (ζ):
+                          <span id="experiment_compute_exponent_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="experiment_compute_exponent"
+                          step="0.05"
+                        />
+                        <small class="text-muted"
+                          >Relates OOMs of experiment compute to OOMs of
+                          parallel coding labor.</small
+                        >
+                      </div>
+                      <!-- coding_labor_exponent deprecated; use parallel_penalty toggle instead -->
+                    </div>
+                    <div id="expPseudoparamsGroup" style="display: none">
+                      <div class="mb-3 form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="enable_parallel_penalty"
+                        />
+                        <label class="form-check-label" for="enable_parallel_penalty"
+                          title="When enabled, applies the configured parallel penalty; when disabled, sets parallel_penalty=0.0"
+                          >Enable Parallel Penalty</label>
+                        <small class="text-muted d-block">Controls whether to apply a penalty to parallel coding labor contribution in exp. capacity.</small>
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label" for="parallel_penalty"
+                          >Parallel Penalty:
+                          <span id="parallel_penalty_val">Loading...</span>
+                        </label>
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="parallel_penalty"
+                          step="0.01"
+                        />
+                        <small class="text-muted d-block">
+                          Penalty applied to parallel coding labor contribution in experiment capacity calculations.
+                        </small>
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Exp. Cap. with ∞ labor:
+                          <span id="inf_labor_asymptote_val">Loading...</span
+                          >x</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="inf_labor_asymptote"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >Compared to 2024 baseline</small
+                        >
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Exp. Cap. with ∞ compute:
+                          <span id="inf_compute_asymptote_val">Loading...</span
+                          >x</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="inf_compute_asymptote"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >Compared to 2024 baseline</small
+                        >
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Exp. Cap. with 30x labor:
+                          <span id="labor_anchor_exp_cap_val">Loading...</span
+                          >x</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="labor_anchor_exp_cap"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Compared to 2024 baseline</small
+                        >
+                      </div>
+                      <div class="mb-3">
+                        <label class="param-label"
+                          >Exp. Cap. Reduction with 0.1x compute:
+                          <span id="inv_compute_anchor_exp_cap_val"
+                            >Loading...</span
+                          >x</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="inv_compute_anchor_exp_cap"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Compared to 2024 baseline</small
+                        >
+                      </div>
+                      <div class="mt-2">
+                        <small
+                          class="text-muted"
+                          id="computedExpParams"
+                          style="display: none"
+                        >
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI Research Taste Anchors -->
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">AI Research Taste Anchors</h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#aiResearchTasteParams"
+                      aria-expanded="false"
+                      aria-controls="aiResearchTasteParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="aiResearchTasteParams">
+                    <div class="mb-3">
+                      <label class="param-label">Schedule Type (units):</label>
+                      <select
+                        class="form-select form-select-sm"
+                        id="taste_schedule_type"
+                      >
+                        <option value="SDs per effective OOM">
+                          SDs per effective OOM
+                        </option>
+                        <option value="SDs per progress-year">
+                          SDs per progress-year
+                        </option>
+                      </select>
+                      <small class="text-muted"
+                        >Choose the unit convention for SD-based schedule</small
+                      >
+                    </div>
+
+                    <div class="row">
+                      <div class="col-6" id="sc_taste_fraction_group">
+                        <label class="param-label"
+                          >ACD-AI Research Taste:
+                          <span id="ai_research_taste_at_superhuman_coder_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="ai_research_taste_at_superhuman_coder"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Research Taste at ACD-AI (units: multiplier on research
+                          effort)</small
+                        >
+                      </div>
+                      <div
+                        class="col-6"
+                        id="sc_taste_sd_group"
+                        style="display: none"
+                      >
+                        <label class="param-label"
+                          >ACD-AI Research Taste (SD):
+                          <span
+                            id="ai_research_taste_at_superhuman_coder_sd_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="ai_research_taste_at_superhuman_coder_sd"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >ACD-AI taste in human-range standard deviations</small
+                        >
+                      </div>
+                    </div>
+                    <div class="row mt-2">
+                      <div class="col-12">
+                        <label class="param-label"
+                          >AI Research Taste Slope:
+                          <span id="ai_research_taste_slope_val"
+                            >Loading...</span
+                          >
+                          SD/effective-OOM</label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="ai_research_taste_slope"
+                          step="0.1"
+                        />
+                        <small
+                          class="text-muted"
+                          id="ai_research_taste_slope_info"
+                          >Steepness of research taste curve</small
+                        >
+                      </div>
+                    </div>
+                    <div class="row mt-2">
+                      <div class="col-12">
+                        <label class="param-label"
+                          >Top Percentile Threshold:
+                          <span id="top_percentile_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="top_percentile"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)</small
+                        >
+                      </div>
+                    </div>
+                    <div class="row mt-2">
+                      <div class="col-12">
+                        <label class="param-label"
+                          >Median to Top Taste Multiplier:
+                          <span id="median_to_top_taste_multiplier_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="median_to_top_taste_multiplier"
+                          step="0.1"
+                        />
+                        <small class="text-muted"
+                          >Ratio of top percentile researcher taste to median researcher taste</small
+                        >
+                        <div class="mt-1">
+                          <small class="text-muted"
+                            >Top percentile: <span id="top_taste_percentile_val">—</span>
+                            (<span id="top_taste_num_sds_val">—</span> SDs),
+                            f: <span id="f_multiplier_per_sd_val">—</span>,
+                            s·log₁₀(f): <span id="slope_times_log_f_val">—</span> OOMs of taste / OOM of effective compute</small
+                          >
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">
+                      Effective Compute Parameters
+                    </h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#overallProgressParams"
+                      aria-expanded="false"
+                      aria-controls="overallProgressParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="overallProgressParams">
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Software efficiency growth rate in 2023:
+                        <span id="software_progress_rate_at_reference_year_val">Loading...</span> OOMs/year</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="software_progress_rate_at_reference_year"
+                        step="0.05"
+                      />
+                      <small class="text-muted"
+                        >Used to find r, the number of doublings of software
+                        efficiency per doubling in cumulative research
+                        effort.</small
+                      >
+                      <small class="text-muted" id="software_progress_rate_at_reference_year_range"
+                        >Loading range...</small
+                      >
+                      <div class="mt-1">
+                        <small class="text-muted"
+                          >Calibrated r:
+                          <span id="r_software_val">—</span>, β:
+                          <span id="beta_software_val">—</span> OOMs of research stock / OOM of software efficiency</small
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Normalization Parameters -->
+                <!-- <div class="param-group">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-muted mb-0">Normalization Constants</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationParams" aria-expanded="false" aria-controls="normalizationParams">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="normalizationParams">
+
+                                </div>
+                            </div> -->
+
+                <!-- Simulation Settings -->
+                <div class="param-group">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">Simulation Settings</h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#simulationSettingsParams"
+                      aria-expanded="false"
+                      aria-controls="simulationSettingsParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="simulationSettingsParams">
+                    <div class="mb-3">
+                      <label class="param-label" for="coding_labor_mode">Coding Labor Mode:</label>
+                      <select class="form-select form-select-sm" id="coding_labor_mode">
+                        <option value="simple_ces">Simple CES</option>
+                        <option value="optimal_ces">Optimal Frontier CES</option>
+                      </select>
+                      <small class="text-muted">Choose between the legacy simple CES and the optimized frontier CES implementation.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label" for="optimal_ces_grid_size">
+                        Optimal CES Grid Size: <span id="optimal_ces_grid_size_val">Loading...</span>
+                      </label>
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="optimal_ces_grid_size"
+                        step="1"
+                      />
+                      <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
+                    </div>
+                    <div class="row">
+                      <div class="col-4">
+                        <label class="param-label">Start Year</label>
+                        <input
+                          type="number"
+                          class="form-control form-control-sm"
+                          id="start_year"
+                        />
+                      </div>
+                      <div class="col-4">
+                        <label class="param-label">End Year</label>
+                        <input
+                          type="number"
+                          class="form-control form-control-sm"
+                          id="end_year"
+                        />
+                      </div>
+                      <div class="col-4">
+                        <label class="param-label">Initial Progress</label>
+                        <input
+                          type="number"
+                          class="form-control form-control-sm"
+                          id="initial_progress"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row mb-2">
+                  <div class="col-12">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="autoUpdate"
+                        checked
+                      />
+                      <label class="form-check-label" for="autoUpdate"
+                        >Auto-update on slider change</label
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-12">
+                    <button
+                      class="btn btn-primary w-100"
+                      onclick="computeModel()"
+                    >
+                      Update Model
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data Panel -->
+              <div class="tab-pane fade" id="data-panel">
+                <h5>AGI Project Scenarios</h5>
+
+                <div class="mb-3">
+                  <label class="form-label">Select Input Time Series</label>
+                  <select
+                    class="form-select"
+                    id="datasetSelect"
+                    onchange="selectDataset()"
+                  >
+                    <option value="default">OpenBrain, no pause</option>
+                    <option value="updated_default">
+                      [software-only] OpenBrain, no pause
+                    </option>
+                    <option value="truncated_default">
+                      [truncated] OpenBrain, no pause
+                    </option>
+                    <option value="pretrain_russia">
+                      [pretraining world] Russia
+                    </option>
+                    <option value="pretrain_us_black_site">
+                      [pretraining world] US Black Site
+                    </option>
+                    <option value="pretrain_cn_black_site">
+                      [pretraining world] China Black Site
+                    </option>
+                    <option value="rl_russia">[RL world] Russia</option>
+                    <option value="rl_us_black_site">
+                      [RL world] US Black Site
+                    </option>
+                    <option value="rl_cn_black_site">
+                      [RL world] China Black Site
+                    </option>
+                  </select>
+                  <div class="form-text">
+                    Choose from preloaded time series for different project
+                    scenarios.
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label">Upload Custom CSV Data</label>
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="csvFile"
+                    accept=".csv"
+                    onchange="uploadData()"
+                  />
+                  <div class="form-text">
+                    CSV should have columns: time, L_HUMAN, inference_compute,
+                    experiment_compute, training_compute_growth_rate
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <button
+                    class="btn btn-secondary w-100"
+                    onclick="loadDefaultData()"
+                  >
+                    Load Default Data
+                  </button>
+                </div>
+
+                <div id="dataPreview" class="mt-3" style="display: none">
+                  <h6>Data Summary</h6>
+                  <div id="dataSummary"></div>
+                </div>
+              </div>
+
+              
+
+              <!-- Parameter Estimation Panel -->
+              <div class="tab-pane fade" id="estimation-panel">
+                <h5>[Under construction]</h5>
+                <p class="text-muted">
+                  Define anchor constraints to estimate optimal parameters
+                </p>
+
+                <div id="anchorConstraints">
+                  <!-- Dynamic constraints will be added here -->
+                </div>
+
+                <button
+                  class="btn btn-sm btn-success mb-3"
+                  onclick="addAnchorConstraint()"
+                >
+                  <i class="fas fa-plus"></i> Add Constraint
+                </button>
+
+                <div class="param-group">
+                  <h6 class="text-muted">Parameters to Optimize</h6>
+                  <p>
+                    <small
+                      >Uncheck a parameter to hold it fixed at its current value
+                      during optimization.</small
+                    >
+                  </p>
+                  <div id="fixedParamsCheckboxes">
+                    <!-- Checkboxes will be dynamically generated here -->
+                  </div>
+                </div>
+
+                <div
+                  id="constraintValidation"
+                  class="alert alert-info"
+                  style="display: none"
+                >
+                  <h6>Constraint Validation</h6>
+                  <div id="validationResults"></div>
+                </div>
+
+                <button
+                  class="btn btn-warning w-100 mt-3"
+                  onclick="estimateParameters()"
+                  disabled
+                  id="estimateBtn"
+                >
+                  Estimate Parameters (Add constraints first)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Visualization -->
+        <div class="col-lg-8 right-panel">
+          <!-- Plot Tab Navigation -->
+          <ul class="nav nav-tabs mb-3" id="plotTabs" style="display: none">
+            <!-- Tabs will be dynamically populated -->
+          </ul>
+
+          <div class="plot-container">
+            <!-- Tab content for plots -->
+            <div class="tab-content" id="plotTabContent">
+              <!-- Default single plot container for initial load -->
+              <div class="tab-pane fade show active" id="default-plot">
+                <div id="plotDiv" style="width: 100%; height: 100%"></div>
+              </div>
+            </div>
+
+            <div class="loading-spinner" id="loadingSpinner">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Computing...</span>
+              </div>
+              <div class="mt-2">Computing model trajectory...</div>
+            </div>
+          </div>
+
+          <div class="alert alert-danger error-alert mt-3" id="errorAlert">
+            <strong>Error:</strong> <span id="errorMessage"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Global parameter configuration from server
+      let parameterConfig = null;
+      // Global precise input mode toggle
+      let usePreciseInputs = false;
+      // Central list of parameter IDs managed by the UI/collector
+      const PARAMETER_IDS = [
+        "rho_coding_labor",
+        "rho_experiment_capacity",
+        "alpha_experiment_capacity",
+        "software_progress_rate_at_reference_year",
+        "automation_fraction_at_superhuman_coder",
+        "swe_multiplier_at_present_day",
+        "automation_interp_type",
+        "coding_labor_normalization",
+        // Optimal CES and mode
+        "coding_labor_mode",
+        "coding_automation_efficiency_slope",
+        "optimal_ces_eta_init",
+        "optimal_ces_grid_size",
+        
+        "experiment_compute_exponent",
+        // exp capacity pseudoparameters
+        "inf_labor_asymptote",
+        "inf_compute_asymptote",
+        "labor_anchor_exp_cap",
+        "inv_compute_anchor_exp_cap",
+        // parallel penalty (controlled by toggle)
+        "parallel_penalty",
+        "ai_research_taste_at_superhuman_coder_sd",
+        "ai_research_taste_slope",
+        "top_percentile",
+        "median_to_top_taste_multiplier",
+        "taste_schedule_type",
+        "sc_time_horizon_minutes",
+        "horizon_extrapolation_type",
+        "include_gap",
+        "gap_years",
+        "pre_gap_sc_time_horizon",
+        // Manual horizon fitting parameters
+        "present_day",
+        "present_horizon",
+        "present_doubling_time",
+        "doubling_difficulty_growth_rate",
+      ];
+
+      // Load parameter configuration from server
+      async function loadParameterConfig() {
+        try {
+          const response = await fetch("/api/parameter-config");
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          if (data.success) {
+            parameterConfig = data.config;
+            console.log(
+              "Successfully loaded parameter configuration:",
+              parameterConfig
+            );
+
+            // Validate config structure
+            if (!parameterConfig.bounds || !parameterConfig.defaults) {
+              console.warn(
+                "Parameter config is missing expected properties:",
+                parameterConfig
+              );
+            }
+          } else {
+            throw new Error(data.error || "Unknown API error");
+          }
+        } catch (error) {
+          console.error(
+            "Failed to load parameter configuration:",
+            error.message
+          );
+          console.warn("Falling back to hardcoded parameter values");
+          parameterConfig = null;
+
+          // Show user-friendly warning if needed
+          showConfigWarning(
+            "Parameter configuration could not be loaded from server. Using default values."
+          );
+        }
+      }
+
+      function showConfigWarning(message) {
+        // Show a non-intrusive warning about config loading failure
+        const warningDiv = document.createElement("div");
+        warningDiv.className =
+          "alert alert-warning alert-dismissible fade show";
+        warningDiv.style.position = "fixed";
+        warningDiv.style.top = "10px";
+        warningDiv.style.right = "10px";
+        warningDiv.style.zIndex = "9999";
+        warningDiv.style.maxWidth = "400px";
+        warningDiv.innerHTML = `
+                <small><strong>Configuration Notice:</strong> ${message}</small>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+            `;
+        document.body.appendChild(warningDiv);
+
+        // Auto-dismiss after 10 seconds
+        setTimeout(() => {
+          if (warningDiv.parentNode) {
+            warningDiv.remove();
+          }
+        }, 10000);
+      }
+
+      // Initialize app
+      $(document).ready(function () {
+        // Ensure plot container has consistent height from the start
+        const plotContainer = $(".plot-container")[0];
+        if (plotContainer) {
+          plotContainer.style.setProperty("height", "1280px", "important");
+          // Force a reflow to ensure the height is applied immediately
+          plotContainer.offsetHeight;
+        }
+
+        // Load parameter configuration first, then initialize everything
+        loadParameterConfig().then(() => {
+          // Initialize server session in parallel with UI setup
+          const sessionPromise = initializeSession();
+
+          // Set up UI controls from parameter config
+          initializeParameterControls();
+          initializeControls();
+          populateFixedParamsCheckboxes();
+
+          // Wire up precise input toggle
+          $("#preciseInputMode").on("change", function () {
+            setInputMode(this.checked);
+          });
+          // Wire up direct CES input toggle (default OFF)
+          $("#directCesToggle").on("change", function () {
+            setCesInputMode(this.checked);
+          });
+          // Initialize default mode (pseudoparameters mode)
+          //setCesInputMode(false);
+
+          // Wait for session to be ready, then compute model
+          sessionPromise
+            .then(() => {
+              computeModel();
+            })
+            .catch(() => {
+              // If session init fails, still try to compute (fallback mode)
+              console.warn(
+                "Computing model without proper session initialization"
+              );
+              computeModel();
+            });
+        });
+      });
+
+      function initializeControls() {
+        // Add event listeners to all range inputs
+        $('input[type="range"]').on("input", function () {
+          updateDisplayValue(this);
+
+          // Auto-update if enabled
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          }
+        });
+
+        // Add event listeners to number inputs
+        $('input[type="number"]').on("change", function () {
+          computeModel();
+        });
+
+        // Add event listeners to auto-fit checkboxes
+        $('input[id^="auto_fit_"]').on("change", function () {
+          const paramId = this.id.replace("auto_fit_", "");
+          const slider = document.getElementById(paramId);
+          const displaySpan = document.getElementById(paramId + "_val");
+
+          if (slider) {
+            if (this.checked) {
+              // Enable auto-fit: disable slider and show "Auto-fit"
+              slider.disabled = true;
+              if (displaySpan) {
+                displaySpan.textContent = "Auto-fit";
+              }
+            } else {
+              // Disable auto-fit: enable slider and show actual value
+              slider.disabled = false;
+              updateDisplayValue(slider);
+            }
+
+            // Auto-update if enabled
+            if ($("#autoUpdate").is(":checked")) {
+              clearTimeout(window.updateTimer);
+              window.updateTimer = setTimeout(computeModel, 300);
+            }
+          }
+        });
+
+        // Add event listeners to select dropdowns
+        $("select").on("change", function () {
+          if (this.id === "horizon_extrapolation_type") {
+            updateHorizonExtrapolationVisibility();
+          } else if (this.id === "taste_schedule_type") {
+            updateTasteUnitsVisibility();
+          } else if (this.id === "coding_labor_mode") {
+            // no-op; backend uses this value directly
+          }
+          // Auto-update if enabled
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else {
+            // For dropdowns, always trigger recompute regardless of auto-update setting
+            // since dropdown changes are typically intentional parameter changes
+            computeModel();
+          }
+        });
+
+        // Wire include_gap toggle
+        $("#include_gap").on("change", function () {
+          updateBenchmarksAndGapsVisibility();
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else {
+            computeModel();
+          }
+        });
+
+        // Initialize display values
+        $('input[type="range"]').each(function () {
+          updateDisplayValue(this);
+        });
+        // Initialize include_gap visibility
+        updateBenchmarksAndGapsVisibility();
+        // Initialize converted gap display
+        updateGapConvertedDisplay();
+
+        // Initialize anchor time display text
+        updateAnchorTimeDisplay();
+        // Initialize visibility for horizon extrapolation dependent controls
+        updateHorizonExtrapolationVisibility();
+        // Initialize SD/fraction visibility per schedule type
+        updateTasteUnitsVisibility();
+      }
+
+      function updateBenchmarksAndGapsVisibility() {
+        const toggle = document.getElementById("include_gap");
+        const group = document.getElementById("gap_years_group");
+        const scGroup = document.getElementById("sc_time_horizon_group");
+        const satGroup = document.getElementById("pre_gap_sc_time_horizon_group");
+        if (!toggle || !group) return;
+        group.style.display = toggle.checked ? "" : "none";
+        if (scGroup) scGroup.style.display = toggle.checked ? "none" : "";
+        if (satGroup) satGroup.style.display = toggle.checked ? "" : "none";
+      }
+
+      function formatDecimalYearToDate(decimalYear) {
+        // Convert decimal year (e.g., 2025.25) to readable date format
+        const year = Math.floor(decimalYear);
+        const monthDecimal = (decimalYear - year) * 12;
+        const month = Math.floor(monthDecimal);
+
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        return `${monthNames[month]} ${year}`;
+      }
+
+      function updateAnchorTimeDisplay() {
+        // Update the dynamic anchor time text in the SWE Multiplier section
+        const anchorTimeSlider = document.getElementById("present_day");
+        const anchorTimeText = document.getElementById(
+          "swe_multiplier_present_day_text"
+        );
+        const gapUnitsSpan = document.getElementById("gap_years_units");
+        const gapUnitsHelpSpan = document.getElementById(
+          "gap_years_units_help"
+        );
+        const gapConvertedSpan = document.getElementById(
+          "gap_years_converted_val"
+        );
+
+        if (anchorTimeSlider && anchorTimeText) {
+          const anchorTimeValue = parseFloat(anchorTimeSlider.value);
+          const formattedDate = formatDecimalYearToDate(anchorTimeValue);
+          anchorTimeText.textContent = `Coding labor multiplier at present day (${formattedDate})`;
+          // Update gap units to '<YEAR>-progress-years'
+          const anchorYear = isFinite(anchorTimeValue)
+            ? Math.floor(anchorTimeValue)
+            : null;
+          const unitsLabel =
+            anchorYear !== null
+              ? `${anchorYear}-progress-years`
+              : "anchor-progress-years";
+          if (gapUnitsSpan) gapUnitsSpan.textContent = unitsLabel;
+          if (gapUnitsHelpSpan) gapUnitsHelpSpan.textContent = unitsLabel;
+          if (gapConvertedSpan) updateGapConvertedDisplay();
+        }
+      }
+
+      function updateGapConvertedDisplay() {
+        try {
+          const gapSlider = document.getElementById("gap_years");
+          const convertedEl = document.getElementById(
+            "gap_years_converted_val"
+          );
+          if (!gapSlider || !convertedEl) return;
+          const gapVal = parseFloat(gapSlider.value);
+          let rate = window.summary?.anchor_progress_rate;
+          let converted;
+          if (rate !== undefined && rate !== null && isFinite(rate)) {
+            converted = gapVal * Number(rate);
+          } else {
+            // Fallback: use plain value if rate is not yet available
+            converted = gapVal;
+          }
+          // Display with minimal trailing zeros
+          const fmt = (n) =>
+            Number(n)
+              .toFixed(3)
+              .replace(/\.0+$/, "")
+              .replace(/\.([1-9])0+$/, ".$1");
+          convertedEl.textContent = isFinite(converted) ? fmt(converted) : "—";
+        } catch (e) {
+          // best-effort; keep silent in UI
+        }
+      }
+
+      function updateHorizonExtrapolationVisibility() {
+        // Show doubling decay rate controls only when decaying doubling time is selected
+        const typeSelect = document.getElementById(
+          "horizon_extrapolation_type"
+        );
+        const decayGroup = document.getElementById("doubling_difficulty_growth_rate_group");
+        if (!decayGroup) return;
+        const selected = typeSelect ? typeSelect.value : "";
+        const shouldShow =
+          selected === "decaying doubling time" ||
+          selected === "Decaying doubling time" ||
+          selected === "Decaying Doubling Time";
+        decayGroup.style.display = shouldShow ? "" : "none";
+      }
+
+      function updateTasteUnitsVisibility() {
+        const typeSelect = document.getElementById("taste_schedule_type");
+        const scTasteFractionGroup = document.getElementById(
+          "sc_taste_fraction_group"
+        );
+        const scTasteSdGroup = document.getElementById("sc_taste_sd_group");
+        if (!typeSelect || !scTasteFractionGroup || !scTasteSdGroup) return;
+        const selected = typeSelect.value;
+        const useSD =
+          selected === "SDs per effective OOM" ||
+          selected === "SDs per progress-year";
+        scTasteSdGroup.style.display = useSD ? "" : "none";
+        scTasteFractionGroup.style.display = useSD ? "none" : "";
+
+        // Adjust column widths to prevent squashing
+        if (useSD) {
+          scTasteSdGroup.classList.remove("col-6");
+          scTasteSdGroup.classList.add("col-12");
+          scTasteFractionGroup.classList.remove("col-6");
+          scTasteFractionGroup.classList.add("col-12");
+        } else {
+          scTasteSdGroup.classList.remove("col-12");
+          scTasteSdGroup.classList.add("col-6");
+          scTasteFractionGroup.classList.remove("col-12");
+          scTasteFractionGroup.classList.add("col-6");
+        }
+
+        const slopeInfoEl = document.getElementById(
+          "ai_research_taste_slope_info"
+        );
+        if (slopeInfoEl) {
+          if (selected === "SDs per effective OOM") {
+            slopeInfoEl.textContent = "Slope: SD per effective OOM";
+          } else if (selected === "SDs per progress-year") {
+            slopeInfoEl.textContent = "Slope: SD per progress-year";
+          }
+        }
+
+        // Update the main label units text
+        const labelElement = document.querySelector('label[for="ai_research_taste_slope"], label:has(#ai_research_taste_slope_val)');
+        if (labelElement) {
+          const unitsText = labelElement.querySelector(':scope > *:last-child');
+          if (unitsText && unitsText.nodeType === Node.TEXT_NODE) {
+            // Find and update the units text node
+            const textNode = Array.from(labelElement.childNodes).find(node =>
+              node.nodeType === Node.TEXT_NODE && node.textContent.trim().startsWith('SD/')
+            );
+            if (textNode) {
+              if (selected === "SDs per effective OOM") {
+                textNode.textContent = 'SDs/effective-OOM';
+              } else if (selected === "SDs per progress-year") {
+                textNode.textContent = 'SDs/progress-year';
+              }
+            }
+          } else {
+            // Fallback: update the last text content
+            const html = labelElement.innerHTML;
+            if (selected === "SDs per effective OOM") {
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/effective-OOM');
+            } else if (selected === "SDs per progress-year") {
+              labelElement.innerHTML = html.replace(/SD\/[^<]*$/, 'SDs/progress-year');
+            }
+          }
+        }
+
+        // Update the slider value to the appropriate default for the mode
+        const slopeSlider = document.getElementById("ai_research_taste_slope");
+        if (slopeSlider && parameterConfig?.taste_slope_defaults) {
+          const defaultValue = parameterConfig.taste_slope_defaults[selected];
+          if (defaultValue !== undefined) {
+            slopeSlider.value = defaultValue;
+            // Update the display value
+            updateDisplayValue(slopeSlider);
+          }
+        }
+      }
+
+      function updateDisplayValue(input) {
+        const value = parseFloat(input.value);
+        const displayId = input.id + "_val";
+        let displayValue;
+
+        if (!isFinite(value)) {
+          const displayElement = document.getElementById(displayId);
+          if (displayElement) {
+            displayElement.textContent = "—";
+          }
+          return;
+        }
+
+        console.log("Updating slider:", input.id, "to value:", value);
+
+        // Special handling for optional parameters - show "Auto-fit" when checkbox is checked
+        if (
+          input.id === "present_horizon" ||
+          input.id === "present_doubling_time" ||
+          input.id === "doubling_difficulty_growth_rate"
+        ) {
+          const autoFitCheckbox = document.getElementById(
+            "auto_fit_" + input.id
+          );
+          if (autoFitCheckbox && autoFitCheckbox.checked) {
+            displayValue = "Auto-fit";
+          } else {
+            if (input.id === "present_doubling_time") {
+              // Display in decimal months instead of decimal years
+              displayValue = (value * 12).toFixed(1);
+            } else if (input.id === "doubling_difficulty_growth_rate") {
+              // Display as percentage
+              displayValue = (value * 100).toFixed(1) + "%";
+            } else {
+              displayValue = value.toFixed(3);
+            }
+          }
+        } else if (input.id === "present_day") {
+          // Format anchor time as readable date
+          displayValue = formatDecimalYearToDate(value);
+        } else if (input.id === "automation_fraction_at_superhuman_coder") {
+          // Direct percentage display (no logit transformation)
+          displayValue = (value * 100).toFixed(1) + "%";
+        } else if (input.id === "ai_research_taste_at_superhuman_coder_sd") {
+          displayValue = value.toFixed(2) + " SD";
+        } else if (
+          input.id === "rho_experiment_capacity" ||
+          input.id === "rho_coding_labor" ||
+          input.id === "swe_multiplier_at_present_day"
+        ) {
+          // Higher precision for substitutability parameters, coding labor exponent, and SWE multiplier
+          displayValue = value.toFixed(2);
+        } else if (
+          input.id.includes("progress") ||
+          input.id.includes("research_stock")
+        ) {
+          displayValue = value.toFixed(2);
+        } else if (input.id === "top_percentile") {
+          // Show actual percentile value (convert from negated log scale)
+          const actualValue = usePreciseInputs ? value : (1.0 - Math.pow(10, -value));
+          console.log("top_percentile display: sliderValue=" + value + ", actualValue=" + actualValue);
+          // Use toPrecision for values very close to 1 to avoid rounding to 1.0000
+          if (actualValue > 0.9999) {
+            displayValue = actualValue.toPrecision(5);
+          } else {
+            displayValue = actualValue.toFixed(4);
+          }
+        } else if (input.id === "coding_labor_normalization") {
+          // Show actual value; respect precise mode
+          const actualValue = usePreciseInputs ? value : Math.pow(10, value);
+          displayValue =
+            actualValue < 0.001
+              ? actualValue.toExponential(2)
+              : actualValue.toExponential(2);
+        } else if (
+          input.id === "sc_time_horizon_minutes" ||
+          input.id === "pre_gap_sc_time_horizon"
+        ) {
+          // Convert minutes to work months/years; respect precise mode
+          const actualValueMinutes = usePreciseInputs
+            ? value
+            : Math.pow(10, value);
+          const workMonths = actualValueMinutes / 10380; // 173 hours * 60 mins = 10380 minutes per work month
+          const workYears = actualValueMinutes / 124560; // 124560 minutes per work year
+
+          // Update the label unit based on the value
+          const labelElement = document
+            .querySelector("#" + input.id)
+            .closest(".mb-3")
+            .querySelector("label.param-label");
+          if (labelElement) {
+            const isSC = input.id === "sc_time_horizon_minutes";
+            if (workMonths > 12) {
+              labelElement.innerHTML = isSC
+                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
+              if (workYears >= 10) {
+                displayValue = workYears.toFixed(0);
+              } else if (workYears >= 1) {
+                displayValue = workYears.toFixed(1);
+              } else {
+                displayValue = workYears.toFixed(2);
+              }
+            } else {
+              labelElement.innerHTML = isSC
+                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
+              if (workMonths >= 10) {
+                displayValue = workMonths.toFixed(0);
+              } else if (workMonths >= 1) {
+                displayValue = workMonths.toFixed(1);
+              } else {
+                displayValue = workMonths.toFixed(2);
+              }
+            }
+          }
+        } else if (input.id.includes("normalization")) {
+          if (value < 0.001) {
+            displayValue = value.toExponential(2);
+          } else {
+            displayValue = value.toFixed(3);
+          }
+        } else {
+          displayValue = value.toFixed(2);
+        }
+
+        const displayElement = document.getElementById(displayId);
+        if (displayElement) {
+          displayElement.textContent = displayValue;
+        } else {
+          console.error("Display element not found:", displayId);
+        }
+
+        // Update anchor time display text if this is the present_day parameter
+        if (input.id === "present_day") {
+          updateAnchorTimeDisplay();
+        }
+        // Update converted gap display if the gap slider changed
+        if (input.id === "gap_years") {
+          updateGapConvertedDisplay();
+        }
+      }
+
+      function collectParameters() {
+        // Collect and validate all parameters with proper type conversion
+        const params = {};
+
+        // List of expected parameters with their element IDs
+        const parameterIds = PARAMETER_IDS;
+
+        parameterIds.forEach((id) => {
+          // Handle parallel_penalty even if no input element exists
+          if (id === "parallel_penalty") {
+            try {
+              // If toggle missing, treat as enabled (use default/slider)
+              const toggleEl = document.getElementById("enable_parallel_penalty");
+              const enabled = toggleEl ? !!toggleEl.checked : true;
+              if (!enabled) {
+                params[id] = 0.0;
+              } else {
+                const el = document.getElementById(id);
+                const pv = el ? parseFloat(el.value) : NaN;
+                if (isFinite(pv)) {
+                  params[id] = pv;
+                } else {
+                  params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                }
+              }
+            } catch (e) {
+              params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+            }
+            return; // done handling this id
+          }
+
+          const element = $("#" + id);
+          if (element.length) {
+            let value;
+
+            // Special handling for string parameters
+            if (
+              id === "taste_schedule_type" ||
+              id === "horizon_extrapolation_type" ||
+          id === "automation_interp_type" ||
+          id === "coding_labor_mode"
+            ) {
+              value = element.val(); // Keep as string
+            } else {
+              value = parseFloat(element.val());
+
+              // Special handling for parameters that are log-scaled in slider mode
+              if (id === "top_percentile") {
+                // For top_percentile, use negated log scale on (1 - value) to make high percentiles easier to select
+                // Convert from slider (-log of 1-percentile) to actual percentile
+                const logValue = value;
+                value = 1.0 - Math.pow(10, -logValue);
+                console.log("top_percentile collection: logValue=" + logValue + ", actualValue=" + value);
+              } else if (id === "coding_labor_normalization") {
+                // In precise mode, numeric input is actual value; otherwise transform from log slider value
+                if (!usePreciseInputs) value = Math.pow(10, value);
+              } else if (
+                id === "sc_time_horizon_minutes" ||
+                id === "pre_gap_sc_time_horizon"
+              ) {
+                if (!usePreciseInputs) value = Math.pow(10, value);
+              } else if (id === "gap_years") {
+                // plain numeric slider; already parsed
+              }
+
+              // Special handling for optional parameters - set to null if auto-fit checkbox is checked
+              if (
+                id === "present_horizon" ||
+                id === "present_doubling_time" ||
+                id === "doubling_difficulty_growth_rate"
+              ) {
+                const autoFitCheckbox = document.getElementById(
+                  "auto_fit_" + id
+                );
+                if (autoFitCheckbox && autoFitCheckbox.checked) {
+                  value = null;
+                }
+              }
+            }
+
+            // Validate numeric parameters only (allow null for optional parameters)
+            if (
+              id !== "taste_schedule_type" &&
+              id !== "horizon_extrapolation_type" &&
+          id !== "automation_interp_type" &&
+          id !== "coding_labor_mode" &&
+              id !== "include_gap" &&
+              value !== null &&
+              !isFinite(value)
+            ) {
+              console.warn(
+                `Invalid value for ${id}: ${element.val()}, using fallback`
+              );
+              // Use fallback from parameter config or hardcoded value
+              if (
+                parameterConfig &&
+                parameterConfig.defaults &&
+                parameterConfig.defaults[id] !== undefined
+              ) {
+                value = parameterConfig.defaults[id];
+              } else {
+                // Hardcoded fallbacks as last resort
+                const fallbacks = {
+                  rho_coding_labor: -2,
+                  rho_experiment_capacity: -0.1,
+                  alpha_experiment_capacity: 0.5,
+                  software_progress_rate_at_reference_year: 0.5,
+                  automation_fraction_at_superhuman_coder: 0.99,
+                  swe_multiplier_at_present_day: 2.0,
+                  coding_labor_normalization: 1,
+                  experiment_compute_exponent: 0.4,
+                  ai_research_taste_at_superhuman_coder_sd: null,
+                  ai_research_taste_slope: 1.2,
+                  sc_time_horizon_minutes: 50000.0,
+                  present_day: 2025.25,
+                  present_horizon: null,
+                  present_doubling_time: null,
+                  doubling_difficulty_growth_rate: null,
+                };
+                value = fallbacks[id] || 1;
+              }
+            }
+
+            // For string parameters, validate against allowed values
+            if (id === "taste_schedule_type") {
+              const allowedTypes = parameterConfig?.taste_schedule_types || [
+                "exponential",
+                "sigmoid",
+              ];
+              if (!allowedTypes.includes(value)) {
+                console.warn(
+                  `Invalid taste_schedule_type: ${value}, using default`
+                );
+                value =
+                  parameterConfig?.defaults?.taste_schedule_type ||
+                  "exponential";
+              }
+            } else if (id === "horizon_extrapolation_type") {
+              const allowedTypes =
+                parameterConfig?.horizon_extrapolation_types || [
+                  "exponential",
+                  "decaying doubling time",
+                ];
+              if (!allowedTypes.includes(value)) {
+                console.warn(
+                  `Invalid horizon_extrapolation_type: ${value}, using default`
+                );
+                value =
+                  parameterConfig?.defaults?.horizon_extrapolation_type ||
+                  "exponential";
+              }
+            } else if (id === "automation_interp_type") {
+              const allowedTypes = parameterConfig?.automation_interp_types || [
+                "exponential",
+                "linear",
+              ];
+              if (!allowedTypes.includes(value)) {
+                console.warn(
+                  `Invalid automation_interp_type: ${value}, using default`
+                );
+                value =
+                  parameterConfig?.defaults?.automation_interp_type ||
+                  "exponential";
+              }
+            } else if (id === "coding_labor_mode") {
+              const allowedModes = parameterConfig?.coding_labor_modes || [
+                "simple_ces",
+                "optimal_ces",
+              ];
+              if (!allowedModes.includes(value)) {
+                console.warn(
+                  `Invalid coding_labor_mode: ${value}, using default`
+                );
+                value =
+                  parameterConfig?.defaults?.coding_labor_mode ||
+                  "simple_ces";
+              }
+            }
+
+            // Handle boolean checkbox for benchmarks & gaps mode
+            if (id === "include_gap") {
+              const enabled =
+                document.getElementById("include_gap")?.checked ||
+                false;
+              params[id] = enabled ? "gap" : "no gap";
+              // When enabled, force sc_time_horizon_minutes to current saturation horizon selection
+              if (enabled) {
+                const satEl = document.getElementById(
+                  "pre_gap_sc_time_horizon"
+                );
+                if (satEl) {
+                  let satVal = parseFloat(satEl.value);
+                  if (!usePreciseInputs) satVal = Math.pow(10, satVal);
+                  params["sc_time_horizon_minutes"] = satVal;
+                } else if (
+                  parameterConfig &&
+                  parameterConfig.pre_gap_sc_time_horizon
+                ) {
+                  params["sc_time_horizon_minutes"] =
+                    parameterConfig.pre_gap_sc_time_horizon;
+                }
+              }
+            } else {
+              // Special handling: parallel_penalty controlled by toggle
+              if (id === "parallel_penalty") {
+                const enabled = document.getElementById("enable_parallel_penalty")?.checked || false;
+                if (!enabled) {
+                  params[id] = 0.0;
+                } else {
+                  // Use slider/input if present, else default from server config
+                  if (element.length) {
+                    const pv = parseFloat(element.val());
+                    if (isFinite(pv)) {
+                      params[id] = pv;
+                    } else {
+                      params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                    }
+                  } else {
+                    params[id] = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+                  }
+                }
+              } else {
+                params[id] = value;
+              }
+            }
+          } else {
+            console.warn(`Parameter element not found: ${id}`);
+          }
+        });
+
+        console.log("Collected parameters:", params);
+        return params;
+      }
+
+      function computeModel() {
+        const parameters = collectParameters();
+        const useDirectCes =
+          !!document.getElementById("directCesToggle")?.checked;
+        // Pass UI toggle as a parameter expected by backend model
+        parameters["direct_input_exp_cap_ces_params"] = useDirectCes;
+
+        // Validate time range inputs
+        let startYear = parseInt($("#start_year").val());
+        let endYear = parseInt($("#end_year").val());
+        let initialProgress = parseFloat($("#initial_progress").val());
+
+        // Apply fallbacks for invalid inputs
+        if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
+        if (!isFinite(endYear) || endYear < startYear) {
+          endYear = Math.max(startYear + 1, 2050);
+        }
+        if (!isFinite(initialProgress)) initialProgress = 0.0;
+
+        const timeRange = [startYear, endYear];
+
+        console.log("Computing model with parameters:", parameters);
+        console.log(
+          "Time range:",
+          timeRange,
+          "Initial progress:",
+          initialProgress
+        );
+        showLoading(true);
+        hideError();
+
+        $.ajax({
+          url: "/api/compute",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify({
+            parameters: parameters,
+            time_range: timeRange,
+            initial_progress: initialProgress,
+          }),
+          success: function (response) {
+            console.log("Model response:", response);
+            if (response.success) {
+              if (response.plots && response.tabs) {
+                // Handle multi-tab response
+                createPlotTabs(response.tabs, response.plots);
+              } else if (response.plot) {
+                // Handle legacy single plot response (fallback)
+                createSinglePlot(response.plot);
+              } else {
+                showError("No plot data received from server");
+              }
+              if (response.summary) {
+                updateSummary(response.summary);
+              }
+              try {
+                updateMilestonesFromResponse(response);
+              } catch (e) {
+                console.warn("Failed to update milestones", e);
+              }
+              try {
+                updateComputedExpParams(response);
+              } catch (e) {
+                console.warn("Failed to update computed exp params", e);
+              }
+            } else {
+              showError(response.error);
+            }
+          },
+          error: function (xhr) {
+            console.error("AJAX error:", xhr);
+            const error = xhr.responseJSON
+              ? xhr.responseJSON.error
+              : "Unknown error occurred";
+            showError(error);
+          },
+          complete: function () {
+            showLoading(false);
+          },
+        });
+      }
+
+      function createPlotTabs(tabs, plots, preserveActiveTab = true) {
+        console.log("Creating plot tabs:", tabs, plots);
+
+        // Store currently active tab before clearing
+        let currentActiveTabId = null;
+        if (preserveActiveTab) {
+          const activeTab = $("#plotTabs .nav-link.active");
+          if (activeTab.length > 0) {
+            // Extract tab ID from data-bs-target attribute
+            const target = activeTab.attr("data-bs-target");
+            if (target) {
+              currentActiveTabId = target
+                .replace("#", "")
+                .replace("-content", "");
+              console.log("Preserving active tab:", currentActiveTabId);
+            }
+          }
+        }
+
+        // Clean up any existing event listeners to prevent memory leaks
+        $(window).off("resize.plotResize");
+        $('#plotTabs button[data-bs-toggle="tab"]').off(
+          "shown.bs.tab.plotResize"
+        );
+
+        // Show tab navigation
+        $("#plotTabs").show();
+
+        // Clear existing tabs and content
+        $("#plotTabs").empty();
+        $("#plotTabContent").empty();
+
+        // Store plot data and tab configuration for resize handling
+        window.plotData = plots;
+        window.plotIds = {};
+        window.tabConfigurations = tabs;
+
+        // Create tab navigation and content
+        let foundActiveTab = false;
+        tabs.forEach((tab, index) => {
+          // Determine if this tab should be active
+          let isActive = false;
+          if (currentActiveTabId && tab.id === currentActiveTabId) {
+            isActive = true;
+            foundActiveTab = true;
+          } else if (!currentActiveTabId && index === 0) {
+            // Default to first tab if no preserved tab
+            isActive = true;
+            foundActiveTab = true;
+            currentActiveTabId = tab.id;
+          }
+
+          const activeClass = isActive ? "active" : "";
+          const showActiveClass = isActive ? "show active" : "";
+
+          // Create tab navigation item
+          const tabNav = `
+                    <li class="nav-item">
+                        <button class="nav-link ${activeClass}" id="${tab.id}-tab" data-bs-toggle="tab" 
+                                data-bs-target="#${tab.id}-content" type="button">
+                            ${tab.name}
+                        </button>
+                    </li>
+                `;
+          $("#plotTabs").append(tabNav);
+
+          // Create tab content pane
+          const plotId = `plot-${tab.id}`;
+          window.plotIds[tab.id] = plotId; // Store for resize handling
+
+          const tabContent = `
+                    <div class="tab-pane fade ${showActiveClass}" id="${tab.id}-content">
+                        <div id="${plotId}" style="width: 100%; height: 100%; min-height: 600px;"></div>
+                        <div class="tab-explanation" id="${tab.id}-explanation" style="display: none;">
+                            <!-- Explanation content will be inserted here -->
+                        </div>
+                    </div>
+                `;
+          $("#plotTabContent").append(tabContent);
+
+          // Create the plot if data exists
+          if (plots[tab.id]) {
+            setTimeout(() => {
+              try {
+                // Ensure plot layout uses consistent height while preserving all axis settings
+                const plotLayout = { ...plots[tab.id].layout };
+                if (plotLayout.height && plotLayout.height !== 1280) {
+                  console.log(
+                    `Adjusting plot layout height from ${plotLayout.height} to match container`
+                  );
+                  plotLayout.height = undefined; // Let it use container dimensions
+                }
+
+                // Apply light theme styling
+                plotLayout.paper_bgcolor = "white";
+                plotLayout.plot_bgcolor = "white";
+                plotLayout.font = {
+                  ...(plotLayout.font || {}),
+                  color: "#2b2d42",
+                };
+                plotLayout.title = {
+                  ...(plotLayout.title || {}),
+                  font: {
+                    ...(plotLayout.title?.font || {}),
+                    color: "#2b2d42",
+                  },
+                };
+                plotLayout.hoverlabel = {
+                  ...(plotLayout.hoverlabel || {}),
+                  bgcolor: "white",
+                  bordercolor: "#e0e0e0",
+                  font: {
+                    ...(plotLayout.hoverlabel?.font || {}),
+                    color: "#2b2d42",
+                  },
+                };
+                Plotly.newPlot(plotId, plots[tab.id].data, plotLayout, {
+                  responsive: true,
+                  displayModeBar: true,
+                  displaylogo: false,
+                  modeBarButtonsToRemove: ["pan2d", "lasso2d"],
+                  toImageButtonOptions: {
+                    format: "svg",
+                    filename: `ai_progress_${tab.id}`,
+                    height: null,
+                    width: null,
+                    scale: 2,
+                  },
+                });
+
+                // Mark this plot as created
+                window.plotIds[tab.id + "_created"] = true;
+              } catch (error) {
+                console.error(
+                  `Failed to create plot for tab ${tab.id}:`,
+                  error
+                );
+              }
+            }, index * 100); // Stagger plot creation to avoid overwhelming the browser
+          } else {
+            console.warn(`No plot data found for tab ${tab.id}`);
+          }
+
+          // Add explanation if available
+          if (tab.explanation && tab.explanation.trim()) {
+            try {
+              const explanationHtml = marked.parse(tab.explanation.trim());
+              $(`#${tab.id}-explanation`).html(explanationHtml).show();
+            } catch (error) {
+              console.error(
+                `Failed to render explanation for tab ${tab.id}:`,
+                error
+              );
+            }
+          }
+        });
+
+        // Fallback: if preserved tab wasn't found, activate the first tab
+        if (!foundActiveTab && tabs.length > 0) {
+          console.log("Preserved tab not found, falling back to first tab");
+          const firstTab = tabs[0];
+          $(`#${firstTab.id}-tab`).addClass("active");
+          $(`#${firstTab.id}-content`).addClass("show active");
+          currentActiveTabId = firstTab.id;
+        }
+
+        // Set initial container height for the active tab immediately
+        if (currentActiveTabId) {
+          updatePlotContainerHeight(currentActiveTabId);
+        } else if (tabs.length > 0) {
+          // If no active tab ID, use the first tab for height calculation
+          updatePlotContainerHeight(tabs[0].id);
+        }
+
+        // Add event listeners for tab changes to handle plot resizing
+        setupTabResizeHandlers(tabs);
+      }
+
+      function updatePlotContainerHeight(tabId) {
+        // Find the tab configuration for the given tabId
+        const tabConfig = window.tabConfigurations?.find(
+          (tab) => tab.id === tabId
+        );
+        if (tabConfig && tabConfig.rows) {
+          const heightPerRow = 320; // pixels per row (reduced from 400)
+          const totalHeight = heightPerRow * tabConfig.rows;
+          const plotContainer = $(".plot-container")[0];
+
+          console.log(
+            `Updating plot container height for tab ${tabId}: ${tabConfig.rows} rows = ${totalHeight}px`
+          );
+          // Use !important to override CSS and ensure the change takes effect immediately
+          if (plotContainer) {
+            plotContainer.style.setProperty(
+              "height",
+              totalHeight + "px",
+              "important"
+            );
+            // Also trigger a reflow to ensure the change is applied
+            plotContainer.offsetHeight;
+          }
+        } else {
+          // Fallback: ensure reduced height is applied even without rows config
+          const plotContainer = $(".plot-container");
+          const currentHeight = plotContainer.height();
+          if (currentHeight > 1280) {
+            console.log(
+              `Applying reduced height fallback: ${currentHeight}px -> 1280px`
+            );
+            const containerElement = plotContainer[0];
+            if (containerElement) {
+              containerElement.style.setProperty(
+                "height",
+                "1280px",
+                "important"
+              );
+              containerElement.offsetHeight;
+            }
+          }
+        }
+      }
+
+      function setupTabResizeHandlers(tabs) {
+        // Remove any existing event listeners to avoid duplicates
+        $('#plotTabs button[data-bs-toggle="tab"]').off(
+          "shown.bs.tab.plotResize"
+        );
+
+        // Add event listeners for tab shown events
+        $('#plotTabs button[data-bs-toggle="tab"]').on(
+          "shown.bs.tab.plotResize",
+          function (e) {
+            const tabId = e.target
+              .getAttribute("data-bs-target")
+              .replace("#", "")
+              .replace("-content", "");
+            const plotId = window.plotIds[tabId];
+
+            console.log("Tab shown:", tabId, "Plot ID:", plotId);
+
+            // Update container height for this tab
+            updatePlotContainerHeight(tabId);
+
+            if (plotId && window.plotIds[tabId + "_created"]) {
+              setTimeout(() => {
+                try {
+                  // Resize the plot to fit the container
+                  Plotly.Plots.resize(plotId);
+                  console.log("Resized plot for tab:", tabId);
+                } catch (error) {
+                  console.warn("Failed to resize plot for tab:", tabId, error);
+
+                  // If resize fails, try to recreate the plot
+                  if (window.plotData && window.plotData[tabId]) {
+                    console.log("Attempting to recreate plot for tab:", tabId);
+                    try {
+                      // Ensure plot layout uses consistent height during recreation
+                      const plotLayout = { ...window.plotData[tabId].layout };
+                      if (plotLayout.height && plotLayout.height !== 1280) {
+                        console.log(
+                          `Adjusting recreated plot layout height from ${plotLayout.height} to match container`
+                        );
+                        plotLayout.height = undefined; // Let it use container dimensions
+                      }
+
+                      // Apply light theme styling
+                      plotLayout.paper_bgcolor = "white";
+                      plotLayout.plot_bgcolor = "white";
+                      plotLayout.font = {
+                        ...(plotLayout.font || {}),
+                        color: "#2b2d42",
+                      };
+                      plotLayout.title = {
+                        ...(plotLayout.title || {}),
+                        font: {
+                          ...(plotLayout.title?.font || {}),
+                          color: "#2b2d42",
+                        },
+                      };
+                      plotLayout.hoverlabel = {
+                        ...(plotLayout.hoverlabel || {}),
+                        bgcolor: "white",
+                        bordercolor: "#e0e0e0",
+                        font: {
+                          ...(plotLayout.hoverlabel?.font || {}),
+                          color: "#2b2d42",
+                        },
+                      };
+                      Plotly.newPlot(
+                        plotId,
+                        window.plotData[tabId].data,
+                        plotLayout,
+                        {
+                          responsive: true,
+                          displayModeBar: true,
+                          displaylogo: false,
+                          modeBarButtonsToRemove: ["pan2d", "lasso2d"],
+                          toImageButtonOptions: {
+                            format: "svg",
+                            filename: `ai_progress_${tabId}`,
+                            height: null,
+                            width: null,
+                            scale: 2,
+                          },
+                        }
+                      );
+                    } catch (recreateError) {
+                      console.error(
+                        "Failed to recreate plot for tab:",
+                        tabId,
+                        recreateError
+                      );
+                    }
+                  }
+                }
+              }, 50); // Small delay to ensure tab transition is complete
+            }
+          }
+        );
+
+        // Also handle window resize events for all visible plots
+        $(window)
+          .off("resize.plotResize")
+          .on("resize.plotResize", function () {
+            // Find the currently active tab
+            const activeTab = $("#plotTabs .nav-link.active");
+            if (activeTab.length > 0) {
+              const tabId = activeTab
+                .attr("data-bs-target")
+                .replace("#", "")
+                .replace("-content", "");
+              const plotId = window.plotIds[tabId];
+
+              if (plotId && window.plotIds[tabId + "_created"]) {
+                setTimeout(() => {
+                  try {
+                    Plotly.Plots.resize(plotId);
+                  } catch (error) {
+                    console.warn(
+                      "Failed to resize plot on window resize:",
+                      plotId,
+                      error
+                    );
+                  }
+                }, 100);
+              }
+            }
+          });
+      }
+
+      function createSinglePlot(plotData) {
+        console.log("Creating single plot (legacy mode)");
+
+        // Clean up any tab-related event listeners
+        $(window).off("resize.plotResize");
+        $('#plotTabs button[data-bs-toggle="tab"]').off(
+          "shown.bs.tab.plotResize"
+        );
+
+        // Hide tab navigation
+        $("#plotTabs").hide();
+
+        // Clear existing content and create single plot container
+        // Set reasonable height for single plot mode - use consistent height calculation
+        const singlePlotContainer = $(".plot-container")[0];
+        if (singlePlotContainer) {
+          singlePlotContainer.style.setProperty(
+            "height",
+            "1280px",
+            "important"
+          );
+          // Force a reflow to ensure the height is applied immediately
+          singlePlotContainer.offsetHeight;
+        }
+        $("#plotTabContent").html(`
+                <div class="tab-pane fade show active" id="default-plot">
+                    <div id="plotDiv" style="width: 100%; height: 100%; min-height: 1280px;"></div>
+                </div>
+            `);
+
+        // Create the plot
+        const plotDiv = document.getElementById("plotDiv");
+        if (plotDiv.children.length === 0) {
+          setTimeout(() => {
+            // Ensure plot layout uses consistent height
+            const plotLayout = { ...plotData.layout };
+            if (plotLayout.height && plotLayout.height !== 1280) {
+              console.log(
+                `Adjusting single plot layout height from ${plotLayout.height} to match container`
+              );
+              plotLayout.height = undefined; // Let it use container dimensions
+            }
+
+            // Apply light theme styling
+            plotLayout.paper_bgcolor = "white";
+            plotLayout.plot_bgcolor = "white";
+            plotLayout.font = {
+              ...(plotLayout.font || {}),
+              color: "#2b2d42",
+            };
+            plotLayout.title = {
+              ...(plotLayout.title || {}),
+              font: {
+                ...(plotLayout.title?.font || {}),
+                color: "#2b2d42",
+              },
+            };
+            plotLayout.hoverlabel = {
+              ...(plotLayout.hoverlabel || {}),
+              bgcolor: "white",
+              bordercolor: "#e0e0e0",
+              font: {
+                ...(plotLayout.hoverlabel?.font || {}),
+                color: "#2b2d42",
+              },
+            };
+            Plotly.newPlot("plotDiv", plotData.data, plotLayout, {
+              responsive: true,
+              displayModeBar: true,
+              modeBarButtonsToRemove: ["pan2d", "lasso2d"],
+              toImageButtonOptions: {
+                format: "png",
+                filename: "ai_progress_model",
+                height: 1280,
+                width: null,
+                scale: 1,
+              },
+            });
+          }, 5);
+        } else {
+          // Ensure plot layout uses consistent height for updates too
+          const plotLayout = { ...plotData.layout };
+          if (plotLayout.height && plotLayout.height !== 1280) {
+            console.log(
+              `Adjusting single plot update layout height from ${plotLayout.height} to match container`
+            );
+            plotLayout.height = undefined; // Let it use container dimensions
+          }
+
+          // Apply light theme styling
+          plotLayout.paper_bgcolor = "white";
+          plotLayout.plot_bgcolor = "white";
+          plotLayout.font = {
+            ...(plotLayout.font || {}),
+            color: "#2b2d42",
+          };
+          plotLayout.title = {
+            ...(plotLayout.title || {}),
+            font: {
+              ...(plotLayout.title?.font || {}),
+              color: "#2b2d42",
+            },
+          };
+          plotLayout.hoverlabel = {
+            ...(plotLayout.hoverlabel || {}),
+            bgcolor: "white",
+            bordercolor: "#e0e0e0",
+            font: {
+              ...(plotLayout.hoverlabel?.font || {}),
+              color: "#2b2d42",
+            },
+          };
+          Plotly.react("plotDiv", plotData.data, plotLayout, {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ["pan2d", "lasso2d"],
+          });
+        }
+      }
+
+      function initializeSession() {
+        // Initialize server-side session data without affecting UI
+        return $.ajax({
+          url: "/api/default-data",
+          method: "GET",
+          success: function (response) {
+            console.log("Server session initialized successfully");
+          },
+          error: function (xhr) {
+            console.error("Failed to initialize server session:", xhr);
+          },
+        });
+      }
+
+      function loadDefaultData() {
+        // This function is kept for compatibility but now delegates to the parameter config system
+        if (parameterConfig && parameterConfig.defaults) {
+          console.log(
+            "Using parameter config defaults instead of /api/default-data"
+          );
+          // Re-initialize controls to ensure they have the latest values
+          initializeParameterControls();
+          computeModel();
+        } else {
+          // Fallback to API call if parameter config is not available
+          console.log(
+            "Parameter config not available, fetching from /api/default-data"
+          );
+          $.ajax({
+            url: "/api/default-data",
+            method: "GET",
+            success: function (response) {
+              // Update parameter controls
+              Object.keys(response.parameters).forEach((key) => {
+                const element = $("#" + key);
+                if (element.length) {
+                  let value = response.parameters[key];
+
+                  // Only convert certain parameters to log scale for display
+                  if (key === "top_percentile") {
+                    // Convert to negated log scale on (1 - percentile) for display
+                    value = -Math.log10(Math.max(1.0 - value, 1e-6));
+                  } else if (key === "coding_labor_normalization") {
+                    // Convert to log scale for display
+                    value = Math.log10(Math.max(value, 1e-5));
+                  }
+
+                  element.val(value);
+                  updateDisplayValue(element[0]);
+                }
+              });
+
+              // Compute initial model
+              computeModel();
+            },
+            error: function (xhr) {
+              console.error("Failed to load default data:", xhr);
+              showError("Failed to load default parameter values");
+            },
+          });
+        }
+      }
+
+      function uploadData() {
+        const fileInput = $("#csvFile")[0];
+        if (!fileInput.files.length) return;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        showLoading(true);
+
+        $.ajax({
+          url: "/api/upload-data",
+          method: "POST",
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: function (response) {
+            if (response.success) {
+              $("#dataPreview").show();
+              $("#dataSummary").html(
+                `<div>Time range: ${response.data_summary.time_range[0]} - ${response.data_summary.time_range[1]}</div>` +
+                  `<div>Data points: ${response.data_summary.data_points}</div>`
+              );
+
+              // Update time range inputs
+              $("#start_year").val(
+                Math.floor(response.data_summary.time_range[0])
+              );
+              $("#end_year").val(
+                Math.ceil(response.data_summary.time_range[1])
+              );
+
+              computeModel();
+            } else {
+              showError(response.error);
+            }
+          },
+          error: function (xhr) {
+            const error = xhr.responseJSON
+              ? xhr.responseJSON.error
+              : "Failed to upload file";
+            showError(error);
+          },
+          complete: function () {
+            showLoading(false);
+          },
+        });
+      }
+
+      function selectDataset() {
+        const dataset = $("#datasetSelect").val();
+        if (!dataset) return;
+
+        showLoading(true);
+
+        $.ajax({
+          url: "/api/select-data",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify({ dataset }),
+          success: function (response) {
+            if (response.success) {
+              $("#dataPreview").show();
+              $("#dataSummary").html(
+                `<div>Time range: ${response.data_summary.time_range[0]} - ${response.data_summary.time_range[1]}</div>` +
+                  `<div>Data points: ${response.data_summary.data_points}</div>`
+              );
+
+              // Update time range inputs
+              $("#start_year").val(
+                Math.floor(response.data_summary.time_range[0])
+              );
+              $("#end_year").val(
+                Math.ceil(response.data_summary.time_range[1])
+              );
+
+              computeModel();
+            } else {
+              showError(response.error || "Failed to select dataset");
+            }
+          },
+          error: function (xhr) {
+            const error = xhr.responseJSON
+              ? xhr.responseJSON.error
+              : "Failed to select dataset";
+            showError(error);
+          },
+          complete: function () {
+            showLoading(false);
+          },
+        });
+      }
+
+      function estimateParameters() {
+        const anchors = collectConstraints();
+
+        if (anchors.length === 0) {
+          alert(
+            "Please add at least one constraint before estimating parameters."
+          );
+          return;
+        }
+
+        const fixedParams = [];
+        $('#fixedParamsCheckboxes input[type="checkbox"]').each(function () {
+          if (!$(this).is(":checked")) {
+            fixedParams.push($(this).val());
+          }
+        });
+
+        // Show validation results
+        const validationDiv = document.getElementById("constraintValidation");
+        const validationResults = document.getElementById("validationResults");
+        validationResults.innerHTML = `
+                <p><strong>Found ${anchors.length} constraint${
+          anchors.length > 1 ? "s" : ""
+        }:</strong></p>
+                <ul>
+                    ${anchors
+                      .map(
+                        (anchor, i) => `
+                        <li>Constraint ${i + 1}: When ${Object.entries(
+                          anchor.conditions
+                        )
+                          .map(([k, v]) => `${k}=${v}`)
+                          .join(", ")}, 
+                        expect ${anchor.target_variable} = ${
+                          anchor.target_value
+                        } (weight: ${anchor.weight})</li>
+                    `
+                      )
+                      .join("")}
+                </ul>
+            `;
+        validationDiv.style.display = "block";
+
+        const initialParameters = collectParameters();
+        const initialProgress = parseFloat($("#initial_progress").val());
+        const timeRange = [
+          parseInt($("#start_year").val()),
+          parseInt($("#end_year").val()),
+        ];
+
+        showLoading(true);
+
+        $.ajax({
+          url: "/api/estimate-parameters",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify({
+            anchors: anchors,
+            initial_parameters: initialParameters,
+            initial_progress: initialProgress,
+            time_range: timeRange,
+            fixed_params: fixedParams,
+          }),
+          success: function (response) {
+            if (response.success) {
+              // Update parameter controls with estimated values
+              let updatedParams = [];
+              Object.keys(response.estimated_parameters).forEach((key) => {
+                const element = $("#" + key);
+                if (element.length) {
+                  const oldValue = element.val();
+                  let newValue = response.estimated_parameters[key];
+
+                  // Apply bounds checking and inverse transformation for UI controls
+                  newValue = applyParameterBounds(key, newValue);
+
+                  element.val(newValue);
+                  updateDisplayValue(element[0]);
+                  updatedParams.push(
+                    `${key}: ${parseFloat(oldValue).toFixed(4)} → ${parseFloat(
+                      newValue
+                    ).toFixed(4)}`
+                  );
+                  console.log(
+                    `Updated parameter ${key}: ${oldValue} → ${newValue}`
+                  );
+                } else {
+                  console.warn(`UI element not found for parameter: ${key}`);
+                  updatedParams.push(
+                    `${key}: ?? → ${response.estimated_parameters[key].toFixed(
+                      4
+                    )} (no UI control)`
+                  );
+                }
+              });
+
+              // Check if we have plot data (new synchronized response)
+              if (response.plots && response.tabs && response.summary) {
+                // Handle multi-tab response
+                createPlotTabs(response.tabs, response.plots);
+              } else if (response.plot && response.summary) {
+                // Handle legacy single plot response (fallback)
+                createSinglePlot(response.plot);
+              }
+              if (response.summary) {
+                updateSummary(response.summary);
+              }
+
+              // Show parameter changes in validation area
+              const validationResults =
+                document.getElementById("validationResults");
+              validationResults.innerHTML += `
+                            <div class="mt-3">
+                                <p><strong>Parameter Updates:</strong></p>
+                                <div style="font-family: monospace; font-size: 0.9em;">
+                                    ${updatedParams
+                                      .map((param) => {
+                                        const [name, change] =
+                                          param.split(": ");
+                                        const [oldVal, newVal] =
+                                          change.split(" → ");
+                                        const oldNum = parseFloat(oldVal);
+                                        const newNum = parseFloat(newVal);
+                                        const changePercent =
+                                          oldNum !== 0
+                                            ? (
+                                                ((newNum - oldNum) /
+                                                  Math.abs(oldNum)) *
+                                                100
+                                              ).toFixed(1)
+                                            : "N/A";
+                                        const changeColor =
+                                          newNum > oldNum
+                                            ? "text-success"
+                                            : newNum < oldNum
+                                            ? "text-warning"
+                                            : "text-muted";
+                                        return `<div>${name}: ${oldVal} → <span class="${changeColor}">${newVal}</span> <small class="text-muted">(${changePercent}%)</small></div>`;
+                                      })
+                                      .join("")}
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <p><strong>Constraint Satisfaction Analysis:</strong></p>
+                                    <div class="progress-container">
+                                        ${response.constraint_evaluations
+                                          .map((eval, i) => {
+                                            const satisfactionPercent = (
+                                              eval.satisfaction * 100
+                                            ).toFixed(1);
+                                            const barColor =
+                                              eval.satisfaction > 0.9
+                                                ? "bg-success"
+                                                : eval.satisfaction > 0.7
+                                                ? "bg-warning"
+                                                : "bg-danger";
+                                            const errorText =
+                                              eval.error !== undefined
+                                                ? ` (error: ${eval.error.toFixed(
+                                                    3
+                                                  )})`
+                                                : "";
+                                            return `
+                                                <div class="mb-2">
+                                                    <small>Constraint ${
+                                                      i + 1
+                                                    }: ${
+                                              eval.target_variable
+                                            } = ${
+                                              eval.target_value
+                                            }${errorText}</small>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar ${barColor}" style="width: ${satisfactionPercent}%">
+                                                            ${satisfactionPercent}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                          })
+                                          .join("")}
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <p><strong>Optimization Results:</strong></p>
+                                    <div style="font-family: monospace; font-size: 0.9em;">
+                                        <div>Initial objective: ${
+                                          response.optimization_info
+                                            .initial_objective
+                                            ? response.optimization_info.initial_objective.toFixed(
+                                                6
+                                              )
+                                            : "N/A"
+                                        }</div>
+                                        <div>Final objective: ${
+                                          response.optimization_info
+                                            .final_objective
+                                            ? response.optimization_info.final_objective.toFixed(
+                                                6
+                                              )
+                                            : "N/A"
+                                        }</div>
+                                        <div class="text-success">Improvement: ${
+                                          response.optimization_info.improvement
+                                            ? response.optimization_info.improvement.toFixed(
+                                                6
+                                              )
+                                            : "N/A"
+                                        }</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-success mt-2">
+                                    ${
+                                      response.plots || response.plot
+                                        ? "✓ Parameters estimated and model updated successfully! The graphs show the new results."
+                                        : '✓ Parameters estimated successfully! Click "Update Model" to see the results.'
+                                    }
+                                </div>
+                                
+                                ${
+                                  response.computation_error
+                                    ? `
+                                    <div class="alert alert-warning mt-2">
+                                        ⚠️ Parameter estimation succeeded, but model computation encountered an issue: ${response.computation_error}
+                                        <br><small>You can try running the model manually or adjust the parameters.</small>
+                                    </div>
+                                `
+                                    : ""
+                                }
+                            </div>
+                        `;
+
+              // Only call computeModel if we don't already have plot data
+              if (!response.plots && !response.plot) {
+                computeModel();
+              }
+            } else {
+              const validationResults =
+                document.getElementById("validationResults");
+              validationResults.innerHTML += `
+                            <div class="alert alert-danger mt-2">
+                                ✗ Parameter estimation failed: ${response.error}
+                            </div>
+                        `;
+              showError(response.error);
+            }
+          },
+          error: function (xhr) {
+            const error = xhr.responseJSON
+              ? xhr.responseJSON.error
+              : "Parameter estimation failed";
+            showError(error);
+          },
+          complete: function () {
+            showLoading(false);
+          },
+        });
+      }
+
+      function exportResults() {
+        window.location.href = "/api/export-csv";
+      }
+
+      function exportMETRData() {
+        // Direct download - backend will handle validation
+        window.location.href = "/api/export-metr-data";
+      }
+
+      function initializeParameterControls() {
+        // Comprehensive initialization of all parameter controls from config
+        if (!parameterConfig) {
+          console.warn(
+            "Parameter config not available, using fallback initialization"
+          );
+          initializeFallbackControls();
+          return;
+        }
+
+        // Initialize range sliders
+        if (parameterConfig.bounds && parameterConfig.defaults) {
+          Object.entries(parameterConfig.bounds).forEach(
+            ([paramName, bounds]) => {
+              const slider = document.getElementById(paramName);
+              const defaultValue = parameterConfig.defaults[paramName];
+
+              if (slider && slider.type === "range") {
+                const [min, max] = bounds;
+
+                // Special handling for certain parameters
+                if (paramName === "top_percentile") {
+                  // This slider uses log scale on (1 - percentile), so convert bounds and default
+                  // Note: We negate the log scale so higher percentiles are on the right
+                  slider.min = -Math.log10(1.0 - min); // More negative for lower percentiles
+                  slider.max = -Math.log10(Math.max(1.0 - max, 1e-6)); // Less negative for higher percentiles
+                  slider.value = -Math.log10(Math.max(1.0 - defaultValue, 1e-6));
+                  console.log("top_percentile slider init:", {min: slider.min, max: slider.max, value: slider.value, defaultValue: defaultValue});
+                } else if (paramName === "coding_labor_normalization") {
+                  // This slider uses log scale, so convert bounds and default
+                  slider.min = Math.log10(Math.max(min, 1e-5)); // Avoid log(0)
+                  slider.max = Math.log10(max);
+                  slider.value = Math.log10(Math.max(defaultValue, 1e-5));
+                } else if (
+                  paramName === "sc_time_horizon_minutes" ||
+                  paramName === "pre_gap_sc_time_horizon"
+                ) {
+                  // This slider uses log scale for better usability with large range
+                  slider.min = Math.log10(Math.max(min, 1));
+                  slider.max = Math.log10(max);
+                  slider.value = Math.log10(Math.max(defaultValue, 1));
+                } else {
+                  slider.min = min;
+                  slider.max = max;
+                  slider.value = defaultValue;
+                }
+
+                // Update display value
+                updateDisplayValue(slider);
+
+                // Update range display text if element exists
+                const rangeDisplay = document.getElementById(
+                  paramName + "_range"
+                );
+                if (rangeDisplay) {
+                  rangeDisplay.textContent = `Range: [${min}, ${max}]`;
+                }
+
+                console.log(
+                  `Initialized ${paramName}: bounds=[${slider.min}, ${slider.max}], value=${slider.value}`
+                );
+              }
+            }
+          );
+        }
+
+        // Initialize coding_labor_mode dropdown
+        try {
+          const clmSelect = document.getElementById("coding_labor_mode");
+          if (clmSelect && parameterConfig?.coding_labor_modes) {
+            clmSelect.innerHTML = "";
+            parameterConfig.coding_labor_modes.forEach((mode) => {
+              const opt = document.createElement("option");
+              opt.value = mode;
+              opt.textContent = mode === 'optimal_ces' ? 'Optimal Frontier CES' : 'Simple CES';
+              clmSelect.appendChild(opt);
+            });
+            clmSelect.value = parameterConfig?.defaults?.coding_labor_mode || 'simple_ces';
+          }
+        } catch (e) {
+          console.warn("Failed to initialize coding_labor_mode dropdown", e);
+        }
+
+        // Initialize parallel penalty toggle state. Default: enabled iff default != 0
+        try {
+          const toggle = document.getElementById("enable_parallel_penalty");
+          if (toggle) {
+            const def = parameterConfig?.defaults?.parallel_penalty ?? 0.0;
+            toggle.checked = !!def && def !== 0.0;
+          }
+        } catch (e) {
+          console.warn("Failed to initialize parallel penalty toggle", e);
+        }
+
+        // Initialize Benchmarks & Gaps controls from defaults where appropriate
+        try {
+          const gapSlider = document.getElementById("gap_years");
+          if (
+            gapSlider &&
+            parameterConfig.defaults &&
+            parameterConfig.defaults.gap_years !== undefined
+          ) {
+            gapSlider.value = parameterConfig.defaults.gap_years;
+            updateDisplayValue(gapSlider);
+          }
+          // Default the toggle to OFF regardless of server default
+          const benchToggle = document.getElementById(
+            "include_gap"
+          );
+          if (benchToggle) {
+            benchToggle.checked = false;
+            updateBenchmarksAndGapsVisibility();
+          }
+        } catch (e) {
+          console.warn("Failed to initialize benchmarks & gaps controls", e);
+        }
+
+        // Initialize dropdown controls
+        if (
+          parameterConfig?.taste_schedule_types &&
+          parameterConfig?.defaults
+        ) {
+          const tasteScheduleSelect = document.getElementById(
+            "taste_schedule_type"
+          );
+          if (tasteScheduleSelect) {
+            // Clear existing options
+            tasteScheduleSelect.innerHTML = "";
+
+            // Add options from config
+            parameterConfig.taste_schedule_types.forEach((type) => {
+              const option = document.createElement("option");
+              option.value = type;
+              option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+              tasteScheduleSelect.appendChild(option);
+            });
+
+            // Set default value
+            const defaultType =
+              parameterConfig.defaults.taste_schedule_type || "exponential";
+            tasteScheduleSelect.value = defaultType;
+
+            console.log(
+              `Initialized taste_schedule_type dropdown with options: ${parameterConfig.taste_schedule_types.join(
+                ", "
+              )}, default: ${defaultType}`
+            );
+          }
+        }
+
+        if (
+          parameterConfig?.automation_interp_types &&
+          parameterConfig?.defaults
+        ) {
+          const automationInterpSelect = document.getElementById(
+            "automation_interp_type"
+          );
+          if (automationInterpSelect) {
+            automationInterpSelect.innerHTML = "";
+            parameterConfig.automation_interp_types.forEach((type) => {
+              const option = document.createElement("option");
+              option.value = type;
+              option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+              automationInterpSelect.appendChild(option);
+            });
+            const defaultType =
+              parameterConfig.defaults.automation_interp_type || "exponential";
+            automationInterpSelect.value = defaultType;
+            console.log(
+              `Initialized automation_interp_type dropdown with options: ${parameterConfig.automation_interp_types.join(
+                ", "
+              )}, default: ${defaultType}`
+            );
+          }
+        }
+
+        if (
+          parameterConfig?.horizon_extrapolation_types &&
+          parameterConfig?.defaults
+        ) {
+          const horizonExtrapolationSelect = document.getElementById(
+            "horizon_extrapolation_type"
+          );
+          if (horizonExtrapolationSelect) {
+            // Clear existing options
+            horizonExtrapolationSelect.innerHTML = "";
+
+            // Add options from config
+            parameterConfig.horizon_extrapolation_types.forEach((type) => {
+              const option = document.createElement("option");
+              option.value = type;
+              option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+              horizonExtrapolationSelect.appendChild(option);
+            });
+
+            // Set default value
+            const defaultType =
+              parameterConfig.defaults.horizon_extrapolation_type ||
+              "exponential";
+            horizonExtrapolationSelect.value = defaultType;
+
+            console.log(
+              `Initialized horizon_extrapolation_type dropdown with options: ${parameterConfig.horizon_extrapolation_types.join(
+                ", "
+              )}, default: ${defaultType}`
+            );
+          }
+        }
+
+        // Set defaults for non-range inputs in Optimal CES group
+        try {
+          const etaInitEl = document.getElementById('optimal_ces_eta_init');
+          if (etaInitEl && parameterConfig?.defaults?.optimal_ces_eta_init !== undefined) {
+            etaInitEl.value = parameterConfig.defaults.optimal_ces_eta_init;
+          }
+        } catch (e) {
+          console.warn('Failed to initialize optimal_ces_eta_init', e);
+        }
+
+        // Initialize number inputs (simulation settings)
+        // Use hardcoded defaults since simulation settings aren't in parameter config yet
+        const startYear = document.getElementById("start_year");
+        if (startYear) {
+          startYear.value = startYear.value || 2012;
+          startYear.min = 2000;
+          startYear.max = 2050;
+        }
+
+        const endYear = document.getElementById("end_year");
+        if (endYear) {
+          endYear.value = endYear.value || 2050;
+          endYear.min = 2020;
+          endYear.max = 2100;
+        }
+
+        const initialProgress = document.getElementById("initial_progress");
+        if (initialProgress) {
+          initialProgress.value = initialProgress.value || 0.0;
+          initialProgress.min = -100;
+          initialProgress.max = 100;
+        }
+
+        // Initialize auto-fit checkboxes and their corresponding sliders
+        const autoFitParams = [
+          "present_horizon",
+          "present_doubling_time",
+          "doubling_difficulty_growth_rate",
+        ];
+        autoFitParams.forEach((paramId) => {
+          const checkbox = document.getElementById("auto_fit_" + paramId);
+          const slider = document.getElementById(paramId);
+
+          if (checkbox && slider) {
+            // Set initial state based on checkbox
+            if (checkbox.checked) {
+              slider.disabled = true;
+              const displaySpan = document.getElementById(paramId + "_val");
+              if (displaySpan) {
+                displaySpan.textContent = "Auto-fit";
+              }
+            } else {
+              slider.disabled = false;
+              updateDisplayValue(slider);
+            }
+          }
+        });
+
+        // Update parameter labels from descriptions if available
+        if (parameterConfig.descriptions) {
+          Object.entries(parameterConfig.descriptions).forEach(
+            ([paramName, info]) => {
+              const label = document.querySelector(
+                `label[for="${paramName}"], label:has(#${paramName})`
+              );
+              if (label && info.name) {
+                // Update the label text while preserving the span for display value
+                const span = label.querySelector("span");
+                const spanHtml = span ? span.outerHTML : "";
+                const colonIndex = label.innerHTML.indexOf(":");
+                if (colonIndex !== -1) {
+                  label.innerHTML = `${info.name}: ${spanHtml}`;
+                }
+              }
+            }
+          );
+        }
+        // If precise mode is currently enabled, ensure inputs reflect that mode
+        if (usePreciseInputs) {
+          setInputMode(true);
+        }
+        // Apply CES input mode UI after initializing controls
+        setCesInputMode(
+          document.getElementById("directCesToggle")?.checked || false,
+          true
+        );
+      }
+
+      function setCesInputMode(useDirect, suppressCompute = false) {
+        try {
+          const directGroup = document.getElementById("expCesDirectGroup");
+          const pseudoGroup = document.getElementById("expPseudoparamsGroup");
+          const codingExpGroup = document.getElementById(
+            "codingLaborExponentGroup"
+          );
+          const computedEl = document.getElementById("computedExpParams");
+          if (directGroup) directGroup.style.display = useDirect ? "" : "none";
+          if (pseudoGroup) pseudoGroup.style.display = useDirect ? "none" : "";
+          if (codingExpGroup)
+            codingExpGroup.style.display = useDirect ? "" : "none";
+          if (computedEl) computedEl.style.display = useDirect ? "none" : "";
+          // Auto-update if enabled and not suppressed
+          if (!suppressCompute && $("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          }
+        } catch (e) {
+          console.warn("Failed to set CES input mode", e);
+        }
+      }
+
+      function updateComputedExpParams(response) {
+        try {
+          const computedEl = document.getElementById("computedExpParams");
+          if (!computedEl) return;
+          const useDirect =
+            !!document.getElementById("directCesToggle")?.checked;
+          if (useDirect) {
+            computedEl.style.display = "none";
+            return;
+          }
+          const p =
+            response && response.exp_capacity_params
+              ? response.exp_capacity_params
+              : null;
+          if (!p) {
+            computedEl.style.display = "none";
+            return;
+          }
+          const fmt = (v) =>
+            v === null || v === undefined || !isFinite(v)
+              ? "—"
+              : Number(v).toFixed(3);
+          computedEl.innerText = `Computed CES params → ρ: ${fmt(
+            p.rho
+          )}, α: ${fmt(p.alpha)}, ζ: ${fmt(
+            p.experiment_compute_exponent
+          )}, penalty: ${fmt(parameters.parallel_penalty ?? parameterConfig?.defaults?.parallel_penalty ?? 0)}`;
+          computedEl.style.display = "";
+        } catch (e) {
+          console.warn("Failed rendering computed params", e);
+        }
+      }
+
+      function applyParameterBounds(key, value) {
+        // Centralized bounds checking and transformation for UI controls
+        let newValue = value;
+
+        // Special handling for values that are log-scaled in slider mode
+        if (!usePreciseInputs) {
+          if (key === "top_percentile") {
+            // Convert from actual percentile to negated log scale on (1 - percentile)
+            newValue = -Math.log10(Math.max(1.0 - value, 1e-6));
+          } else if (key === "coding_labor_normalization") {
+            newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
+          } else if (
+            key === "sc_time_horizon_minutes" ||
+            key === "pre_gap_sc_time_horizon"
+          ) {
+            newValue = Math.log10(Math.max(value, 1));
+          }
+        }
+
+        // Get bounds from parameter config if available, otherwise use element attributes or fallbacks
+        let minVal, maxVal;
+        if (
+          parameterConfig &&
+          parameterConfig.bounds &&
+          parameterConfig.bounds[key]
+        ) {
+          const bounds = parameterConfig.bounds[key];
+          minVal = bounds[0];
+          maxVal = bounds[1];
+
+          // Apply log scale conversion to bounds for slider mode only
+          if (!usePreciseInputs) {
+            if (key === "top_percentile") {
+              minVal = -Math.log10(1.0 - bounds[0]);
+              maxVal = -Math.log10(Math.max(1.0 - bounds[1], 1e-6));
+            } else if (key === "coding_labor_normalization") {
+              minVal = Math.log10(Math.max(bounds[0], 1e-5));
+              maxVal = Math.log10(bounds[1]);
+            } else if (
+              key === "sc_time_horizon_minutes" ||
+              key === "pre_gap_sc_time_horizon"
+            ) {
+              minVal = Math.log10(Math.max(bounds[0], 1));
+              maxVal = Math.log10(bounds[1]);
+            }
+          }
+        } else {
+          // Fall back to element attributes or hardcoded bounds
+          const element = $("#" + key);
+          if (element.length) {
+            minVal = parseFloat(element.attr("min"));
+            maxVal = parseFloat(element.attr("max"));
+          }
+
+          // If still no bounds, use hardcoded fallbacks as last resort
+          if (isNaN(minVal) || isNaN(maxVal)) {
+            const fallbackBounds = {
+              rho_coding_labor: [-10, 1],
+              rho_experiment_capacity: [-1, 1],
+              alpha_experiment_capacity: [0.05, 0.95],
+              software_progress_rate_at_reference_year: [0.1, 10],
+              automation_fraction_at_superhuman_coder: [0.1, 0.99],
+
+              swe_multiplier_at_present_day: [1.0, 10.0],
+              coding_labor_normalization: [-5, 1],
+              experiment_compute_exponent: [0.1, 1.0],
+              ai_research_taste_slope: [0.1, 10],
+              sc_time_horizon_minutes: [3, 6], // Log scale bounds
+              pre_gap_sc_time_horizon: [3, 6],
+              // exp capacity pseudoparameters
+              inf_labor_asymptote: [0, 1000000],
+              inf_compute_asymptote: [0, 1000000],
+              labor_anchor_exp_cap: [0, 1000000],
+              inv_compute_anchor_exp_cap: [0, 1000000],
+            };
+
+            if (fallbackBounds[key]) {
+              [minVal, maxVal] = fallbackBounds[key];
+            }
+          }
+        }
+
+        // Apply bounds if we have them
+        if (!isNaN(minVal) && !isNaN(maxVal)) {
+          newValue = Math.max(minVal, Math.min(maxVal, newValue));
+        }
+
+        return newValue;
+      }
+
+      function setInputMode(precise) {
+        usePreciseInputs = !!precise;
+        // Iterate through all known parameter controls and toggle their types/values
+        PARAMETER_IDS.forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          // Skip non-input controls (e.g., selects) and checkboxes
+          const tag = el.tagName ? el.tagName.toLowerCase() : "";
+          if (tag !== "input") return;
+          if (el.type === "checkbox") return;
+
+          // Save original slider attributes if not already saved
+          if (!el.dataset.rangeMin) el.dataset.rangeMin = el.min ?? "";
+          if (!el.dataset.rangeMax) el.dataset.rangeMax = el.max ?? "";
+          if (!el.dataset.rangeStep) el.dataset.rangeStep = el.step ?? "";
+
+          // Determine new value respecting special log-scaled parameters
+          let current = parseFloat(el.value);
+          if (!isFinite(current)) current = 0;
+
+          if (precise) {
+            // Switching to precise numeric inputs
+            let newVal = current;
+            if (
+              id === "coding_labor_normalization" ||
+              id === "sc_time_horizon_minutes" ||
+              id === "pre_gap_sc_time_horizon"
+            ) {
+              // Convert from log slider value to actual value
+              newVal = Math.pow(10, current);
+            }
+
+            // Switch type and classes
+            el.type = "number";
+            el.classList.remove("form-range", "range-input");
+            el.classList.add("form-control", "form-control-sm");
+            el.step = "any";
+            el.min = "";
+            el.max = "";
+            el.value = newVal;
+
+            // Bind input handler for display + auto-update
+            $(el)
+              .off("input.precise")
+              .on("input.precise", function () {
+                updateDisplayValue(this);
+                if ($("#autoUpdate").is(":checked")) {
+                  clearTimeout(window.updateTimer);
+                  window.updateTimer = setTimeout(computeModel, 300);
+                }
+              });
+          } else {
+            // Switching back to slider inputs
+            let newVal = current;
+            if (
+              id === "coding_labor_normalization" ||
+              id === "sc_time_horizon_minutes" ||
+              id === "pre_gap_sc_time_horizon"
+            ) {
+              // Convert from actual value back to log slider value
+              newVal = Math.log10(
+                Math.max(
+                  current,
+                  id === "coding_labor_normalization" ? 1e-5 : 1
+                )
+              );
+            }
+
+            el.type = "range";
+            el.classList.remove("form-control", "form-control-sm");
+            el.classList.add("form-range", "range-input");
+            el.min = el.dataset.rangeMin || el.min;
+            el.max = el.dataset.rangeMax || el.max;
+            el.step = el.dataset.rangeStep || el.step || "0.01";
+            el.value = newVal;
+
+            // Remove precise input handler
+            $(el).off("input.precise");
+          }
+
+          // Refresh display text for each control
+          updateDisplayValue(el);
+        });
+      }
+
+      function initializeFallbackControls() {
+        // Fallback initialization with hardcoded values when config is not available
+        const fallbackData = {
+          rho_coding_labor: { min: -10, max: 1, value: -2, range: "[-10, 0]" },
+          rho_experiment_capacity: {
+            min: -1,
+            max: 1,
+            value: -0.2,
+            range: "[-1, 1]",
+          },
+          alpha_experiment_capacity: { min: 0.05, max: 0.95, value: 0.5 },
+          software_progress_rate_at_reference_year: { min: 0.1, max: 10, value: 1.0, range: "[0.1, 10]" },
+          automation_fraction_at_superhuman_coder: {
+            min: 0.1,
+            max: 0.99,
+            value: 0.99,
+          },
+
+          swe_multiplier_at_present_day: { min: 1.0, max: 10.0, value: 2.0 },
+          coding_labor_normalization: { min: -5, max: 1, value: 0 },
+          experiment_compute_exponent: {
+            min: 0.1,
+            max: 1.0,
+            value: 0.4,
+            range: "[0.1, 1.0]",
+          },
+          ai_research_taste_at_superhuman_coder: {
+            min: 0.1,
+            max: 5,
+            value: 0.95,
+          },
+          ai_research_taste_slope: { min: 0.1, max: 10, value: 1.2 },
+          sc_time_horizon_minutes: { min: 3, max: 6, value: 4.7 }, // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
+          pre_gap_sc_time_horizon: { min: 3, max: 6, value: 4.016 },
+          // Manual horizon fitting parameters
+          present_day: { min: 2020.0, max: 2030.0, value: 2025.25 },
+          present_horizon: { min: 0.01, max: 10000.0, value: 1000.0 }, // Default to reasonable value
+          present_doubling_time: { min: 0.01, max: 100.0, value: 2.0 }, // Default to reasonable value
+          doubling_difficulty_growth_rate: { min: 0.5, max: 1.499, value: 0.92 }, // Default to reasonable value (1 - 0.08)
+        };
+
+        Object.entries(fallbackData).forEach(([paramName, config]) => {
+          const slider = document.getElementById(paramName);
+          if (slider && slider.type === "range") {
+            slider.min = config.min;
+            slider.max = config.max;
+            slider.value = config.value;
+            updateDisplayValue(slider);
+
+            // Update range display if available
+            const rangeDisplay = document.getElementById(paramName + "_range");
+            if (rangeDisplay && config.range) {
+              rangeDisplay.textContent = `Range: ${config.range}`;
+            } else if (paramName === "sc_time_horizon_minutes") {
+              // Special display for log scale parameter
+              if (rangeDisplay) {
+                rangeDisplay.textContent = "Range: [1k, 1M minutes]";
+              }
+            }
+          }
+        });
+        // Ensure pseudoparameter sliders have some bounds when server config is unavailable
+        [
+          "inf_labor_asymptote",
+          "inf_compute_asymptote",
+          "labor_anchor_exp_cap",
+          "inv_compute_anchor_exp_cap",
+        ].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el && el.type === "range") {
+            if (!el.min) el.min = 0;
+            if (!el.max) el.max = 1000000;
+            if (!el.value)
+              el.value =
+                id === "inf_compute_asymptote"
+                  ? 5000
+                  : id === "inf_labor_asymptote"
+                  ? 15
+                  : id === "labor_anchor_exp_cap"
+                  ? 1.6
+                  : 2.5;
+            updateDisplayValue(el);
+          }
+        });
+
+        // Fallback simulation settings
+        const simSettings = {
+          start_year: { value: 2012, min: 2000, max: 2050 },
+          end_year: { value: 2050, min: 2020, max: 2100 },
+          initial_progress: { value: 0.0, min: 0.0, max: 100 },
+        };
+
+        Object.entries(simSettings).forEach(([inputName, config]) => {
+          const input = document.getElementById(inputName);
+          if (input) {
+            input.value = config.value;
+            input.min = config.min;
+            input.max = config.max;
+          }
+        });
+
+        // Initialize auto-fit checkboxes and their corresponding sliders
+        const autoFitParams = [
+          "present_horizon",
+          "present_doubling_time",
+          "doubling_difficulty_growth_rate",
+        ];
+        autoFitParams.forEach((paramId) => {
+          const checkbox = document.getElementById("auto_fit_" + paramId);
+          const slider = document.getElementById(paramId);
+
+          if (checkbox && slider) {
+            // Set initial state based on checkbox (defaults to checked/auto-fit)
+            if (checkbox.checked) {
+              slider.disabled = true;
+              const displaySpan = document.getElementById(paramId + "_val");
+              if (displaySpan) {
+                displaySpan.textContent = "Auto-fit";
+              }
+            } else {
+              slider.disabled = false;
+              updateDisplayValue(slider);
+            }
+          }
+        });
+      }
+
+      function populateFixedParamsCheckboxes() {
+        const container = $("#fixedParamsCheckboxes");
+        container.empty();
+
+        // Use parameter config from server if available, otherwise fallback to hardcoded
+        let params;
+        if (parameterConfig && parameterConfig.descriptions) {
+          params = {};
+          Object.entries(parameterConfig.descriptions).forEach(([id, info]) => {
+            params[id] = info.name || info.display_name || id;
+          });
+        } else {
+          // Fallback to hardcoded values (reduced reliance on hardcoded data)
+          console.warn("Using fallback parameter names for checkboxes");
+          params = {
+            rho_coding_labor: "Cognitive Elasticity",
+            rho_experiment_capacity: "Progress Elasticity",
+            alpha_experiment_capacity: "Compute Weight",
+            software_progress_rate_at_reference_year: "Software Scale",
+            automation_fraction_at_superhuman_coder: "ACD-AI Automation Fraction:",
+
+            swe_multiplier_at_present_day: "SWE Multiplier at Present Day",
+            coding_labor_normalization: "Parallel Coding Labor Normalization",
+            experiment_compute_exponent: "Experiment Compute Discounting",
+            ai_research_taste_at_superhuman_coder: "ACD-AI Research Taste",
+            ai_research_taste_slope: "AI Research Taste Slope",
+            sc_time_horizon_minutes: "Time Horizon to Superhuman Coder",
+          };
+        }
+
+        Object.entries(params).forEach(([id, label]) => {
+          const checkboxHtml = `
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" value="${id}" id="fix_param_${id}" checked>
+                        <label class="form-check-label" for="fix_param_${id}">
+                            ${label}
+                        </label>
+                    </div>
+                `;
+          container.append(checkboxHtml);
+        });
+      }
+
+      function showLoading(show) {
+        if (show) {
+          $("#loadingSpinner").show();
+          $("#plotDiv").hide();
+        } else {
+          $("#loadingSpinner").hide();
+          $("#plotDiv").show();
+        }
+      }
+
+      function showError(message) {
+        $("#errorMessage").text(message);
+        $("#errorAlert").show();
+      }
+
+      function hideError() {
+        $("#errorAlert").hide();
+      }
+      function formatDecimalYearToMonthYear(decimalYear) {
+        if (
+          decimalYear === null ||
+          decimalYear === undefined ||
+          !isFinite(decimalYear)
+        ) {
+          return "—";
+        }
+
+        let year = Math.floor(decimalYear);
+        const yearFraction = decimalYear - year;
+
+        // Convert fraction of year to month (0-11), but handle edge case where rounding gives 12
+        let monthIndex = Math.round(yearFraction * 12);
+
+        // Handle edge case: if monthIndex is 12, it should be January of next year
+        if (monthIndex >= 12) {
+          monthIndex = 0;
+          year += 1;
+        }
+
+        // Month abbreviations
+        const monthAbbreviations = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        return `${monthAbbreviations[monthIndex]} ${year}`;
+      }
+
+      function updateSummary(summary) {
+        try {
+          $("#summaryCards").show();
+          const fmt = (n, digits = 2) => {
+            if (n === null || n === undefined || !isFinite(n)) return "—";
+            return Number(n)
+              .toFixed(digits)
+              .replace(/\.0+$/, "")
+              .replace(/\.([1-9])0+$/, ".$1");
+          };
+          // SC Time (formatted as month and year)
+          $("#summary_sc_time").text(
+            summary.sc_time != null
+              ? formatDecimalYearToMonthYear(summary.sc_time)
+              : "—"
+          );
+          $("#milestone_sc_time").text(
+            summary.sc_time != null
+              ? formatDecimalYearToMonthYear(summary.sc_time)
+              : "—"
+          );
+          // AI2027 SC Time (formatted as month and year)
+          $("#summary_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
+              : "—"
+          );
+          $("#milestone_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
+              : "—"
+          );
+          // SC R&D progress multiplier
+          $("#summary_sc_rd_multiplier").text(
+            summary.sc_sw_multiplier != null
+              ? fmt(summary.sc_sw_multiplier, 2) + "x"
+              : "—"
+          );
+          $("#milestone_sc_rd_multiplier").text(
+            summary.sc_sw_multiplier != null
+              ? fmt(summary.sc_sw_multiplier, 2) + "x"
+              : "—"
+          );
+          // Progress rate at anchor time
+          $("#summary_anchor_progress_rate").text(
+            summary.anchor_progress_rate != null
+              ? fmt(summary.anchor_progress_rate, 3)
+              : "—"
+          );
+
+          // Calibrated r_software value
+          $("#r_software_val").text(
+            summary.r_software != null
+              ? fmt(summary.r_software, 4)
+              : "—"
+          );
+
+          // Beta (inverse of r_software)
+          $("#beta_software_val").text(
+            summary.beta_software != null
+              ? fmt(summary.beta_software, 4)
+              : "—"
+          );
+
+          // Top taste percentile metrics
+          $("#top_taste_percentile_val").text(
+            summary.top_taste_percentile != null
+              ? (summary.top_taste_percentile * 100).toFixed(1) + "%"
+              : "—"
+          );
+          
+          $("#top_taste_num_sds_val").text(
+            summary.top_taste_num_sds != null
+              ? fmt(summary.top_taste_num_sds, 2)
+              : "—"
+          );
+          
+          $("#f_multiplier_per_sd_val").text(
+            summary.f_multiplier_per_sd != null
+              ? fmt(summary.f_multiplier_per_sd, 3)
+              : "—"
+          );
+          
+          $("#slope_times_log_f_val").text(
+            summary.slope_times_log_f != null
+              ? fmt(summary.slope_times_log_f, 3)
+              : "—"
+          );
+
+          // Make summary globally available for converted gap display
+          window.summary = window.summary || {};
+          window.summary.anchor_progress_rate = summary.anchor_progress_rate;
+          // Refresh converted gap display now that we have fresh rate
+          updateGapConvertedDisplay();
+
+          // Update AI Research Taste Slope info text under the slider
+          const slopeInfoEl = document.getElementById(
+            "ai_research_taste_slope_info"
+          );
+          if (slopeInfoEl) {
+            // Get current taste schedule type
+            const tasteScheduleSelect = document.getElementById("taste_schedule_type");
+            const currentType = tasteScheduleSelect ? tasteScheduleSelect.value : "SDs per effective OOM";
+
+            let slope, units;
+            if (currentType === "SDs per progress-year") {
+              // When in progress-year mode, show the equivalent effective OOM value
+              slope = summary.ai_research_taste_slope_per_effective_oom;
+              units = "SD/effective-OOM";
+            } else {
+              // When in effective OOM mode, show the equivalent progress-year value
+              slope = summary.ai_research_taste_slope_per_anchor_progress_year;
+              units = "SD/anchor-progress-year";
+            }
+
+            if (slope !== undefined && slope !== null && isFinite(slope)) {
+              slopeInfoEl.textContent = `Slope at present: ${fmt(
+                slope,
+                2
+              )} ${units}`;
+            } else {
+              slopeInfoEl.textContent = "Steepness of research taste curve";
+            }
+          }
+
+          // Update instantaneous anchor doubling time (convert years -> months)
+          try {
+            const instYears = summary.instantaneous_anchor_doubling_time_years;
+            const instMonths =
+              instYears !== undefined &&
+              instYears !== null &&
+              isFinite(instYears)
+                ? instYears * 12.0
+                : null;
+            const el = document.getElementById(
+              "instantaneous_anchor_doubling_time_val"
+            );
+            if (el) {
+              el.textContent =
+                instMonths !== null && isFinite(instMonths)
+                  ? fmt(instMonths, 2)
+                  : "—";
+            }
+          } catch (e) {
+            /* no-op */
+          }
+        } catch (e) {
+          console.warn("Failed to update summary", e);
+        }
+      }
+
+      function updateMilestonesFromResponse(response) {
+        try {
+          const tableBody = document.getElementById("milestonesTableBody");
+          if (!tableBody) return;
+          // Prefer explicit milestones field if present; otherwise try to derive minimal entries from summary
+          const milestones = response?.milestones || response?.results?.milestones || null;
+          tableBody.innerHTML = "";
+
+          const addRow = (name, timeVal, progressMult, effectiveCompute) => {
+            const tr = document.createElement("tr");
+            const tdName = document.createElement("td");
+            const tdTime = document.createElement("td");
+            const tdEC = document.createElement("td");
+            const tdMult = document.createElement("td");
+            tdName.textContent = name;
+            tdTime.textContent =
+              timeVal != null && isFinite(timeVal)
+                ? formatDecimalYearToMonthYear(timeVal)
+                : "—";
+            tdEC.textContent =
+              effectiveCompute != null && isFinite(effectiveCompute)
+                ? `1e${Number(effectiveCompute).toFixed(1)}`
+                : "—";
+            tdMult.textContent =
+              progressMult != null && isFinite(progressMult)
+                ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                : "—";
+            tr.appendChild(tdName);
+            tr.appendChild(tdTime);
+            tr.appendChild(tdEC);
+            tr.appendChild(tdMult);
+            tableBody.appendChild(tr);
+          };
+
+          // Build entries and sort by time (ascending); missing times go last
+          const entries = [];
+          if (milestones && typeof milestones === "object") {
+            Object.entries(milestones).forEach(([name, info]) => {
+              entries.push({
+                name,
+                time: info?.time,
+                pm: info?.progress_multiplier,
+                ec: info?.effective_compute_ooms,
+              });
+            });
+          } else {
+            const summary = response?.summary || {};
+            entries.push({ name: "ACD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null });
+            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null });
+          }
+
+          entries.sort((a, b) => {
+            const at = a && a.time != null && isFinite(a.time) ? a.time : Infinity;
+            const bt = b && b.time != null && isFinite(b.time) ? b.time : Infinity;
+            return at - bt;
+          });
+
+          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec));
+        } catch (e) {
+          console.warn("Failed to render milestones table", e);
+        }
+      }
+
+
+      let constraintCounter = 0;
+
+      function addAnchorConstraint() {
+        constraintCounter++;
+        const constraintId = `constraint_${constraintCounter}`;
+
+        const constraintHtml = `
+                <div class="card mb-3" id="${constraintId}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Constraint ${constraintCounter}</h6>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeConstraint('${constraintId}')">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Condition</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Condition Variable</label>
+                                    <select class="form-select form-select-sm" name="condition_variable">
+                                        <option value="time">Time</option>
+                                        <option value="automation_fraction">Automation Fraction</option>
+                                        <option value="inference_compute">AI Labor</option>
+                                        <option value="L_HUMAN">Human Labor</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Condition Value</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="condition_value" placeholder="Enter value" step="any" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Target</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Target Variable</label>
+                                    <select class="form-select form-select-sm" name="target_variable">
+                                        <option value="progress_rate">Progress Rate</option>
+                                        <option value="automation_fraction">Automation Fraction</option>
+                                        <option value="coding_labor">Parallel Coding Labor</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Target Value</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="target_value" placeholder="Expected value" step="any" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Weight</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           name="weight" value="1.0" step="0.1" min="0.1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                Preview: When <span class="condition-var-preview" data-constraint="${constraintId}">condition variable</span> = 
+                                <span class="condition-val-preview" data-constraint="${constraintId}">value</span>, 
+                                expect <span class="target-preview" data-constraint="${constraintId}">target variable</span> = 
+                                <span class="value-preview" data-constraint="${constraintId}">value</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        document
+          .getElementById("anchorConstraints")
+          .insertAdjacentHTML("beforeend", constraintHtml);
+        updateConstraintPreview(constraintId);
+        updateEstimateButton();
+
+        // Add event listeners for preview updates
+        const constraintCard = document.getElementById(constraintId);
+        constraintCard.querySelectorAll("input, select").forEach((input) => {
+          input.addEventListener("input", () =>
+            updateConstraintPreview(constraintId)
+          );
+        });
+      }
+
+      function removeConstraint(constraintId) {
+        document.getElementById(constraintId).remove();
+        updateEstimateButton();
+      }
+
+      function updateConstraintPreview(constraintId) {
+        const card = document.getElementById(constraintId);
+        const inputs = card.querySelectorAll("input, select");
+
+        let conditionVar = "";
+        let conditionVal = "";
+        let targetVar = "";
+        let targetVal = "";
+
+        inputs.forEach((input) => {
+          const value = input.value;
+          if (input.name === "condition_variable") {
+            conditionVar = value;
+          } else if (input.name === "condition_value") {
+            conditionVal = value;
+          } else if (input.name === "target_variable") {
+            targetVar = value;
+          } else if (input.name === "target_value") {
+            targetVal = value;
+          }
+        });
+
+        card.querySelector(".condition-var-preview").textContent =
+          conditionVar || "condition variable";
+        card.querySelector(".condition-val-preview").textContent =
+          conditionVal || "value";
+        card.querySelector(".target-preview").textContent =
+          targetVar || "target variable";
+        card.querySelector(".value-preview").textContent = targetVal || "value";
+      }
+
+      function updateEstimateButton() {
+        const constraintCount = document.querySelectorAll(
+          "#anchorConstraints .card"
+        ).length;
+        const estimateBtn = document.getElementById("estimateBtn");
+
+        if (constraintCount > 0) {
+          estimateBtn.disabled = false;
+          estimateBtn.textContent = `Estimate Parameters (${constraintCount} constraint${
+            constraintCount > 1 ? "s" : ""
+          })`;
+        } else {
+          estimateBtn.disabled = true;
+          estimateBtn.textContent =
+            "Estimate Parameters (Add constraints first)";
+        }
+      }
+
+      function collectConstraints() {
+        const constraints = [];
+        const constraintCards = document.querySelectorAll(
+          "#anchorConstraints .card"
+        );
+
+        constraintCards.forEach((card) => {
+          const inputs = card.querySelectorAll("input, select");
+          const constraint = {
+            conditions: {},
+            target_variable: "",
+            target_value: 0,
+            weight: 1.0,
+          };
+
+          let conditionVariable = "";
+          let conditionValue = "";
+
+          inputs.forEach((input) => {
+            const value = input.value;
+            if (value) {
+              if (input.name === "condition_variable") {
+                conditionVariable = value;
+              } else if (input.name === "condition_value") {
+                conditionValue = parseFloat(value);
+              } else if (input.name === "target_variable") {
+                constraint.target_variable = value;
+              } else if (input.name === "target_value") {
+                constraint.target_value = parseFloat(value);
+              } else if (input.name === "weight") {
+                constraint.weight = parseFloat(value);
+              }
+            }
+          });
+
+          // Add the single condition to the conditions object
+          if (conditionVariable && conditionValue !== "") {
+            constraint.conditions[conditionVariable] = conditionValue;
+          }
+
+          if (
+            constraint.target_variable &&
+            constraint.target_value !== "" &&
+            Object.keys(constraint.conditions).length > 0
+          ) {
+            constraints.push(constraint);
+          }
+        });
+
+        return constraints;
+      }
+    </script>
+  </body>
+</html>

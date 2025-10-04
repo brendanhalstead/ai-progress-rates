@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Rollouts</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.0/dist/nouislider.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.0/dist/nouislider.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Monte Carlo Rollouts</h3>
+            <div>
+                <a class="btn btn-outline-secondary" href="/">Back to Model</a>
+            </div>
+        </div>
+
+        <!-- Live plots row placed above parameter settings -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live SC-time Histogram</span>
+                        <span id="liveHistStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveHistWrap" style="display:none;">
+                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live SC-time histogram" />
+                        </div>
+                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating SC-time histogram while rollouts are running.</div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Live Horizon Trajectories</span>
+                        <span id="liveTrajStatus" class="small text-muted"></span>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveTrajWrap" style="display:none;">
+                            <img id="imgLiveTraj" class="img-fluid rounded border" alt="Live horizon trajectories" />
+                        </div>
+                        <div id="liveTrajEmpty" class="text-muted small">Start a job to see a live-updating horizon trajectories plot while rollouts are running.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Run Settings</span>
+                        <div class="btn-group btn-group-sm">
+                            <button id="loadCfgBtn" class="btn btn-outline-secondary">Load Sampling Configuration</button>
+                            <button id="saveCfgBtn" class="btn btn-outline-secondary">Save Sampling Configuration</button>
+                            <button id="loadFromFileBtn" class="btn btn-outline-primary">Reset to Defaults</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <label class="form-label">Seed</label>
+                                <input type="number" class="form-control form-control-sm" id="seed" value="42">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Samples</label>
+                                <input type="number" class="form-control form-control-sm" id="num_samples" value="1000" min="1">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Initial Progress</label>
+                                <input type="number" class="form-control form-control-sm" id="initial_progress" value="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Start Year</label>
+                                <input type="number" class="form-control form-control-sm" id="start_year" value="2012">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">End Year</label>
+                                <input type="number" class="form-control form-control-sm" id="end_year" value="2050">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Input Data CSV (optional absolute path)</label>
+                            <input type="text" class="form-control form-control-sm" id="input_data" placeholder="/abs/path/to/input_data.csv">
+                            <div class="form-text">Leave blank to use default at input_data.csv.</div>
+                        </div>
+                        <div class="d-grid">
+                            <button id="runBtn" class="btn btn-primary">Run Monte Carlo</button>
+                        </div>
+                        <input type="file" id="cfgFileInput" accept=".yaml,.yml,application/x-yaml,text/yaml" style="display:none;" />
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">Job Status</div>
+                    <div class="card-body">
+                        <div id="jobStatus" class="small text-muted">No job started.</div>
+                        <pre id="jobLog" class="mt-2" style="max-height: 220px; overflow: auto; background: var(--surface-2); padding: 8px;"></pre>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Rollout Analysis</span>
+                        <span class="small text-muted">Auto-generated after run</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="analysisEmpty" class="text-muted small">Run a job to see the SC-time distribution and sensitivity plots here.</div>
+                        <div id="analysisWrap" class="row g-3" style="display:none;">
+                            <div class="col-12 d-flex gap-2 align-items-center">
+                                <button id="btnDownloadZip" class="btn btn-sm btn-outline-primary">Download all outputs (ZIP)</button>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Download individual files
+                                    </button>
+                                    <ul class="dropdown-menu" id="downloadMenu">
+                                        <!-- Populated dynamically based on artifacts and common files -->
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">SC-by-Quarter Probability</label>
+                                <div id="scByQuarter" class="rounded border p-2" style="background: var(--surface-1);"></div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Quarterly Horizon Statistics (median and 90% CI)</label>
+                                <div id="quarterlyHorizonStats" class="table-responsive rounded border" style="background: var(--surface-1);"></div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">SC-time Distribution</label>
+                                <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Horizon Trajectories</label>
+                                <img id="imgHorizonTraj" class="img-fluid rounded border" alt="Horizon trajectories" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Pearson Correlation (top)</label>
+                                <img id="imgSensPearson" class="img-fluid rounded border" alt="Sensitivity Pearson" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Sensitivity: Spearman Correlation (top)</label>
+                                <img id="imgSensSpearman" class="img-fluid rounded border" alt="Sensitivity Spearman" />
+                            </div>
+                            <div class="col-md-6" style="display: none;">
+                                <label class="form-label small">Sensitivity: Permutation Importance (top)</label>
+                                <img id="imgSensPerm" class="img-fluid rounded border" alt="Sensitivity Permutation" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span>Parameter Distributions</span>
+                        <div>
+                            <button id="addParamBtn" class="btn btn-sm btn-outline-success">Add Parameter</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 70vh; overflow: auto;">
+                        <div class="text-muted small mb-2">
+                            Clicking the ✕ on a row omits that parameter from sampling. All rollouts will use the default value defined in the model config. 
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle" id="distTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 220px;">Parameter</th>
+                                        <th style="width: 120px;">Distribution</th>
+                                        <th>Spec</th>
+                                        <th style="width: 60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="distBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = null;
+        let jobId = null;
+        let sessionJobIds = [];
+        let pollTimer = null;
+        let liveHistTimer = null;
+        let liveTrajTimer = null;
+        let cancelOnUnload = false;
+        
+        // Generate unique ids so labels can associate with inputs
+        let __uidCounter = 0;
+        function uid(prefix = 'id') {
+            __uidCounter += 1;
+            return `${prefix}-${__uidCounter}`;
+        }
+
+        function field(name, placeholder = '', value = '') {
+            const id = uid(`txt-${name}`);
+            const label = placeholder ? `<label for="${id}" class="form-label small mb-0">${placeholder}</label>` : '';
+            return `${label}<input id="${id}" type="text" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+        }
+
+        function numberField(name, placeholder = '', value = '') {
+            const id = uid(`num-${name}`);
+            const label = placeholder ? `<label for="${id}" class="form-label small mb-0">${placeholder}</label>` : '';
+            return `${label}<input id="${id}" type="number" step="any" class="form-control form-control-sm dist-field" data-key="${name}" placeholder="${placeholder}" value="${value}">`;
+        }
+
+        function hiddenNumberField(name, value = '') {
+            return `<input type="hidden" class="dist-field" data-key="${name}" value="${value}">`;
+        }
+
+        function selectDist(name, value) {
+            const opts = ['fixed','uniform','normal','lognormal','shifted_lognormal','beta','choice'];
+            return `<select class="form-select form-select-sm dist-select" data-key="${name}">` +
+                opts.map(o => `<option value="${o}" ${o===value?'selected':''}>${o}</option>`).join('') + `</select>`;
+        }
+
+        function renderSpecInputs(dist, spec) {
+            // Render a compact spec editor row based on dist type
+            const s = spec || {};
+            if (dist === 'fixed') {
+                // Preserve type: support boolean, string, and numeric fixed values
+                if (typeof s.value === 'boolean') {
+                    const checked = s.value ? 'checked' : '';
+                    return `<div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input dist-field" data-key="value" data-kind="boolean" ${checked}>
+                    </div>`;
+                }
+                if (typeof s.value === 'string') {
+                    const esc = String(s.value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    return `<input type="text" class="form-control form-control-sm dist-field" data-key="value" data-kind="string" placeholder="value" value="${esc}">`;
+                }
+                return `${numberField('value', 'value', s.value ?? '')}`;
+            }
+            if (dist === 'uniform') {
+                return `<div class="row g-1">
+                    <div class="col-6">${numberField('min','min', s.min ?? '')}</div>
+                    <div class="col-6">${numberField('max','max', s.max ?? '')}</div>
+                </div>`;
+            }
+            if (dist === 'normal') {
+                const sdVal = (s.sd ?? s.sigma);
+                let defMin = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean - 3 * sdVal) : -10;
+                let defMax = (Number.isFinite(s.mean) && Number.isFinite(sdVal)) ? (s.mean + 3 * sdVal) : 10;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
+                return `<div class="row g-1">
+                    <div class="col-12 mt-1">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
+                    ${hiddenNumberField('mean', s.mean ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? s.sigma ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
+                </div>`;
+            }
+            if (dist === 'lognormal') {
+                const sigmaVal = (s.sigma ?? s.sd);
+                let defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
+                let defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
+                return `<div class="row g-1">
+                    <div class="col-12 mt-1">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
+                    ${hiddenNumberField('mu', s.mu ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
+                </div>`;
+            }
+            if (dist === 'shifted_lognormal') {
+                const sigmaVal = (s.sigma ?? s.sd);
+                let defMin = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu - 3 * sigmaVal) : 0.000001;
+                let defMax = (Number.isFinite(s.mu) && Number.isFinite(sigmaVal)) ? Math.exp(s.mu + 3 * sigmaVal) : 100;
+                const ciArr = Array.isArray(s.ci80) && s.ci80.length === 2 ? s.ci80 : null;
+                const ciLow = (ciArr ? s.ci80[0] : s.ci80_low);
+                const ciHigh = (ciArr ? s.ci80[1] : s.ci80_high);
+                // Ensure default slider range includes provided CI80 if present (pre-shift)
+                if (Number.isFinite(ciLow)) defMin = Math.min(defMin, ciLow);
+                if (Number.isFinite(ciHigh)) defMax = Math.max(defMax, ciHigh);
+                return `<div class="row g-1">
+                    <div class="col-12 mt-1">
+                        <div class="ci80-interval-slider" data-default-min="${defMin}" data-default-max="${defMax}"></div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>CI80 low: <span class="ci80-low-val"></span></span>
+                            <span>Median: <span class="ci80-med-val"></span></span>
+                            <span>CI80 high: <span class="ci80-high-val"></span></span>
+                        </div>
+                    </div>
+                    <div class="col-12 mb-1">${numberField('shift', 'shift', s.shift ?? '')}</div>
+                    ${hiddenNumberField('ci80_low', ciLow ?? '')}
+                    ${hiddenNumberField('ci80_high', ciHigh ?? '')}
+                    ${hiddenNumberField('mu', s.mu ?? '')}
+                    ${hiddenNumberField('sigma', s.sigma ?? '')}
+                    ${hiddenNumberField('sd', s.sd ?? '')}
+                    ${hiddenNumberField('min', s.min ?? '')}
+                    ${hiddenNumberField('max', s.max ?? '')}
+                </div>`;
+            }
+            if (dist === 'beta') {
+                return `<div class="row g-1">
+                    <div class="col-3">${numberField('alpha','alpha', s.alpha ?? '')}</div>
+                    <div class="col-3">${numberField('beta','beta', s.beta ?? '')}</div>
+                    <div class="col-3">${numberField('min','min', s.min ?? 0)}</div>
+                    <div class="col-3">${numberField('max','max', s.max ?? 1)}</div>
+                </div>`;
+            }
+            if (dist === 'choice') {
+                const values = Array.isArray(s.values) ? s.values.join(',') : '';
+                const probs = Array.isArray(s.p) ? s.p.join(',') : '';
+                return `<div class="row g-1">
+                    <div class="col-8">${field('values','values (comma-separated)', values)}</div>
+                    <div class="col-4">${field('p','p (optional, probabilities)', probs)}</div>
+                </div>`;
+            }
+            return '';
+        }
+
+        function toSpecObject(row) {
+            const dist = row.querySelector('.dist-select').value;
+            const spec = { dist };
+            row.querySelectorAll('.dist-field').forEach(el => {
+                const k = el.getAttribute('data-key');
+                let v = el.value;
+                if (['values','p'].includes(k)) {
+                    if (k === 'values') {
+                        spec.values = v.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                    } else if (k === 'p') {
+                        const arr = v.split(',').map(s => s.trim()).filter(s => s.length > 0).map(parseFloat);
+                        if (arr.length > 0) spec.p = arr;
+                    }
+                } else {
+                    // preserve explicit types when provided
+                    const kind = el.getAttribute('data-kind');
+                    if (kind === 'string') {
+                        spec[k] = String(v);
+                    } else if (kind === 'boolean') {
+                        spec[k] = !!el.checked;
+                    } else {
+                        // numeric fields (default)
+                        if (v !== '') spec[k] = parseFloat(v);
+                    }
+                }
+            });
+            // Prefer ci80 array syntax for normal/lognormal/shifted_lognormal if low/high present
+            if (dist === 'normal' || dist === 'lognormal' || dist === 'shifted_lognormal') {
+                const low = spec.ci80_low;
+                const high = spec.ci80_high;
+                if (Number.isFinite(low) && Number.isFinite(high)) {
+                    spec.ci80 = [low, high];
+                    delete spec.ci80_low;
+                    delete spec.ci80_high;
+                    if (dist === 'normal') {
+                        delete spec.mean;
+                        delete spec.sd;
+                        delete spec.sigma;
+                    } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
+                        delete spec.mu;
+                        delete spec.sigma;
+                        delete spec.sd;
+                    }
+                }
+            }
+            // Auto add clip_to_bounds when bounds are present
+            if ((spec.min !== undefined || spec.max !== undefined) && dist !== 'fixed' && dist !== 'choice') {
+                spec.clip_to_bounds = true;
+            }
+            return spec;
+        }
+
+        // ----- Slider and field synchronization helpers -----
+        const Z80 = 1.2815515655446004; // 10th/90th quantile z-score
+
+        function isFiniteNumber(value) {
+            const n = typeof value === 'number' ? value : parseFloat(value);
+            return Number.isFinite(n);
+        }
+
+        function parseNum(value) {
+            const n = parseFloat(value);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        // Format numbers for display in CI labels
+        function formatNumber(value) {
+            if (!isFiniteNumber(value)) return '';
+            try {
+                return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value);
+            } catch (e) {
+                const n = Number(value);
+                return Number.isFinite(n) && n.toPrecision ? n.toPrecision(4) : String(n);
+            }
+        }
+
+        function updateSliderLabels(specCell, lowVal, highVal) {
+            const lowSpan = specCell.querySelector('.ci80-low-val');
+            const highSpan = specCell.querySelector('.ci80-high-val');
+            const medSpan = specCell.querySelector('.ci80-med-val');
+            if (lowSpan) lowSpan.textContent = isFiniteNumber(lowVal) ? formatNumber(lowVal) : '';
+            if (highSpan) highSpan.textContent = isFiniteNumber(highVal) ? formatNumber(highVal) : '';
+            if (medSpan) {
+                const tr = specCell.closest('tr');
+                const dist = tr?.querySelector('.dist-select')?.value;
+                let median = null;
+                if (isFiniteNumber(lowVal) && isFiniteNumber(highVal)) {
+                    if (dist === 'normal') {
+                        median = (lowVal + highVal) / 2;
+                    } else if (dist === 'lognormal') {
+                        if (lowVal > 0 && highVal > 0) {
+                            median = Math.sqrt(lowVal * highVal);
+                        }
+                    } else if (dist === 'shifted_lognormal') {
+                        if (lowVal > 0 && highVal > 0) {
+                            const baseMedian = Math.sqrt(lowVal * highVal);
+                            median = isFiniteNumber(baseMedian) ? baseMedian : null;
+                        }
+                    }
+                }
+                medSpan.textContent = isFiniteNumber(median) ? formatNumber(median) : '';
+            }
+        }
+
+        function clamp(value, min, max) {
+            if (!Number.isFinite(value)) return value;
+            if (Number.isFinite(min) && value < min) return min;
+            if (Number.isFinite(max) && value > max) return max;
+            return value;
+        }
+
+        function computeNormalCI(mean, sd) {
+            if (!isFiniteNumber(mean) || !isFiniteNumber(sd)) return [null, null];
+            const low = mean - Z80 * sd;
+            const high = mean + Z80 * sd;
+            return [low, high];
+        }
+
+        function computeLognormalCI(mu, sigma) {
+            if (!isFiniteNumber(mu) || !isFiniteNumber(sigma)) return [null, null];
+            const low = Math.exp(mu - Z80 * sigma);
+            const high = Math.exp(mu + Z80 * sigma);
+            return [low, high];
+        }
+
+        function bindRowInteractions(tr) {
+            const dist = tr.querySelector('.dist-select')?.value;
+            if (dist !== 'normal' && dist !== 'lognormal' && dist !== 'shifted_lognormal') return;
+            const specCell = tr.querySelector('.spec-cell');
+            const sliderDiv = specCell.querySelector('.ci80-interval-slider');
+            const lowField = specCell.querySelector('.dist-field[data-key="ci80_low"]');
+            const highField = specCell.querySelector('.dist-field[data-key="ci80_high"]');
+            const minField = specCell.querySelector('.dist-field[data-key="min"]');
+            const maxField = specCell.querySelector('.dist-field[data-key="max"]');
+            const meanField = specCell.querySelector('.dist-field[data-key="mean"]');
+            const sdField = specCell.querySelector('.dist-field[data-key="sd"]');
+            const muField = specCell.querySelector('.dist-field[data-key="mu"]');
+            const sigmaField = specCell.querySelector('.dist-field[data-key="sigma"]');
+            const shiftField = specCell.querySelector('.dist-field[data-key="shift"]');
+
+            if (!sliderDiv || !lowField || !highField) return;
+
+            function getBounds() {
+                const defaultMin = parseNum(sliderDiv.getAttribute('data-default-min'));
+                const defaultMax = parseNum(sliderDiv.getAttribute('data-default-max'));
+                const minVal = parseNum(minField?.value);
+                const maxVal = parseNum(maxField?.value);
+                const minB = isFiniteNumber(minVal) ? minVal : defaultMin;
+                const maxB = isFiniteNumber(maxVal) ? maxVal : defaultMax;
+                return [minB, maxB];
+            }
+
+            function ensureSlider(lowVal, highVal, rangeMin, rangeMax) {
+                // Destroy existing slider if present to avoid duplicate bindings
+                if (sliderDiv.noUiSlider) {
+                    sliderDiv.noUiSlider.destroy();
+                }
+                noUiSlider.create(sliderDiv, {
+                    start: [lowVal, highVal],
+                    connect: true,
+                    range: { min: rangeMin, max: rangeMax }
+                });
+                sliderDiv.noUiSlider.on('update', (values) => {
+                    const low = parseNum(values[0]);
+                    const high = parseNum(values[1]);
+                    if (isFiniteNumber(low)) lowField.value = String(low);
+                    if (isFiniteNumber(high)) highField.value = String(high);
+                    updateSliderLabels(specCell, low, high);
+                });
+            }
+
+            function updateSliderRange() {
+                const [minB, maxB] = getBounds();
+                if (sliderDiv.noUiSlider) {
+                    const current = sliderDiv.noUiSlider.get().map(parseNum);
+                    const newLow = clamp(current[0], minB, maxB);
+                    const newHigh = clamp(current[1], minB, maxB);
+                    sliderDiv.noUiSlider.updateOptions({ range: { min: minB, max: maxB } }, true);
+                    sliderDiv.noUiSlider.set([newLow, newHigh]);
+                }
+            }
+
+            function setSliderFromFieldsOrDefaults() {
+                const [minB, maxB] = getBounds();
+                let lowVal = parseNum(lowField.value);
+                let highVal = parseNum(highField.value);
+                const minValRaw = parseNum(minField?.value);
+                const maxValRaw = parseNum(maxField?.value);
+                const hasMinExplicit = isFiniteNumber(minValRaw);
+                const hasMaxExplicit = isFiniteNumber(maxValRaw);
+
+                if (!isFiniteNumber(lowVal) || !isFiniteNumber(highVal)) {
+                    if (dist === 'normal') {
+                        const mean = parseNum(meanField?.value);
+                        const sd = parseNum(sdField?.value) ?? parseNum(sigmaField?.value);
+                        const [dl, dh] = computeNormalCI(mean, sd);
+                        lowVal = (isFiniteNumber(lowVal) ? lowVal : dl);
+                        highVal = (isFiniteNumber(highVal) ? highVal : dh);
+                    } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
+                        const mu = parseNum(muField?.value);
+                        const sigma = parseNum(sigmaField?.value) ?? parseNum(sdField?.value);
+                        const [dl, dh] = computeLognormalCI(mu, sigma);
+                        lowVal = (isFiniteNumber(lowVal) ? lowVal : dl);
+                        highVal = (isFiniteNumber(highVal) ? highVal : dh);
+                    }
+                }
+
+                // Only clamp to explicit user-provided min/max, not defaults
+                if (hasMinExplicit) {
+                    const mb = minValRaw;
+                    if (isFiniteNumber(lowVal)) lowVal = Math.max(mb, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.max(mb, highVal);
+                }
+                if (hasMaxExplicit) {
+                    const xb = maxValRaw;
+                    if (isFiniteNumber(lowVal)) lowVal = Math.min(xb, lowVal);
+                    if (isFiniteNumber(highVal)) highVal = Math.min(xb, highVal);
+                }
+                if (isFiniteNumber(lowVal) && isFiniteNumber(highVal) && lowVal > highVal) {
+                    const mid = (lowVal + highVal) / 2;
+                    lowVal = mid;
+                    highVal = mid;
+                }
+
+                // Initialize slider
+                const initLow = isFiniteNumber(lowVal) ? lowVal : (isFiniteNumber(minB) ? minB : 0);
+                const initHigh = isFiniteNumber(highVal) ? highVal : (isFiniteNumber(maxB) ? maxB : 1);
+                // Ensure the slider range accommodates the specified CI80 even when bounds/defaults are narrow
+                // Base the range on defaults but expand to include CI values
+                let rangeMin = isFiniteNumber(minB) ? Math.min(minB, initLow) : initLow;
+                let rangeMax = isFiniteNumber(maxB) ? Math.max(maxB, initHigh) : initHigh;
+                // If user explicitly set min/max, also include them in the range
+                if (hasMinExplicit) rangeMin = Math.min(rangeMin, minValRaw);
+                if (hasMaxExplicit) rangeMax = Math.max(rangeMax, maxValRaw);
+                if (!isFiniteNumber(rangeMin)) rangeMin = 0;
+                if (!isFiniteNumber(rangeMax)) rangeMax = 1;
+                if (rangeMax <= rangeMin) {
+                    // Expand slightly to create a visible range
+                    const eps = Math.max(1e-9, Math.abs(rangeMin) * 1e-6 + 1);
+                    rangeMax = rangeMin + eps;
+                }
+                ensureSlider(initLow, initHigh, rangeMin, rangeMax);
+
+                // Set hidden fields and labels now
+                lowField.value = String(initLow);
+                highField.value = String(initHigh);
+                updateSliderLabels(specCell, initLow, initHigh);
+            }
+
+            // Bind reactions to bound fields and distribution params
+            minField?.addEventListener('input', () => {
+                updateSliderRange();
+            });
+            maxField?.addEventListener('input', () => {
+                updateSliderRange();
+            });
+            if (dist === 'normal') {
+                meanField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                sdField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                sigmaField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+            } else if (dist === 'lognormal' || dist === 'shifted_lognormal') {
+                muField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                sigmaField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                sdField?.addEventListener('input', () => {
+                    if (!lowField.value && !highField.value) setSliderFromFieldsOrDefaults();
+                });
+                shiftField?.addEventListener('input', () => {
+                    const low = parseNum(lowField.value);
+                    const high = parseNum(highField.value);
+                    updateSliderLabels(specCell, low, high);
+                });
+            }
+
+            // Initial setup
+            setSliderFromFieldsOrDefaults();
+        }
+
+        function addRow(paramName, distSpec) {
+            const tbody = document.getElementById('distBody');
+            const tr = document.createElement('tr');
+            const dist = (distSpec && distSpec.dist) || 'fixed';
+            tr.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm param-name" value="${paramName || ''}" placeholder="parameter name"></td>
+                <td>${selectDist('dist', dist)}</td>
+                <td class="spec-cell">${renderSpecInputs(dist, distSpec)}</td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-danger remove-row">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+
+            tr.querySelector('.dist-select').addEventListener('change', (e) => {
+                const d = e.target.value;
+                tr.querySelector('.spec-cell').innerHTML = renderSpecInputs(d, {});
+                bindRowInteractions(tr);
+            });
+            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+            bindRowInteractions(tr);
+        }
+
+        function renderConfig(cfg) {
+            currentConfig = cfg || {};
+            // Fill top-level fields
+            document.getElementById('seed').value = currentConfig.seed ?? 42;
+            document.getElementById('num_samples').value = currentConfig.num_samples ?? currentConfig.num_rollouts ?? 1000;
+            document.getElementById('initial_progress').value = currentConfig.initial_progress ?? 0.0;
+            if (Array.isArray(currentConfig.time_range) && currentConfig.time_range.length === 2) {
+                document.getElementById('start_year').value = currentConfig.time_range[0];
+                document.getElementById('end_year').value = currentConfig.time_range[1];
+            }
+            document.getElementById('input_data').value = currentConfig.input_data || '';
+
+            // Render parameter rows
+            const tbody = document.getElementById('distBody');
+            tbody.innerHTML = '';
+            const params = currentConfig.parameters || {};
+            Object.keys(params).forEach(name => addRow(name, params[name]));
+        }
+
+        async function loadDefaultConfig(source='generated') {
+            const res = await fetch(`/api/monte-carlo/default-config?source=${source}`);
+            const data = await res.json();
+            if (data.success) {
+                renderConfig(data.config);
+            } else {
+                alert(data.error || 'Failed to load default config');
+            }
+        }
+
+        async function exportCurrentConfig() {
+            try {
+                const cfg = collectConfigFromUI();
+                const res = await fetch('/api/monte-carlo/export-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `Export failed (${res.status})`);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sampling_config.yaml';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert(e.message || 'Failed to export sampling configuration');
+            }
+        }
+
+        async function importConfigFromYamlText(yamlText) {
+            try {
+                const form = new FormData();
+                // Prefer file upload endpoint path for robust parsing
+                const file = new Blob([yamlText], { type: 'application/x-yaml' });
+                form.append('file', file, 'sampling_config.yaml');
+                const res = await fetch('/api/monte-carlo/import-config', {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Import failed');
+                renderConfig(data.config);
+            } catch (e) {
+                alert(e.message || 'Failed to import sampling configuration');
+            }
+        }
+
+        function collectConfigFromUI() {
+            const cfg = {
+                seed: parseInt(document.getElementById('seed').value || '42'),
+                num_samples: parseInt(document.getElementById('num_samples').value || '1000'),
+                initial_progress: parseFloat(document.getElementById('initial_progress').value || '0'),
+                time_range: [
+                    parseFloat(document.getElementById('start_year').value || '2012'),
+                    parseFloat(document.getElementById('end_year').value || '2035')
+                ],
+                input_data: (document.getElementById('input_data').value || '').trim() || null,
+                parameters: {}
+            };
+            document.querySelectorAll('#distBody tr').forEach(tr => {
+                const name = tr.querySelector('.param-name').value.trim();
+                if (!name) return;
+                cfg.parameters[name] = toSpecObject(tr);
+            });
+            return cfg;
+        }
+
+        async function startRun() {
+            const cfg = collectConfigFromUI();
+            document.getElementById('runBtn').disabled = true;
+            document.getElementById('jobStatus').textContent = 'Submitting job...';
+            document.getElementById('jobLog').textContent = '';
+            stopLiveHist();
+            stopLiveTraj();
+            setLiveHistVisible(false);
+            setLiveTrajVisible(false);
+            try {
+                const res = await fetch('/api/monte-carlo/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to start job');
+                jobId = data.job_id;
+                cancelOnUnload = true;
+                sessionJobIds.push(jobId);
+                document.getElementById('jobStatus').textContent = `Job ${jobId} started...`;
+                pollJob();
+                startLiveHist();
+                startLiveTraj();
+            } catch (e) {
+                document.getElementById('jobStatus').textContent = `Error: ${e.message}`;
+                document.getElementById('runBtn').disabled = false;
+            }
+        }
+
+        async function pollJob() {
+            if (!jobId) return;
+            try {
+                const res = await fetch(`/api/monte-carlo/status/${jobId}?tail=80`);
+                const data = await res.json();
+                if (data.success) {
+                    const j = data.job;
+                    const status = j.status;
+                    const outDir = j.output_dir ? ` | output: ${j.output_dir}` : '';
+                    document.getElementById('jobStatus').textContent = `Status: ${status}${outDir}`;
+                    document.getElementById('jobLog').textContent = (data.log_tail || []).join('\n');
+                    // Toggle live visibility when running
+                    if (status === 'running') { setLiveHistVisible(true); setLiveTrajVisible(true); }
+                    else { setLiveHistVisible(false); setLiveTrajVisible(false); }
+                    if (status === 'running') {
+                        clearTimeout(pollTimer);
+                        pollTimer = setTimeout(pollJob, 1500);
+                    } else {
+                        document.getElementById('runBtn').disabled = false;
+                        stopLiveHist();
+                        stopLiveTraj();
+                        cancelOnUnload = false;
+                        // Attempt to show artifacts if the job succeeded
+                        if (status === 'succeeded') {
+                            renderArtifacts(j);
+                        }
+                    }
+                } else {
+                    document.getElementById('jobStatus').textContent = data.error || 'Job not found';
+                    document.getElementById('runBtn').disabled = false;
+                }
+            } catch (e) {
+                document.getElementById('jobStatus').textContent = `Error polling job: ${e.message}`;
+                document.getElementById('runBtn').disabled = false;
+            }
+        }
+
+        function setLiveHistVisible(show) {
+            const wrap = document.getElementById('liveHistWrap');
+            const empty = document.getElementById('liveHistEmpty');
+            if (show) {
+                wrap.style.display = '';
+                empty.style.display = 'none';
+            } else {
+                wrap.style.display = 'none';
+                empty.style.display = '';
+            }
+        }
+
+        function startLiveHist() {
+            stopLiveHist();
+            const img = document.getElementById('imgLiveScHist');
+            const statusEl = document.getElementById('liveHistStatus');
+            const tick = async () => {
+                if (!jobId) return;
+                const url = `/api/monte-carlo/live-sc-hist/${jobId}.png?t=${Date.now()}`;
+                // Update image; use onload/onerror to reflect status
+                img.onload = () => { statusEl.textContent = ''; };
+                img.onerror = () => { statusEl.textContent = 'waiting for data…'; };
+                img.src = url;
+            };
+            tick();
+            liveHistTimer = setInterval(tick, 2000);
+        }
+
+        function stopLiveHist() {
+            const statusEl = document.getElementById('liveHistStatus');
+            if (liveHistTimer) {
+                clearInterval(liveHistTimer);
+                liveHistTimer = null;
+            }
+            statusEl.textContent = '';
+        }
+
+        function setLiveTrajVisible(show) {
+            const wrap = document.getElementById('liveTrajWrap');
+            const empty = document.getElementById('liveTrajEmpty');
+            if (show) {
+                wrap.style.display = '';
+                empty.style.display = 'none';
+            } else {
+                wrap.style.display = 'none';
+                empty.style.display = '';
+            }
+        }
+
+        function startLiveTraj() {
+            stopLiveTraj();
+            const img = document.getElementById('imgLiveTraj');
+            const statusEl = document.getElementById('liveTrajStatus');
+            const tick = async () => {
+                if (!jobId) return;
+                const params = new URLSearchParams({ t: String(Date.now()), max: '2000', stop_at_sc: '0' });
+                const url = `/api/monte-carlo/live-horizon-trajectories/${jobId}.png?${params.toString()}`;
+                img.onload = () => { statusEl.textContent = ''; };
+                img.onerror = () => { statusEl.textContent = 'waiting for data…'; };
+                img.src = url;
+            };
+            tick();
+            liveTrajTimer = setInterval(tick, 2500);
+        }
+
+        function stopLiveTraj() {
+            const statusEl = document.getElementById('liveTrajStatus');
+            if (liveTrajTimer) {
+                clearInterval(liveTrajTimer);
+                liveTrajTimer = null;
+            }
+            statusEl.textContent = '';
+        }
+
+        function renderArtifacts(job) {
+            const artifacts = job.artifacts || [];
+            const hasAny = (name) => artifacts.includes(name);
+            const ts = Date.now();
+            const base = (name) => `/api/monte-carlo/artifact/${jobId}/${encodeURIComponent(name)}?t=${ts}`;
+            const dlAll = () => `/api/monte-carlo/download/${jobId}?t=${ts}`;
+
+            const wrap = document.getElementById('analysisWrap');
+            const empty = document.getElementById('analysisEmpty');
+
+            // Show section
+            wrap.style.display = 'flex';
+            empty.style.display = 'none';
+
+            // Toggle and set image sources based on available artifacts
+            const scWrap = document.getElementById('imgScHist').closest('.col-12');
+            const htWrap = document.getElementById('imgHorizonTraj').closest('.col-12');
+            const pearsonWrap = document.getElementById('imgSensPearson').closest('.col-md-6');
+            const spWrap = document.getElementById('imgSensSpearman').closest('.col-md-6');
+            const pmWrap = document.getElementById('imgSensPerm').closest('.col-md-6');
+            const scqWrap = document.getElementById('scByQuarter').closest('.col-12');
+            const qhsWrap = document.getElementById('quarterlyHorizonStats').closest('.col-12');
+
+            // SC-by-quarter HTML fragment
+            const scqDiv = document.getElementById('scByQuarter');
+            if (hasAny('sc_by_quarter.html')) {
+                scqWrap.style.display = '';
+                fetch(base('sc_by_quarter.html'))
+                    .then(r => r.text())
+                    .then(html => { scqDiv.innerHTML = html; })
+                    .catch(() => { scqDiv.innerHTML = '<div class="text-muted small">Failed to load SC-by-quarter table.</div>'; });
+            } else {
+                scqWrap.style.display = 'none';
+                scqDiv.innerHTML = '';
+            }
+
+            // Quarterly Horizon Stats table (fetched from backend)
+            const qhsDiv = document.getElementById('quarterlyHorizonStats');
+            qhsWrap.style.display = '';
+            fetch(`/api/monte-carlo/quarterly-horizon-stats/${jobId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'Failed');
+                    const rows = Array.isArray(data.rows) ? data.rows : [];
+                    if (rows.length === 0) {
+                        qhsDiv.innerHTML = '<div class="p-2 text-muted small">No data yet.</div>';
+                        return;
+                    }
+                    const fmt = (v) => (v === null || v === undefined || Number.isNaN(v)) ? '' : new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(v);
+                    const thead = `<thead><tr>
+                        <th>Quarter</th>
+                        <th>Date</th>
+                        <th>Median (min)</th>
+                        <th>CI5 (min)</th>
+                        <th>CI95 (min)</th>
+                        <th>n</th>
+                    </tr></thead>`;
+                    const tbody = '<tbody>' + rows.map(r => `
+                        <tr>
+                            <td>${r.quarter}</td>
+                            <td>${r.date}</td>
+                            <td>${fmt(r.median)}</td>
+                            <td>${fmt(r.ci5)}</td>
+                            <td>${fmt(r.ci95)}</td>
+                            <td>${r.n ?? ''}</td>
+                        </tr>
+                    `).join('') + '</tbody>';
+                    qhsDiv.innerHTML = `<table class="table table-sm align-middle mb-0">${thead}${tbody}</table>`;
+                })
+                .catch(() => {
+                    qhsDiv.innerHTML = '<div class="p-2 text-muted small">Failed to load quarterly horizon stats.</div>';
+                });
+
+            if (hasAny('sc_time_hist.png')) {
+                document.getElementById('imgScHist').src = base('sc_time_hist.png');
+                scWrap.style.display = '';
+            } else {
+                scWrap.style.display = 'none';
+            }
+            if (hasAny('horizon_trajectories.png')) {
+                document.getElementById('imgHorizonTraj').src = base('horizon_trajectories.png');
+                htWrap.style.display = '';
+            } else {
+                htWrap.style.display = 'none';
+            }
+            if (hasAny('sensitivity_pearson_top.png')) {
+                document.getElementById('imgSensPearson').src = base('sensitivity_pearson_top.png');
+                pearsonWrap.style.display = '';
+            } else {
+                pearsonWrap.style.display = 'none';
+            }
+            if (hasAny('sensitivity_spearman_top.png')) {
+                document.getElementById('imgSensSpearman').src = base('sensitivity_spearman_top.png');
+                spWrap.style.display = '';
+            } else {
+                spWrap.style.display = 'none';
+            }
+            // Permutation importance always hidden
+            pmWrap.style.display = 'none';
+
+            // Wire up download-all
+            const btnZip = document.getElementById('btnDownloadZip');
+            if (btnZip) {
+                btnZip.onclick = () => { window.location.href = dlAll(); };
+            }
+
+            // Populate individual downloads menu with common files and detected artifacts
+            const menu = document.getElementById('downloadMenu');
+            if (menu) {
+                const items = [];
+                const addItem = (label, fname) => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.className = 'dropdown-item';
+                    a.href = base(fname);
+                    a.download = fname;
+                    a.textContent = label;
+                    li.appendChild(a);
+                    items.push(li);
+                };
+                // Known key files
+                ['samples.jsonl', 'rollouts.jsonl', 'metadata.json', 'model_config_snapshot.yaml', 'model_config_snapshot.json']
+                    .forEach(fname => addItem(fname, fname));
+                // Detected artifacts
+                artifacts.forEach(fname => addItem(fname, fname));
+                // Clear and append
+                menu.innerHTML = '';
+                items.forEach(li => menu.appendChild(li));
+            }
+        }
+
+        document.getElementById('loadFromFileBtn').addEventListener('click', () => loadDefaultConfig('file'));
+        document.getElementById('runBtn').addEventListener('click', startRun);
+        document.getElementById('addParamBtn').addEventListener('click', () => addRow('', { dist: 'fixed', value: 0 }));
+        document.getElementById('saveCfgBtn').addEventListener('click', exportCurrentConfig);
+        document.getElementById('loadCfgBtn').addEventListener('click', () => {
+            const input = document.getElementById('cfgFileInput');
+            input.value = '';
+            input.click();
+        });
+        document.getElementById('cfgFileInput').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                await importConfigFromYamlText(text);
+            } catch (err) {
+                alert('Failed to read selected file');
+            }
+        });
+
+        // Initial load: always from sampling_config.yaml
+        loadDefaultConfig('file');
+
+        // Cancel job and delete files when user exits the page
+        function sendCancelBeacon() {
+            if (!cancelOnUnload || sessionJobIds.length === 0) return;
+            const url = `/api/monte-carlo/cleanup`;
+            const blob = new Blob([JSON.stringify({ reason: 'unload', job_ids: sessionJobIds })], { type: 'application/json' });
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(url, blob);
+            } else {
+                // Fallback synchronous request
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, false);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                try { xhr.send(blob); } catch (e) {}
+            }
+        }
+        window.addEventListener('beforeunload', sendCancelBeacon);
+    </script>
+</body>
+</html>
+
