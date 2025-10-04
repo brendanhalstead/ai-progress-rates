@@ -17,7 +17,7 @@ Usage:
     --config config/sampling_config.yaml \
     --num-samples 5000 \
     --input-data input_data.csv \
-    --time-range 2015 2045 \
+    --time-range 2015 2050 \
     --seed 123
 
 If --config is omitted, a default independent distribution is derived from
@@ -688,6 +688,19 @@ def main() -> None:
 
     print(f"Run complete. Artifacts in: {run_dir}")
 
+    # Always generate batch plots
+    python_exe = sys.executable
+    try:
+        print("\nGenerating batch plots (milestone histograms and transitions)...")
+        subprocess.run(
+            [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--batch-all"],
+            cwd=str(REPO_ROOT),
+            check=True
+        )
+        print("Batch plots complete!")
+    except Exception as e:
+        print(f"WARNING: batch plot_rollouts failed: {e}")
+
     # Run post-processing scripts if requested
     if args.post_process:
         print("\nRunning post-processing scripts...")
@@ -715,18 +728,7 @@ def main() -> None:
         except Exception as e:
             print(f"    WARNING: plot_rollouts (horizon_trajectories) failed: {e}")
 
-        # 3. Batch plot all milestone histograms and transitions
-        try:
-            print("  - Generating batch plots (milestone histograms and transitions)...")
-            subprocess.run(
-                [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--batch-all"],
-                cwd=str(REPO_ROOT),
-                check=True
-            )
-        except Exception as e:
-            print(f"    WARNING: batch plot_rollouts failed: {e}")
-
-        # 4. Sensitivity analysis
+        # 3. Sensitivity analysis
         try:
             print("  - Running sensitivity analysis...")
             subprocess.run(
@@ -737,7 +739,7 @@ def main() -> None:
         except Exception as e:
             print(f"    WARNING: sensitivity_analysis failed: {e}")
 
-        # 5. SC by quarter table
+        # 4. SC by quarter table
         try:
             print("  - Generating SC-by-quarter table...")
             subprocess.run(

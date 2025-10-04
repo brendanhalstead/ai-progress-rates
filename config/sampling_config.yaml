@@ -17,7 +17,7 @@
 seed: 32432432
 initial_progress: 0.0
 # If omitted on CLI, this is used; otherwise CLI --time-range overrides
-time_range: [2012.0, 2045.0]
+time_range: [2012.0, 2050.0]
 
 num_rollouts: 1000
 input_data: input_data.csv

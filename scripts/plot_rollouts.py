@@ -796,12 +796,14 @@ def plot_milestone_transition_boxplot(
     labels: List[str],
     durations_per_pair: List[List[float]],
     num_not_achieved_per_pair: List[int],
+    total: int,
     out_path: Path,
     title: Optional[str] = None,
     ymin_years: Optional[float] = None,
     ymax_years: Optional[float] = None,
     exclude_inf_from_stats: bool = False,
     inf_years_cap: Optional[float] = None,
+    inf_years_display: float = 100.0,
     condition_text: Optional[str] = None,
 ) -> None:
     if len(labels) == 0:
@@ -810,10 +812,8 @@ def plot_milestone_transition_boxplot(
         raise ValueError("Mismatched inputs for boxplot")
 
     # Prepare data groups. Finite groups are the true finite durations.
-    # plot_groups are what will be fed to the boxplot: include capped
-    # 'Not achieved' points unless excluded.
+    # Boxes only show achieved durations, not achieved shown as separate scatter points.
     finite_groups: List[np.ndarray] = []
-    plot_groups: List[np.ndarray] = []
     global_min = np.inf
     global_max = 0.0
     for arr, ninf in zip(durations_per_pair, num_not_achieved_per_pair):
@@ -821,15 +821,9 @@ def plot_milestone_transition_boxplot(
         if a.size:
             a = a[np.isfinite(a) & (a > 0)]
         finite_groups.append(a)
-        if exclude_inf_from_stats:
-            group = a
-        else:
-            extra = np.full(int(ninf), float(inf_years_cap)) if int(ninf) > 0 else np.asarray([], dtype=float)
-            group = np.concatenate([a, extra]) if a.size or extra.size else np.asarray([], dtype=float)
-        plot_groups.append(group)
-        if group.size:
-            global_min = min(global_min, float(group.min()))
-            global_max = max(global_max, float(group.max()))
+        if a.size:
+            global_min = min(global_min, float(a.min()))
+            global_max = max(global_max, float(a.max()))
 
     if not np.isfinite(global_min):
         raise ValueError("No finite durations found to plot")
@@ -837,16 +831,16 @@ def plot_milestone_transition_boxplot(
     # Axis limits
     ymin = float(ymin_years) if ymin_years is not None else 10 ** np.floor(np.log10(global_min)) / 10.0
     ymax_candidate = float(ymax_years) if ymax_years is not None else 10 ** np.ceil(np.log10(max(global_max, global_min * 10)))
-    # Ensure y-axis includes the cap for plotted 'Not achieved' points
-    ymax_candidate = max(ymax_candidate, float(inf_years_cap))
+    # Ensure y-axis includes the display point for 'Not achieved' points
+    ymax_candidate = max(ymax_candidate, float(inf_years_display))
     ymax = max(ymax_candidate, ymin * 10.0)
 
     plt.figure(figsize=(16, 8))
     ax = plt.gca()
 
-    # Boxplot
+    # Boxplot - only show achieved durations in the boxes
     bp = plt.boxplot(
-        plot_groups,
+        finite_groups,
         labels=labels,
         showfliers=True,
         patch_artist=True,
@@ -881,7 +875,7 @@ def plot_milestone_transition_boxplot(
             if int(ninf) <= 0:
                 continue
             count = int(ninf)
-            y_points.extend([float(inf_years_cap)] * count)
+            y_points.extend([float(inf_years_display)] * count)
             x_points.extend([float(xi)] * count)
             sizes.extend([12.0] * count)
         if x_points:
@@ -985,11 +979,19 @@ def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out
             except Exception:
                 kde_counts = np.asarray([], dtype=float)
 
-        # Place the Not Achieved bar just to the right of the last numeric bin
-        no_x = float(bin_edges[-1] + bin_width / 2.0)
+        # Place the Not Achieved bar at the simulation end time if available
+        if sim_end is not None:
+            no_x = float(sim_end)
+        else:
+            no_x = float(bin_edges[-1] + bin_width / 2.0)
     else:
-        # Only Not Achieved data: choose an arbitrary position for the single bar
-        no_x = 1.0
+        # Only Not Achieved data: use sim_end if available, else arbitrary position
+        if sim_end is not None:
+            no_x = float(sim_end)
+            bin_width = 1.0
+        else:
+            no_x = 1.0
+            bin_width = 1.0
 
     # Calculate ymax for annotations
     ymax_hist = float(np.max(counts) if counts.size else 0.0)
@@ -1000,8 +1002,13 @@ def plot_milestone_time_histogram(times: List[float], num_not_achieved: int, out
     sim_end_year = int(np.round(sim_end)) if sim_end is not None else None
     if num_not_achieved > 0:
         ax.bar(no_x, num_not_achieved, width=bin_width, edgecolor="black", alpha=0.6, color="tab:red")
-        left = float(bin_edges[0]) if len(data) > 0 else 0.0
-        right = float(no_x + bin_width)
+        left = float(bin_edges[0]) if len(data) > 0 else (no_x - bin_width)
+        right = float(no_x + bin_width / 2.0)
+        ax.set_xlim(left, right)
+    elif len(data) > 0:
+        # No "not achieved" bar, but we have data - set xlim based on bins
+        left = float(bin_edges[0])
+        right = float(bin_edges[-1])
         ax.set_xlim(left, right)
 
     # Percentiles and annotations (including not achieved as simulation end)
@@ -1130,11 +1137,19 @@ def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path
             except Exception:
                 kde_counts = np.asarray([], dtype=float)
 
-        # Place the No SC bar just to the right of the last numeric bin
-        nosc_x = float(bin_edges[-1] + bin_width / 2.0)
+        # Place the No SC bar at the simulation end time if available
+        if sim_end is not None:
+            nosc_x = float(sim_end)
+        else:
+            nosc_x = float(bin_edges[-1] + bin_width / 2.0)
     else:
-        # Only No SC data: choose an arbitrary position for the single bar
-        nosc_x = 1.0
+        # Only No SC data: use sim_end if available, else arbitrary position
+        if sim_end is not None:
+            nosc_x = float(sim_end)
+            bin_width = 1.0
+        else:
+            nosc_x = 1.0
+            bin_width = 1.0
 
     # Calculate ymax for annotations
     ymax_hist = float(np.max(counts) if counts.size else 0.0)
@@ -1145,8 +1160,13 @@ def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path
     sim_end_year = int(np.round(sim_end)) if sim_end is not None else None
     if num_no_sc > 0:
         ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, color="tab:red")
-        left = float(bin_edges[0]) if len(data) > 0 else 0.0
-        right = float(nosc_x + bin_width)
+        left = float(bin_edges[0]) if len(data) > 0 else (nosc_x - bin_width)
+        right = float(nosc_x + bin_width / 2.0)
+        ax.set_xlim(left, right)
+    elif len(data) > 0:
+        # No "no SC" bar, but we have data - set xlim based on bins
+        left = float(bin_edges[0])
+        right = float(bin_edges[-1])
         ax.set_xlim(left, right)
 
     # Percentiles and annotations (including not achieved as simulation end)
@@ -1236,7 +1256,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:(Expensive, threshold only considers taste) SAR,(Expensive, threshold only considers taste) SAR:25x-AIR"
+    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:25x-AIR,25x-AIR:250x-AIR"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
