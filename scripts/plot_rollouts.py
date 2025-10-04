@@ -1209,7 +1209,8 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         "5x-AIR",
         "AI2027-SC",
         "(Expensive, threshold only considers taste) SAR",
-        "25x-AIR",  # SIAR
+        "25x-AIR",
+        "(Expensive, threshold only considers taste) SIAR",
         "250x-AIR"
     ]
 
@@ -1236,11 +1237,12 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
 
     # Milestone transition boxplot
     pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:(Expensive, threshold only considers taste) SAR,(Expensive, threshold only considers taste) SAR:25x-AIR"
+    pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
     labels, durations, num_not_achieved, total, typical_max = _read_milestone_transition_durations(
         rollouts_file,
-        pairs_str,
+        pairs,
         filter_milestone=None,
         filter_by_year=None
     )
