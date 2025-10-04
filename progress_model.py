@@ -3423,9 +3423,9 @@ class ProgressModel:
         ai2027_sc_time = None
         try:
             if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
-                ai2027_sc_required_mult = (
-                    cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty)
-                )
+                # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
+                serial_mult = cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30
+                ai2027_sc_required_mult = (serial_mult ** (1 / self.params.parallel_penalty)) * 30
                 ai2027_sc_time = _find_exponential_crossing_time(
                     np.asarray(times, dtype=float),
                     np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float),
@@ -3591,7 +3591,8 @@ class ProgressModel:
                 'interpolation_type': 'linear',            },
             'AI2027-SC': {
                 'metric': 'ai_coding_labor_mult_ref_present_day',
-                'target': cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty),
+                # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
+                'target': (cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30) ** (1 / self.params.parallel_penalty) * 30,
                 'interpolation_type': 'exponential',
             },
             '5x-AIR': {

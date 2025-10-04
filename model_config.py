@@ -30,7 +30,9 @@ PARALLEL_PENALTY_MAX = 1.0
 # OTHER RANDOM CONSTANTS
 # =============================================================================
 
-LABOR_MULT_EXTRA_FOR_AI2027_SC = 10
+# Serial labor multiplier component for AI2027-SC milestone
+# Formula: (SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30) ** (1 / parallel_penalty) * 30
+SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC = 10
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
