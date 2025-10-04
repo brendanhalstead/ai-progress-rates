@@ -529,21 +529,23 @@ def _read_milestone_transition_durations(
     pairs: List[Tuple[str, str]],
     filter_milestone: Optional[str] = None,
     filter_by_year: Optional[float] = None,
-) -> Tuple[List[str], List[List[float]], List[int], int, Optional[float]]:
+) -> Tuple[List[str], List[List[float]], List[int], List[int], List[int], Optional[float]]:
     """For each pair (A,B), compute finite durations B.time - A.time.
 
     Returns:
         labels: ["A to B", ...]
-        durations_per_pair: list of finite durations arrays (years, only where both achieved)
-        num_not_achieved_per_pair: count of rollouts where B not achieved (given A achieved)
-        total_rollouts: number of rollout records processed
+        durations_per_pair: list of finite durations arrays (years, only where both achieved in order)
+        num_b_not_achieved_per_pair: count where A achieved but B not achieved
+        num_b_before_a_per_pair: count where both achieved but B came before A
+        total_a_achieved_per_pair: number of rollouts where A was achieved for each pair
         typical_max_duration: typical maximum possible duration (sim_end - earliest A time)
     """
     labels: List[str] = [f"{a} to {b}" for a, b in pairs]
     durations_per_pair: List[List[float]] = [[] for _ in pairs]
-    num_not_achieved: List[int] = [0 for _ in pairs]
+    num_b_not_achieved: List[int] = [0 for _ in pairs]
+    num_b_before_a: List[int] = [0 for _ in pairs]
+    total_a_achieved: List[int] = [0 for _ in pairs]
     max_durations: List[float] = []
-    total = 0
 
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -585,8 +587,6 @@ def _read_milestone_transition_durations(
                 if not pass_filter:
                     continue
 
-            total += 1
-
             # Extract milestone times for this rollout once
             times_map: Dict[str, Optional[float]] = {}
             for name, info in milestones.items():
@@ -607,28 +607,36 @@ def _read_milestone_transition_durations(
                 tb = times_map.get(b)
 
                 if ta is None:
-                    # If first milestone not achieved, can't compute duration
-                    num_not_achieved[idx] += 1
+                    # If first milestone not achieved, skip entirely (don't count)
                     continue
+
+                # Count this rollout for this pair (A was achieved)
+                total_a_achieved[idx] += 1
 
                 # Track max possible duration for this transition
                 if simulation_end is not None and simulation_end > ta:
                     max_durations.append(float(simulation_end - ta))
 
                 if tb is None:
-                    # Second milestone not achieved - count as not achieved
-                    num_not_achieved[idx] += 1
+                    # Second milestone not achieved
+                    num_b_not_achieved[idx] += 1
                     continue
 
                 dur = float(tb - ta)
-                if not np.isfinite(dur) or dur <= 0.0:
-                    # Treat non-positive or non-finite as not achieved
-                    num_not_achieved[idx] += 1
+                if not np.isfinite(dur):
+                    # Treat non-finite as B not achieved
+                    num_b_not_achieved[idx] += 1
                     continue
+
+                if dur <= 0.0:
+                    # B came before or at same time as A
+                    num_b_before_a[idx] += 1
+                    continue
+
                 durations_per_pair[idx].append(dur)
 
     typical_max_duration = float(np.median(max_durations)) if max_durations else None
-    return labels, durations_per_pair, num_not_achieved, total, typical_max_duration
+    return labels, durations_per_pair, num_b_not_achieved, num_b_before_a, total_a_achieved, typical_max_duration
 
 
 def _read_milestone_scatter_data(
@@ -795,8 +803,9 @@ def _get_year_tick_values_and_labels(ymin: float, ymax: float) -> Tuple[List[flo
 def plot_milestone_transition_boxplot(
     labels: List[str],
     durations_per_pair: List[List[float]],
-    num_not_achieved_per_pair: List[int],
-    total: int,
+    num_b_not_achieved_per_pair: List[int],
+    num_b_before_a_per_pair: List[int],
+    total_per_pair: List[int],
     out_path: Path,
     title: Optional[str] = None,
     ymin_years: Optional[float] = None,
@@ -808,15 +817,15 @@ def plot_milestone_transition_boxplot(
 ) -> None:
     if len(labels) == 0:
         raise ValueError("No milestone pairs provided")
-    if len(labels) != len(durations_per_pair) or len(labels) != len(num_not_achieved_per_pair):
+    if len(labels) != len(durations_per_pair) or len(labels) != len(num_b_not_achieved_per_pair) or len(labels) != len(num_b_before_a_per_pair):
         raise ValueError("Mismatched inputs for boxplot")
 
     # Prepare data groups. Finite groups are the true finite durations.
-    # Boxes only show achieved durations, not achieved shown as separate scatter points.
+    # Boxes only show achieved durations, issues shown as separate scatter points.
     finite_groups: List[np.ndarray] = []
     global_min = np.inf
     global_max = 0.0
-    for arr, ninf in zip(durations_per_pair, num_not_achieved_per_pair):
+    for arr in durations_per_pair:
         a = np.asarray(arr, dtype=float)
         if a.size:
             a = a[np.isfinite(a) & (a > 0)]
@@ -865,20 +874,33 @@ def plot_milestone_transition_boxplot(
 
     plt.title(title or "Time Spent in Each Milestone Transition (calendar years)")
 
-    # Show "not achieved" points as scatter at the display cap
+    # Show issue points as scatter at the display cap
     x_positions = np.arange(1, len(labels) + 1, dtype=float)
-    y_points: List[float] = []
-    x_points: List[float] = []
-    sizes: List[float] = []
-    for xi, ninf in zip(x_positions, num_not_achieved_per_pair):
-        if int(ninf) <= 0:
-            continue
-        count = int(ninf)
-        y_points.extend([float(inf_years_display)] * count)
-        x_points.extend([float(xi)] * count)
-        sizes.extend([12.0] * count)
-    if x_points:
-        plt.scatter(x_points, y_points, s=sizes, color='red', alpha=0.4, zorder=3, label='Not achieved')
+
+    # Red points for "B not achieved"
+    y_not_achieved: List[float] = []
+    x_not_achieved: List[float] = []
+    for xi, n_not_achieved in zip(x_positions, num_b_not_achieved_per_pair):
+        if int(n_not_achieved) > 0:
+            y_not_achieved.extend([float(inf_years_display)] * int(n_not_achieved))
+            x_not_achieved.extend([float(xi)] * int(n_not_achieved))
+
+    # Orange points for "B before A"
+    y_before: List[float] = []
+    x_before: List[float] = []
+    for xi, n_before in zip(x_positions, num_b_before_a_per_pair):
+        if int(n_before) > 0:
+            y_before.extend([float(inf_years_display) * 0.85] * int(n_before))  # Slightly lower
+            x_before.extend([float(xi)] * int(n_before))
+
+    legend_added = False
+    if x_not_achieved:
+        plt.scatter(x_not_achieved, y_not_achieved, s=12.0, color='red', alpha=0.4, zorder=3, label='Second milestone not achieved', marker='x')
+        legend_added = True
+    if x_before:
+        plt.scatter(x_before, y_before, s=12.0, color='orange', alpha=0.4, zorder=3, label='Second before first', marker='s')
+        legend_added = True
+    if legend_added:
         plt.legend(loc='upper left')
 
     # Stats panel
@@ -888,43 +910,30 @@ def plot_milestone_transition_boxplot(
     if condition_text:
         panel_lines.append(f"Condition: {condition_text}")
         panel_lines.append("")
-    for lbl, arr, ninf in zip(labels, finite_groups, num_not_achieved_per_pair):
+
+    for lbl, arr, n_not_achieved, n_before, total_a in zip(labels, finite_groups, num_b_not_achieved_per_pair, num_b_before_a_per_pair, total_per_pair):
         panel_lines.append(lbl)
         # Only use achieved data for stats
         if arr.size == 0:
-            panel_lines.append("  (none achieved)")
+            panel_lines.append("  (none achieved in order)")
             panel_lines.append("")
             continue
-        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
-        # If there are not achieved cases, indicate with ">" prefix
-        total_count = int(arr.size + ninf)
-        pct_not_achieved = float(ninf) / total_count if total_count > 0 else 0.0
-        suffix = ""
-        if ninf > 0:
-            # If percentile would include not-achieved cases, show ">"
-            if pct_not_achieved > 0.1:  # 10th percentile affected
-                q10_str = f">{_format_years_value(float(q10))}"
-            else:
-                q10_str = _format_years_value(float(q10))
-            if pct_not_achieved > 0.5:  # 50th percentile affected
-                q50_str = f">{_format_years_value(float(q50))}"
-            else:
-                q50_str = _format_years_value(float(q50))
-            if pct_not_achieved > 0.9:  # 90th percentile affected
-                q90_str = "not achieved"
-            else:
-                q90_str = f">{_format_years_value(float(q90))}" if inf_years_cap is not None and q90 >= inf_years_cap * 0.9 else _format_years_value(float(q90))
-            suffix = f" ({ninf}/{total_count} not achieved)"
-        else:
-            q10_str = _format_years_value(float(q10))
-            q50_str = _format_years_value(float(q50))
-            q90_str = _format_years_value(float(q90))
 
-        panel_lines.append(f"  10th: {q10_str}")
-        panel_lines.append(f"  50th: {q50_str}")
-        panel_lines.append(f"  90th: {q90_str}")
-        if suffix:
-            panel_lines.append(suffix)
+        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+
+        panel_lines.append(f"  10th: {_format_years_value(float(q10))}")
+        panel_lines.append(f"  50th: {_format_years_value(float(q50))}")
+        panel_lines.append(f"  90th: {_format_years_value(float(q90))}")
+
+        # Show issue counts if any
+        panel_lines.append(f"  ({arr.size}/{total_a} achieved in order)")
+        if n_not_achieved > 0:
+            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+            panel_lines.append(f"  ({n_not_achieved}/{total_a} {milestone_b} not achieved)")
+        if n_before > 0:
+            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+            milestone_a = lbl.split(" to ")[0] if " to " in lbl else "first"
+            panel_lines.append(f"  ({n_before}/{total_a} {milestone_b} before {milestone_a})")
         panel_lines.append("")
 
     txt = "\n".join(panel_lines)
@@ -1259,7 +1268,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
-    labels, durations, num_not_achieved, total, typical_max = _read_milestone_transition_durations(
+    labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
         rollouts_file,
         pairs,
         filter_milestone=None,
@@ -1270,13 +1279,14 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         plot_milestone_transition_boxplot(
             labels,
             durations,
-            num_not_achieved,
-            total,
+            num_b_not_achieved,
+            num_b_before_a,
+            total_per_pair,
             out_path,
-            inf_years_cap=typical_max,
             ymin_years=None,
             ymax_years=None,
             exclude_inf_from_stats=False,
+            inf_years_cap=typical_max,
             inf_years_display=100.0,
             title="Milestone Transition Durations"
         )
@@ -1422,25 +1432,30 @@ def main() -> None:
         pairs = _parse_milestone_pairs(args.pairs)
         if not pairs:
             raise ValueError("--pairs is required for milestone_transition_box mode (use --list-milestones to inspect names)")
-        labels, durations, num_na_per_pair, total, typical_max = _read_milestone_transition_durations(
+        labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
             rollouts_path,
             pairs,
             filter_milestone=(args.filter_milestone if args.filter_milestone else None),
             filter_by_year=(float(args.filter_by_year) if args.filter_by_year is not None else None),
         )
-        print(f"Processed {total} rollouts from {rollouts_path}")
-        for lbl, arr, ninf in zip(labels, durations, num_na_per_pair):
+        for lbl, arr, n_not_achieved, n_before, total_a in zip(labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair):
             arr_np = np.asarray(arr, dtype=float)
             if arr_np.size:
                 q10, q50, q90 = np.quantile(arr_np, [0.1, 0.5, 0.9])
-                print(f"{lbl}: n={arr_np.size} finite, +{ninf} Not achieved | P10/Median/P90 (years): {q10:.3f} / {q50:.3f} / {q90:.3f}")
+                print(f"{lbl}: n={arr_np.size} achieved in order | P10/Median/P90 (years): {q10:.3f} / {q50:.3f} / {q90:.3f}")
+                if n_not_achieved > 0:
+                    milestone_b = lbl.split(" to ")[1] if " to " in lbl else "B"
+                    print(f"  +{n_not_achieved}/{total_a} {milestone_b} not achieved")
+                if n_before > 0:
+                    print(f"  +{n_before}/{total_a} out of order")
             else:
-                print(f"{lbl}: n=0 finite, +{ninf} Not achieved")
+                print(f"{lbl}: n=0 achieved in order (total where A achieved: {total_a})")
         plot_milestone_transition_boxplot(
             labels,
             durations,
-            num_na_per_pair,
-            total,
+            num_b_not_achieved,
+            num_b_before_a,
+            total_per_pair,
             out_path=out_path,
             title=None,
             ymin_years=(float(args.ymin_years) if args.ymin_years is not None else None),
