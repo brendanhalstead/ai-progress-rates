@@ -1191,13 +1191,13 @@ def get_time_tick_values_and_labels():
     
     return tick_values, tick_labels
 
-def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None):
+def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, aa_time_horizon_minutes=None):
     """Plot horizon lengths over time with METR benchmark points"""
     # Debug: log horizon length values
     logger.info(f"Horizon lengths range: min={np.min(horizon_lengths):.6f}, max={np.max(horizon_lengths):.6f}, median={np.median(horizon_lengths):.6f}")
     
     # Cap horizon lengths at 1 million minutes to prevent scale distortion
-    max_horizon = PARAMETER_BOUNDS['sc_time_horizon_minutes'][1]  # 1 million minutes
+    max_horizon = PARAMETER_BOUNDS['aa_time_horizon_minutes'][1]  # 1 million minutes
     min_horizon = 0.001  # 0.001 minutes
     capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
     num_capped = np.sum(horizon_lengths > max_horizon)
@@ -1282,11 +1282,11 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
                 )
     
     # Add horizontal dashed line for superhuman coder time horizon
-    if sc_time_horizon_minutes is not None:
-        sc_formatted = format_time_duration(sc_time_horizon_minutes)
+    if aa_time_horizon_minutes is not None:
+        sc_formatted = format_time_duration(aa_time_horizon_minutes)
         fig.add_trace(
             go.Scatter(x=[times.min(), times.max()], 
-                      y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
+                      y=[aa_time_horizon_minutes, aa_time_horizon_minutes],
                       name='ACD-AI Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
@@ -1308,10 +1308,10 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
     # )
     # logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length plot at row={row}, col={col}")
 
-def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, sc_time_horizon_minutes=None, progress_at_sc=None):
+def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, aa_time_horizon_minutes=None, progress_at_sc=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
     # Cap horizon lengths at 1 million minutes to prevent scale distortion
-    max_horizon = PARAMETER_BOUNDS['sc_time_horizon_minutes'][1]  # 1 million minutes
+    max_horizon = PARAMETER_BOUNDS['aa_time_horizon_minutes'][1]  # 1 million minutes
     min_horizon = 0.001  # 0.001 minutes
     capped_horizon_lengths = np.clip(horizon_lengths, min_horizon, max_horizon)
     num_capped = np.sum(horizon_lengths > max_horizon)
@@ -1396,11 +1396,11 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
                 )
     
     # Add horizontal dashed line for superhuman coder time horizon
-    if sc_time_horizon_minutes is not None:
-        sc_formatted = format_time_duration(sc_time_horizon_minutes)
+    if aa_time_horizon_minutes is not None:
+        sc_formatted = format_time_duration(aa_time_horizon_minutes)
         fig.add_trace(
             go.Scatter(x=[progress_values.min(), progress_values.max()], 
-                      y=[sc_time_horizon_minutes, sc_time_horizon_minutes],
+                      y=[aa_time_horizon_minutes, aa_time_horizon_minutes],
                       name='ACD-AI Time Horizon',
                       line=dict(color='#d62728', width=2, dash='dash'),
                       mode='lines',
@@ -1445,8 +1445,8 @@ def get_tab_configurations():
     
     # Mapping of plot function names to actual functions
     plot_function_map = {
-        'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes')),
-        'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('sc_time_horizon_minutes'), data.get('progress_at_sc')),
+        'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes')),
+        'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes'), data.get('progress_at_sc')),
         'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
         'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].inference_compute, r, c),
         'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
@@ -1873,7 +1873,7 @@ def params_to_dict(params: Parameters):
         'rho_experiment_capacity': params.rho_experiment_capacity,
         'alpha_experiment_capacity': params.alpha_experiment_capacity,
         'r_software': params.r_software,
-        'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
+        'automation_fraction_at_coding_automation_anchor': params.automation_fraction_at_coding_automation_anchor,
         'automation_interp_type': getattr(params, 'automation_interp_type', 'exponential'),
 
         'coding_labor_normalization': params.coding_labor_normalization,
@@ -1882,13 +1882,13 @@ def params_to_dict(params: Parameters):
         'optimal_ces_eta_init': getattr(params, 'optimal_ces_eta_init', 1.0),
         'optimal_ces_grid_size': getattr(params, 'optimal_ces_grid_size', 4096),
         'experiment_compute_exponent': params.experiment_compute_exponent,
-            'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
-            'ai_research_taste_at_superhuman_coder_sd': params.ai_research_taste_at_superhuman_coder_sd,
+            'ai_research_taste_at_coding_automation_anchor': params.ai_research_taste_at_coding_automation_anchor,
+            'ai_research_taste_at_coding_automation_anchor_sd': params.ai_research_taste_at_coding_automation_anchor_sd,
             'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
         'progress_at_sc': params.progress_at_sc,
-        'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
-        'pre_gap_sc_time_horizon': getattr(params, 'pre_gap_sc_time_horizon', None),
+        'aa_time_horizon_minutes': params.aa_time_horizon_minutes,
+        'pre_gap_aa_time_horizon': getattr(params, 'pre_gap_aa_time_horizon', None),
         'horizon_extrapolation_type': params.horizon_extrapolation_type,
         # Manual horizon fitting parameters
         'present_day': params.present_day,
@@ -2054,7 +2054,7 @@ def get_parameter_config():
             'horizon_extrapolation_types': cfg.HORIZON_EXTRAPOLATION_TYPES,
             'automation_interp_types': ['exponential', 'linear'],
             'coding_labor_modes': ['simple_ces', 'optimal_ces'],
-            'pre_gap_sc_time_horizon': cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'],
+            'pre_gap_aa_time_horizon': cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'],
             'descriptions': {
                 'rho_coding_labor': {
                     'name': 'Cognitive Elasticity (ρ_cognitive)',
@@ -2076,7 +2076,7 @@ def get_parameter_config():
                     'description': 'Scale factor for software progress',
                     'units': 'dimensionless'
                 },
-                'automation_fraction_at_superhuman_coder': {
+                'automation_fraction_at_coding_automation_anchor': {
                     'name': 'Max Automation',
                     'description': 'Automation fraction when AI reaches superhuman coding ability',
                     'units': 'fraction'
@@ -2123,12 +2123,12 @@ def get_parameter_config():
                     'units': 'dimensionless'
                 },
 
-                'ai_research_taste_at_superhuman_coder': {
+                'ai_research_taste_at_coding_automation_anchor': {
                     'name': 'Max AI Research Taste',
                     'description': 'AI research taste when AI reaches superhuman coding ability',
                     'units': 'fraction'
                 },
-                'ai_research_taste_at_superhuman_coder_sd': {
+                'ai_research_taste_at_coding_automation_anchor_sd': {
                     'name': 'Max AI Research Taste (SD)',
                     'description': 'AI research taste at superhuman coder specified in human-range standard deviations',
                     'units': 'SD'
@@ -2149,7 +2149,7 @@ def get_parameter_config():
                     'description': 'Progress level where AI reaches superhuman coding ability (exponential mode)',
                     'units': 'dimensionless'
                 },
-                'sc_time_horizon_minutes': {
+                'aa_time_horizon_minutes': {
                     'name': 'Time Horizon to ACD-AI',
                     'description': 'Time horizon length corresponding to superhuman coder achievement',
                     'units': 'minutes'
@@ -2662,14 +2662,14 @@ def get_default_data():
             'rho_experiment_capacity': params.rho_experiment_capacity,
             'alpha_experiment_capacity': params.alpha_experiment_capacity,
             'r_software': params.r_software,
-            'automation_fraction_at_superhuman_coder': params.automation_fraction_at_superhuman_coder,
+            'automation_fraction_at_coding_automation_anchor': params.automation_fraction_at_coding_automation_anchor,
             'coding_labor_normalization': params.coding_labor_normalization,
             'experiment_compute_exponent': params.experiment_compute_exponent,
-            'ai_research_taste_at_superhuman_coder': params.ai_research_taste_at_superhuman_coder,
+            'ai_research_taste_at_coding_automation_anchor': params.ai_research_taste_at_coding_automation_anchor,
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
             'progress_at_sc': params.progress_at_sc,
-            'sc_time_horizon_minutes': params.sc_time_horizon_minutes,
+            'aa_time_horizon_minutes': params.aa_time_horizon_minutes,
             'horizon_extrapolation_type': params.horizon_extrapolation_type,
             # Manual horizon fitting parameters
             'present_day': params.present_day,

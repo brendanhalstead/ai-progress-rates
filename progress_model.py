@@ -533,21 +533,21 @@ class Parameters:
     experiment_compute_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['experiment_compute_exponent'])
     
     # Automation parameters
-    automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
+    automation_fraction_at_coding_automation_anchor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor'])
     automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
     automation_model: Optional[AutomationModel] = field(default_factory=lambda: None)
     automation_interp_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
-    #ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
+    ai_research_taste_at_coding_automation_anchor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
-    ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
+    ai_research_taste_at_coding_automation_anchor_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd'))
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
-    sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
+    aa_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes'])
     # Pre-gap SC horizon minutes (formerly saturation_horizon_minutes)
-    pre_gap_sc_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
+    pre_gap_aa_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Manual horizon fitting parameters
@@ -598,31 +598,31 @@ class Parameters:
             self.r_software = 1.0
                 
         # Sanitize automation parameters
-        if not np.isfinite(self.automation_fraction_at_superhuman_coder):
-            logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']}")
-            self.automation_fraction_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']
+        if not np.isfinite(self.automation_fraction_at_coding_automation_anchor):
+            logger.warning(f"Non-finite automation_fraction_at_coding_automation_anchor: {self.automation_fraction_at_coding_automation_anchor}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor']}")
+            self.automation_fraction_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor']
                 
         # Sanitize AI research taste parameters
         # If SD-specification is provided, convert to raw taste via TasteDistribution
-        if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
+        if self.ai_research_taste_at_coding_automation_anchor_sd is not None and np.isfinite(self.ai_research_taste_at_coding_automation_anchor_sd):
             try:
                 taste_distribution_tmp = TasteDistribution(top_percentile=self.top_percentile, median_to_top_gap=self.median_to_top_taste_multiplier)
-                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_superhuman_coder_sd))
+                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_coding_automation_anchor_sd))
                 if np.isfinite(converted_taste):
-                    self.ai_research_taste_at_superhuman_coder = float(converted_taste)
+                    self.ai_research_taste_at_coding_automation_anchor = float(converted_taste)
             except Exception as e:
-                logger.warning(f"Failed converting ai_research_taste_at_superhuman_coder_sd to taste: {e}")
-        if not np.isfinite(self.ai_research_taste_at_superhuman_coder):
-            logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
-            self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
+                logger.warning(f"Failed converting ai_research_taste_at_coding_automation_anchor_sd to taste: {e}")
+        if not np.isfinite(self.ai_research_taste_at_coding_automation_anchor):
+            logger.warning(f"Non-finite ai_research_taste_at_coding_automation_anchor: {self.ai_research_taste_at_coding_automation_anchor}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']}")
+            self.ai_research_taste_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']
                 
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
             self.ai_research_taste_slope = 1.0        
         # Sanitize time horizon parameter
-        if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
-            logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
-            self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
+        if not np.isfinite(self.aa_time_horizon_minutes) or self.aa_time_horizon_minutes <= 0:
+            logger.warning(f"Invalid aa_time_horizon_minutes: {self.aa_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes']}")
+            self.aa_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes']
 
         # Sanitize parallel_penalty
         if not np.isfinite(self.parallel_penalty):
@@ -631,9 +631,9 @@ class Parameters:
         else:
             self.parallel_penalty = float(np.clip(self.parallel_penalty, cfg.PARALLEL_PENALTY_MIN, cfg.PARALLEL_PENALTY_MAX))
         # Validate pre-gap SC horizon
-        if not np.isfinite(self.pre_gap_sc_time_horizon) or self.pre_gap_sc_time_horizon <= 0:
-            logger.warning(f"Invalid pre_gap_sc_time_horizon: {self.pre_gap_sc_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon']}")
-            self.pre_gap_sc_time_horizon = float(cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
+        if not np.isfinite(self.pre_gap_aa_time_horizon) or self.pre_gap_aa_time_horizon <= 0:
+            logger.warning(f"Invalid pre_gap_aa_time_horizon: {self.pre_gap_aa_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon']}")
+            self.pre_gap_aa_time_horizon = float(cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'])
         
         # Sanitize categorical parameters
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
@@ -1507,7 +1507,7 @@ def solve_lower_anchor_via_automation_model(
     """
     Solve for the lower anchor automation fraction at the anchor progress such that,
     when initializing AutomationModel with anchors
-        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_superhuman_coder },
+        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_coding_automation_anchor },
     the implied coding-labor multiplier at anchor_progress matches swe_multiplier.
 
     The multiplier is defined on coding labor after applying parallel_penalty and normalization, i.e.
@@ -1527,9 +1527,9 @@ def solve_lower_anchor_via_automation_model(
 
         # Ensure an upper anchor exists
         progress_at_sc = getattr(params, 'progress_at_sc', None)
-        aut_at_sc = getattr(params, 'automation_fraction_at_superhuman_coder', None)
+        aut_at_sc = getattr(params, 'automation_fraction_at_coding_automation_anchor', None)
         if progress_at_sc is None or not np.isfinite(progress_at_sc) or aut_at_sc is None:
-            logger.warning("Missing progress_at_sc or automation_fraction_at_superhuman_coder; falling back to direct solver")
+            logger.warning("Missing progress_at_sc or automation_fraction_at_coding_automation_anchor; falling back to direct solver")
             return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, inference_compute, params)
 
         # Target coding-labor ratio in parallel_penalty space
@@ -1741,7 +1741,7 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
     Sigmoid function for AI research taste: f(x) = L / (1 + e^(-k*(x-x0)))
     """
     # Extract sigmoid parameters
-    L = params.ai_research_taste_at_superhuman_coder  # Upper asymptote
+    L = params.ai_research_taste_at_coding_automation_anchor  # Upper asymptote
     # Midpoint parameter removed with legacy sigmoid
     x0 = None
     k = params.ai_research_taste_slope  # Slope parameter
@@ -1766,12 +1766,12 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
 def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
     """
     Exponential function for AI research taste that passes through 
-    (progress_at_sc, ai_research_taste_at_superhuman_coder) with logplot-slope ai_research_taste_slope.
+    (progress_at_sc, ai_research_taste_at_coding_automation_anchor) with logplot-slope ai_research_taste_slope.
     
     Formula: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
-    where taste_at_sc = ai_research_taste_at_superhuman_coder
+    where taste_at_sc = ai_research_taste_at_coding_automation_anchor
     """
-    taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope
     
@@ -1813,7 +1813,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     
     This schedule interprets the slope parameter as the number of standard deviations
     per progress unit in the underlying log-normal taste distribution. The curve
-    passes through (progress_at_sc, ai_research_taste_at_superhuman_coder).
+    passes through (progress_at_sc, ai_research_taste_at_coding_automation_anchor).
     
     Formula: taste(x) = taste_dist.get_taste_at_sd(slope * x + offset)
     where offset is computed to ensure the curve passes through the anchor point.
@@ -1827,7 +1827,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
     
     # Extract parameters
-    # taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    # taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope  # SD per progress unit
     
@@ -1843,7 +1843,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         # Clamp taste_at_sc to valid range to avoid log(0) issues
         # taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
-        target_sd = params.ai_research_taste_at_superhuman_coder_sd
+        target_sd = params.ai_research_taste_at_coding_automation_anchor_sd
         # Adjust offset to maintain the anchor point with unpenalized slope
         offset = target_sd - slope * progress_at_sc
         
@@ -2477,7 +2477,7 @@ class ProgressModel:
                         _include_gap_flag = bool(_inc)
                 except Exception:
                     _include_gap_flag = False
-                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.pre_gap_aa_time_horizon if _include_gap_flag else self.params.aa_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Solve: target_horizon = exp(slope * progress + intercept)
@@ -2497,13 +2497,13 @@ class ProgressModel:
                             except Exception:
                                 year_label = 'anchor'
                             logger.info(
-                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
+                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_aa_time_horizon} and "
                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                             )
                         self.params.progress_at_sc = calculated_progress_at_sc
                         logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
-                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
@@ -2769,7 +2769,7 @@ class ProgressModel:
                         _include_gap_flag = bool(_inc)
                 except Exception:
                     _include_gap_flag = False
-                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.pre_gap_aa_time_horizon if _include_gap_flag else self.params.aa_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Add numerical safeguards
@@ -2777,7 +2777,7 @@ class ProgressModel:
                             logger.warning("Invalid parameters for progress_at_sc calculation")
                             self.params.progress_at_sc = None
                         elif target_horizon <= 0:
-                            logger.warning("Invalid sc_time_horizon_minutes for calculation")
+                            logger.warning("Invalid aa_time_horizon_minutes for calculation")
                             self.params.progress_at_sc = None
                         else:
                             # Check if the ratio is valid
@@ -2798,12 +2798,12 @@ class ProgressModel:
                                     else:
                                         # Use shifted form if we're in the manual parameter case
                                         if anchor_progress_for_trajectory is not None:
-                                            # Shifted form: sc_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
-                                            # progress = anchor_progress + T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            # Shifted form: aa_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
+                                            # progress = anchor_progress + T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
                                         else:
-                                            # Original form: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
-                                            # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            # Original form: aa_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
+                                            # progress = T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
                                         # If in gap-included mode, add the gap (specified in anchor-progress-years)
@@ -2820,7 +2820,7 @@ class ProgressModel:
                                             except Exception:
                                                 year_label = 'anchor'
                                             logger.info(
-                                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
+                                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_aa_time_horizon} and "
                                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                                             )
                                         
@@ -2831,7 +2831,7 @@ class ProgressModel:
                                             self.params.progress_at_sc = calculated_progress_at_sc
                                             logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError, OverflowError) as e:
-                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None
             
             else:
@@ -3112,7 +3112,7 @@ class ProgressModel:
         logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             present_day_progress: anchor_aut_frac,
-            self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
+            self.params.progress_at_sc: self.params.automation_fraction_at_coding_automation_anchor
         }
         logger.info(f"Automation anchors: {automation_anchors}")
         self.params.automation_anchors = automation_anchors

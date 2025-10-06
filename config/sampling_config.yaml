@@ -25,7 +25,7 @@ per_sample_timeout: 5
 
 parameters:
   # Superhuman coder time horizon + extrapolation
-  sc_time_horizon_minutes:
+  aa_time_horizon_minutes:
     dist: lognormal
     ci80: [12456, 3.11e9] # [.1 work year, 25,000 work years]
   horizon_extrapolation_type:
@@ -33,7 +33,7 @@ parameters:
     value: decaying doubling time
 
   # Gaps mode
-  pre_gap_sc_time_horizon:
+  pre_gap_aa_time_horizon:
     dist: lognormal
     ci80: [12456, 1245600] # [.1 work year, 10 work years]
   include_gap:
@@ -98,7 +98,7 @@ parameters:
     value: "linear"
 
   # Research taste dynamics
-  ai_research_taste_at_superhuman_coder_sd:
+  ai_research_taste_at_coding_automation_anchor_sd:
     dist: normal
     ci80: [-3.5, 3.5]
   ai_research_taste_slope:

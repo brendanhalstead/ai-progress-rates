@@ -190,12 +190,12 @@
                       </div>
                       <div
                         class="mb-3"
-                        id="pre_gap_sc_time_horizon_group"
+                        id="pre_gap_aa_time_horizon_group"
                         style="display: none"
                       >
                         <label class="param-label"
                           >Pre-gap ACD-AI Time Horizon:
-                          <span id="pre_gap_sc_time_horizon_val"
+                          <span id="pre_gap_aa_time_horizon_val"
                             >Loading...</span
                           >
                           work months</label
@@ -203,7 +203,7 @@
                         <input
                           type="range"
                           class="range-input form-range"
-                          id="pre_gap_sc_time_horizon"
+                          id="pre_gap_aa_time_horizon"
                           step="0.1"
                         />
                         <small class="text-muted"
@@ -215,13 +215,13 @@
                     <div class="mb-3" id="sc_time_horizon_group">
                       <label class="param-label"
                         >80% Time Horizon at ACD-AI:
-                        <span id="sc_time_horizon_minutes_val">Loading...</span>
+                        <span id="aa_time_horizon_minutes_val">Loading...</span>
                         work months</label
                       >
                       <input
                         type="range"
                         class="range-input form-range"
-                        id="sc_time_horizon_minutes"
+                        id="aa_time_horizon_minutes"
                         step="0.1"
                       />
                       <small class="text-muted"
@@ -433,14 +433,14 @@
                     <div class="mb-3">
                       <label class="param-label"
                         >ACD-AI Automation Level:
-                        <span id="automation_fraction_at_superhuman_coder_val"
+                        <span id="automation_fraction_at_coding_automation_anchor_val"
                           >Loading...</span
                         ></label
                       >
                       <input
                         type="range"
                         class="range-input form-range"
-                        id="automation_fraction_at_superhuman_coder"
+                        id="automation_fraction_at_coding_automation_anchor"
                         step="0.01"
                       />
                       <small class="text-muted"
@@ -774,14 +774,14 @@
                       <div class="col-6" id="sc_taste_fraction_group">
                         <label class="param-label"
                           >ACD-AI Research Taste:
-                          <span id="ai_research_taste_at_superhuman_coder_val"
+                          <span id="ai_research_taste_at_coding_automation_anchor_val"
                             >Loading...</span
                           ></label
                         >
                         <input
                           type="range"
                           class="range-input form-range"
-                          id="ai_research_taste_at_superhuman_coder"
+                          id="ai_research_taste_at_coding_automation_anchor"
                           step="0.01"
                         />
                         <small class="text-muted"
@@ -797,14 +797,14 @@
                         <label class="param-label"
                           >ACD-AI Research Taste (SD):
                           <span
-                            id="ai_research_taste_at_superhuman_coder_sd_val"
+                            id="ai_research_taste_at_coding_automation_anchor_sd_val"
                             >Loading...</span
                           ></label
                         >
                         <input
                           type="range"
                           class="range-input form-range"
-                          id="ai_research_taste_at_superhuman_coder_sd"
+                          id="ai_research_taste_at_coding_automation_anchor_sd"
                           step="0.1"
                         />
                         <small class="text-muted"
@@ -1207,7 +1207,7 @@
         "rho_experiment_capacity",
         "alpha_experiment_capacity",
         "software_progress_rate_at_reference_year",
-        "automation_fraction_at_superhuman_coder",
+        "automation_fraction_at_coding_automation_anchor",
         "swe_multiplier_at_present_day",
         "automation_interp_type",
         "coding_labor_normalization",
@@ -1225,16 +1225,16 @@
         "inv_compute_anchor_exp_cap",
         // parallel penalty (controlled by toggle)
         "parallel_penalty",
-        "ai_research_taste_at_superhuman_coder_sd",
+        "ai_research_taste_at_coding_automation_anchor_sd",
         "ai_research_taste_slope",
         "top_percentile",
         "median_to_top_taste_multiplier",
         "taste_schedule_type",
-        "sc_time_horizon_minutes",
+        "aa_time_horizon_minutes",
         "horizon_extrapolation_type",
         "include_gap",
         "gap_years",
-        "pre_gap_sc_time_horizon",
+        "pre_gap_aa_time_horizon",
         // Manual horizon fitting parameters
         "present_day",
         "present_horizon",
@@ -1449,7 +1449,7 @@
         const toggle = document.getElementById("include_gap");
         const group = document.getElementById("gap_years_group");
         const scGroup = document.getElementById("sc_time_horizon_group");
-        const satGroup = document.getElementById("pre_gap_sc_time_horizon_group");
+        const satGroup = document.getElementById("pre_gap_aa_time_horizon_group");
         if (!toggle || !group) return;
         group.style.display = toggle.checked ? "" : "none";
         if (scGroup) scGroup.style.display = toggle.checked ? "none" : "";
@@ -1672,10 +1672,10 @@
         } else if (input.id === "present_day") {
           // Format anchor time as readable date
           displayValue = formatDecimalYearToDate(value);
-        } else if (input.id === "automation_fraction_at_superhuman_coder") {
+        } else if (input.id === "automation_fraction_at_coding_automation_anchor") {
           // Direct percentage display (no logit transformation)
           displayValue = (value * 100).toFixed(1) + "%";
-        } else if (input.id === "ai_research_taste_at_superhuman_coder_sd") {
+        } else if (input.id === "ai_research_taste_at_coding_automation_anchor_sd") {
           displayValue = value.toFixed(2) + " SD";
         } else if (
           input.id === "rho_experiment_capacity" ||
@@ -1707,8 +1707,8 @@
               ? actualValue.toExponential(2)
               : actualValue.toExponential(2);
         } else if (
-          input.id === "sc_time_horizon_minutes" ||
-          input.id === "pre_gap_sc_time_horizon"
+          input.id === "aa_time_horizon_minutes" ||
+          input.id === "pre_gap_aa_time_horizon"
         ) {
           // Convert minutes to work months/years; respect precise mode
           const actualValueMinutes = usePreciseInputs
@@ -1723,11 +1723,11 @@
             .closest(".mb-3")
             .querySelector("label.param-label");
           if (labelElement) {
-            const isSC = input.id === "sc_time_horizon_minutes";
+            const isSC = input.id === "aa_time_horizon_minutes";
             if (workMonths > 12) {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work years'
-                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work years';
+                ? '80% Time Horizon at ACD-AI: <span id="aa_time_horizon_minutes_val">Loading...</span> work years'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_aa_time_horizon_val">Loading...</span> work years';
               if (workYears >= 10) {
                 displayValue = workYears.toFixed(0);
               } else if (workYears >= 1) {
@@ -1737,8 +1737,8 @@
               }
             } else {
               labelElement.innerHTML = isSC
-                ? '80% Time Horizon at ACD-AI: <span id="sc_time_horizon_minutes_val">Loading...</span> work months'
-                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_sc_time_horizon_val">Loading...</span> work months';
+                ? '80% Time Horizon at ACD-AI: <span id="aa_time_horizon_minutes_val">Loading...</span> work months'
+                : 'Pre-gap ACD-AI Time Horizon: <span id="pre_gap_aa_time_horizon_val">Loading...</span> work months';
               if (workMonths >= 10) {
                 displayValue = workMonths.toFixed(0);
               } else if (workMonths >= 1) {
@@ -1832,8 +1832,8 @@
                 // In precise mode, numeric input is actual value; otherwise transform from log slider value
                 if (!usePreciseInputs) value = Math.pow(10, value);
               } else if (
-                id === "sc_time_horizon_minutes" ||
-                id === "pre_gap_sc_time_horizon"
+                id === "aa_time_horizon_minutes" ||
+                id === "pre_gap_aa_time_horizon"
               ) {
                 if (!usePreciseInputs) value = Math.pow(10, value);
               } else if (id === "gap_years") {
@@ -1882,13 +1882,13 @@
                   rho_experiment_capacity: -0.1,
                   alpha_experiment_capacity: 0.5,
                   software_progress_rate_at_reference_year: 0.5,
-                  automation_fraction_at_superhuman_coder: 0.99,
+                  automation_fraction_at_coding_automation_anchor: 0.99,
                   swe_multiplier_at_present_day: 2.0,
                   coding_labor_normalization: 1,
                   experiment_compute_exponent: 0.4,
-                  ai_research_taste_at_superhuman_coder_sd: null,
+                  ai_research_taste_at_coding_automation_anchor_sd: null,
                   ai_research_taste_slope: 1.2,
-                  sc_time_horizon_minutes: 50000.0,
+                  aa_time_horizon_minutes: 50000.0,
                   present_day: 2025.25,
                   present_horizon: null,
                   present_doubling_time: null,
@@ -1960,21 +1960,21 @@
                 document.getElementById("include_gap")?.checked ||
                 false;
               params[id] = enabled ? "gap" : "no gap";
-              // When enabled, force sc_time_horizon_minutes to current saturation horizon selection
+              // When enabled, force aa_time_horizon_minutes to current saturation horizon selection
               if (enabled) {
                 const satEl = document.getElementById(
-                  "pre_gap_sc_time_horizon"
+                  "pre_gap_aa_time_horizon"
                 );
                 if (satEl) {
                   let satVal = parseFloat(satEl.value);
                   if (!usePreciseInputs) satVal = Math.pow(10, satVal);
-                  params["sc_time_horizon_minutes"] = satVal;
+                  params["aa_time_horizon_minutes"] = satVal;
                 } else if (
                   parameterConfig &&
-                  parameterConfig.pre_gap_sc_time_horizon
+                  parameterConfig.pre_gap_aa_time_horizon
                 ) {
-                  params["sc_time_horizon_minutes"] =
-                    parameterConfig.pre_gap_sc_time_horizon;
+                  params["aa_time_horizon_minutes"] =
+                    parameterConfig.pre_gap_aa_time_horizon;
                 }
               }
             } else {
@@ -3019,8 +3019,8 @@
                   slider.max = Math.log10(max);
                   slider.value = Math.log10(Math.max(defaultValue, 1e-5));
                 } else if (
-                  paramName === "sc_time_horizon_minutes" ||
-                  paramName === "pre_gap_sc_time_horizon"
+                  paramName === "aa_time_horizon_minutes" ||
+                  paramName === "pre_gap_aa_time_horizon"
                 ) {
                   // This slider uses log scale for better usability with large range
                   slider.min = Math.log10(Math.max(min, 1));
@@ -3350,8 +3350,8 @@
           } else if (key === "coding_labor_normalization") {
             newValue = Math.log10(Math.max(value, 1e-5)); // Avoid log(0)
           } else if (
-            key === "sc_time_horizon_minutes" ||
-            key === "pre_gap_sc_time_horizon"
+            key === "aa_time_horizon_minutes" ||
+            key === "pre_gap_aa_time_horizon"
           ) {
             newValue = Math.log10(Math.max(value, 1));
           }
@@ -3377,8 +3377,8 @@
               minVal = Math.log10(Math.max(bounds[0], 1e-5));
               maxVal = Math.log10(bounds[1]);
             } else if (
-              key === "sc_time_horizon_minutes" ||
-              key === "pre_gap_sc_time_horizon"
+              key === "aa_time_horizon_minutes" ||
+              key === "pre_gap_aa_time_horizon"
             ) {
               minVal = Math.log10(Math.max(bounds[0], 1));
               maxVal = Math.log10(bounds[1]);
@@ -3399,14 +3399,14 @@
               rho_experiment_capacity: [-1, 1],
               alpha_experiment_capacity: [0.05, 0.95],
               software_progress_rate_at_reference_year: [0.1, 10],
-              automation_fraction_at_superhuman_coder: [0.1, 0.99],
+              automation_fraction_at_coding_automation_anchor: [0.1, 0.99],
 
               swe_multiplier_at_present_day: [1.0, 10.0],
               coding_labor_normalization: [-5, 1],
               experiment_compute_exponent: [0.1, 1.0],
               ai_research_taste_slope: [0.1, 10],
-              sc_time_horizon_minutes: [3, 6], // Log scale bounds
-              pre_gap_sc_time_horizon: [3, 6],
+              aa_time_horizon_minutes: [3, 6], // Log scale bounds
+              pre_gap_aa_time_horizon: [3, 6],
               // exp capacity pseudoparameters
               inf_labor_asymptote: [0, 1000000],
               inf_compute_asymptote: [0, 1000000],
@@ -3453,8 +3453,8 @@
             let newVal = current;
             if (
               id === "coding_labor_normalization" ||
-              id === "sc_time_horizon_minutes" ||
-              id === "pre_gap_sc_time_horizon"
+              id === "aa_time_horizon_minutes" ||
+              id === "pre_gap_aa_time_horizon"
             ) {
               // Convert from log slider value to actual value
               newVal = Math.pow(10, current);
@@ -3484,8 +3484,8 @@
             let newVal = current;
             if (
               id === "coding_labor_normalization" ||
-              id === "sc_time_horizon_minutes" ||
-              id === "pre_gap_sc_time_horizon"
+              id === "aa_time_horizon_minutes" ||
+              id === "pre_gap_aa_time_horizon"
             ) {
               // Convert from actual value back to log slider value
               newVal = Math.log10(
@@ -3525,7 +3525,7 @@
           },
           alpha_experiment_capacity: { min: 0.05, max: 0.95, value: 0.5 },
           software_progress_rate_at_reference_year: { min: 0.1, max: 10, value: 1.0, range: "[0.1, 10]" },
-          automation_fraction_at_superhuman_coder: {
+          automation_fraction_at_coding_automation_anchor: {
             min: 0.1,
             max: 0.99,
             value: 0.99,
@@ -3539,14 +3539,14 @@
             value: 0.4,
             range: "[0.1, 1.0]",
           },
-          ai_research_taste_at_superhuman_coder: {
+          ai_research_taste_at_coding_automation_anchor: {
             min: 0.1,
             max: 5,
             value: 0.95,
           },
           ai_research_taste_slope: { min: 0.1, max: 10, value: 1.2 },
-          sc_time_horizon_minutes: { min: 3, max: 6, value: 4.7 }, // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
-          pre_gap_sc_time_horizon: { min: 3, max: 6, value: 4.016 },
+          aa_time_horizon_minutes: { min: 3, max: 6, value: 4.7 }, // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
+          pre_gap_aa_time_horizon: { min: 3, max: 6, value: 4.016 },
           // Manual horizon fitting parameters
           present_day: { min: 2020.0, max: 2030.0, value: 2025.25 },
           present_horizon: { min: 0.01, max: 10000.0, value: 1000.0 }, // Default to reasonable value
@@ -3566,7 +3566,7 @@
             const rangeDisplay = document.getElementById(paramName + "_range");
             if (rangeDisplay && config.range) {
               rangeDisplay.textContent = `Range: ${config.range}`;
-            } else if (paramName === "sc_time_horizon_minutes") {
+            } else if (paramName === "aa_time_horizon_minutes") {
               // Special display for log scale parameter
               if (rangeDisplay) {
                 rangeDisplay.textContent = "Range: [1k, 1M minutes]";
@@ -3659,14 +3659,14 @@
             rho_experiment_capacity: "Progress Elasticity",
             alpha_experiment_capacity: "Compute Weight",
             software_progress_rate_at_reference_year: "Software Scale",
-            automation_fraction_at_superhuman_coder: "ACD-AI Automation Fraction:",
+            automation_fraction_at_coding_automation_anchor: "ACD-AI Automation Fraction:",
 
             swe_multiplier_at_present_day: "SWE Multiplier at Present Day",
             coding_labor_normalization: "Parallel Coding Labor Normalization",
             experiment_compute_exponent: "Experiment Compute Discounting",
-            ai_research_taste_at_superhuman_coder: "ACD-AI Research Taste",
+            ai_research_taste_at_coding_automation_anchor: "ACD-AI Research Taste",
             ai_research_taste_slope: "AI Research Taste Slope",
-            sc_time_horizon_minutes: "Time Horizon to Superhuman Coder",
+            aa_time_horizon_minutes: "Time Horizon to Superhuman Coder",
           };
         }
 
