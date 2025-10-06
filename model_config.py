@@ -30,13 +30,15 @@ PARALLEL_PENALTY_MAX = 1.0
 # OTHER RANDOM CONSTANTS
 # =============================================================================
 
-LABOR_MULT_EXTRA_FOR_AI2027_SC = 10
+# Serial labor multiplier component for AI2027-SC milestone
+# Formula: (SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30) ** (1 / parallel_penalty) * 30
+SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC = 10
 # Aggregate Research Taste configuration
 AGGREGATE_RESEARCH_TASTE_BASELINE = 1.0
 AGGREGATE_RESEARCH_TASTE_FALLBACK = 1.0
 
 # Research Taste Distribution Parameters (Log-Normal)
-TOP_PERCENTILE = 0.001                    # fraction classed as "top" researchers
+TOP_PERCENTILE = 0.999                    # quantile classed as "top" researchers (0.999 = 99.9th percentile)
 MEDIAN_TO_TOP_TASTE_MULTIPLIER = 3.25           # threshold taste ÷ median taste
 
 # Research Taste Schedule Configuration (UI-level options)
@@ -46,8 +48,8 @@ DEFAULT_TASTE_SCHEDULE_TYPE = "SDs per progress-year"
 
 # Default AI research taste slope values for different modes
 TASTE_SLOPE_DEFAULTS = {
-    "SDs per effective OOM": 1.18,
-    "SDs per progress-year": 1.8
+    "SDs per effective OOM": 1.76,
+    "SDs per progress-year": 2.5
 }
 
 # Horizon Extrapolation Configuration
@@ -58,7 +60,7 @@ DEFAULT_HORIZON_EXTRAPOLATION_TYPE = "decaying doubling time"
 DEFAULT_present_day = 2025.6
 DEFAULT_present_horizon = 26  # Will be optimized if None
 DEFAULT_present_doubling_time = 0.408  # Will be optimized if None
-DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE = 0.920  # Will be optimized if None (1 - 0.080)
+DEFAULT_DOUBLING_DIFFICULTY_GROWTH_FACTOR = 0.920  # Will be optimized if None (1 - 0.080)
 
 # AI Research Taste clipping bounds
 AI_RESEARCH_TASTE_MIN = 0.0
@@ -117,21 +119,21 @@ PARAMETER_BOUNDS = {
     'alpha_experiment_capacity': (0.05, 0.95),
     'r_software': (0.1, 10),
     'software_progress_rate_at_reference_year': (0.05, 10),
-    'automation_fraction_at_superhuman_coder': (0.1, 1.0),
+    'automation_fraction_at_coding_automation_anchor': (0.1, 1.0),
     'swe_multiplier_at_present_day': (1.0, 10.0),
     'coding_labor_normalization': (0.00001, 10),
     'experiment_compute_exponent': (experiment_compute_exponent_CLIP_MIN, experiment_compute_exponent_CLIP_MAX),
     # AI Research Taste parameter bounds
-    'ai_research_taste_at_superhuman_coder_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
+    'ai_research_taste_at_coding_automation_anchor_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
     'ai_research_taste_slope': (0.1, 10.0),
     'progress_at_sc': (1.0, 500),
-    'sc_time_horizon_minutes': (1000, 100000000000),
-    'pre_gap_sc_time_horizon': (1000, 100000000000),
+    'aa_time_horizon_minutes': (1000, 100000000000),
+    'pre_gap_aa_time_horizon': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
     'present_day': (2020.0, 2030.0),
     'present_horizon': (0.01, 100),  # minutes
     'present_doubling_time': (0.01, 2),  # doubling time in present years
-    'doubling_difficulty_growth_rate': (0.5, 1.5),  # difficulty growth rate (1 - decay rate)
+    'doubling_difficulty_growth_factor': (0.5, 1.5),  # difficulty growth rate (1 - decay rate)
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
     # coding_labor_exponent deprecated in favor of parallel_penalty
@@ -145,6 +147,7 @@ PARAMETER_BOUNDS = {
     'parallel_penalty': (0.0, 1.0),
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': (1.1, 20.0),
+    'top_percentile': (0.5, 0.99999),
     # Optimal CES coding labor parameters
     'coding_automation_efficiency_slope': (0.01, 10.0),
     'optimal_ces_eta_init': (1e-12, 1e12),
@@ -202,25 +205,25 @@ DEFAULT_PARAMETERS = {
     'alpha_experiment_capacity': 0.701,
     'r_software': 2.40,
     'software_progress_rate_at_reference_year': 0.79,
-    'automation_fraction_at_superhuman_coder': 1.0,
+    'automation_fraction_at_coding_automation_anchor': 1.0,
     'swe_multiplier_at_present_day': 1.6,
     'automation_interp_type': "linear",
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
-    # 'ai_research_taste_at_superhuman_coder': 0.95,
-    'ai_research_taste_at_superhuman_coder_sd': 0,  # Optional: specify SC taste in SD-within-human-range
+    'ai_research_taste_at_coding_automation_anchor': 0.95,
+    'ai_research_taste_at_coding_automation_anchor_sd': 0,  # Optional: specify SC taste in SD-within-human-range
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_sc': None,
-    'sc_time_horizon_minutes': 124560000,
+    'aa_time_horizon_minutes': 6224000,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
     'present_day': DEFAULT_present_day,
     'present_horizon': DEFAULT_present_horizon,
     'present_doubling_time': DEFAULT_present_doubling_time,
-    'doubling_difficulty_growth_rate': DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE,
+    'doubling_difficulty_growth_factor': DEFAULT_DOUBLING_DIFFICULTY_GROWTH_FACTOR,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
     # coding_labor_exponent deprecated in favor of parallel_penalty
@@ -233,11 +236,12 @@ DEFAULT_PARAMETERS = {
     # benchmarks and gaps mode
     'include_gap': 'no gap',
     'gap_years': 1.5,
-    'pre_gap_sc_time_horizon': 575500.0,
+    'pre_gap_aa_time_horizon': 124600.0,
     # penalty on parallel coding labor contribution in exp capacity
     'parallel_penalty': 0.52,
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
+    'top_percentile': TOP_PERCENTILE,
     # Optimal CES coding labor configuration
     'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
     'coding_automation_efficiency_slope': 2.0,
@@ -256,14 +260,14 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 11], 'custom_ticks': True},
         'data_keys': ['times', 'horizon_lengths'],
-        'special_handling': ['metr_data', 'sc_time_horizon_minutes']
+        'special_handling': ['metr_data', 'aa_time_horizon_minutes']
     },
     'plot_horizon_lengths_vs_progress': {
         'title': 'Horizon Length vs Progress',
         'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
         'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 11], 'custom_ticks': True},
         'data_keys': ['progress_values', 'horizon_lengths'],
-        'special_handling': ['metr_data', 'sc_time_horizon_minutes', 'progress_at_sc']
+        'special_handling': ['metr_data', 'aa_time_horizon_minutes', 'progress_at_sc']
     },
     
     # Input plots

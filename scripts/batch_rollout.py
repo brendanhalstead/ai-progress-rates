@@ -17,7 +17,7 @@ Usage:
     --config config/sampling_config.yaml \
     --num-samples 5000 \
     --input-data input_data.csv \
-    --time-range 2015 2045 \
+    --time-range 2015 2050 \
     --seed 123
 
 If --config is omitted, a default independent distribution is derived from
@@ -27,6 +27,7 @@ model_config.PARAMETER_BOUNDS (uniform within bounds) and fixed defaults otherwi
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -50,6 +51,7 @@ except Exception:
 
 # Ensure repository root is on sys.path so we can import project modules
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = REPO_ROOT / "scripts"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -73,6 +75,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="RNG seed")
     parser.add_argument("--output-dir", type=str, default=str(REPO_ROOT / "outputs"), help="Base output directory")
     parser.add_argument("--per-sample-timeout", type=float, default=None, help="Max seconds to spend per rollout (None disables)")
+    parser.add_argument("--post-process", action="store_true", help="Automatically run post-processing scripts (plots, sensitivity analysis, etc.)")
     return parser.parse_args()
 
 
@@ -118,7 +121,7 @@ def _snapshot_model_config(output_dir: Path) -> None:
         "TASTE_SCHEDULE_TYPES", "DEFAULT_TASTE_SCHEDULE_TYPE",
         "HORIZON_EXTRAPOLATION_TYPES", "DEFAULT_HORIZON_EXTRAPOLATION_TYPE",
         "DEFAULT_present_day", "DEFAULT_present_horizon", "DEFAULT_present_doubling_time",
-        "DEFAULT_DOUBLING_DIFFICULTY_GROWTH_RATE", "AI_RESEARCH_TASTE_MIN", "AI_RESEARCH_TASTE_MAX",
+        "DEFAULT_DOUBLING_DIFFICULTY_GROWTH_FACTOR", "AI_RESEARCH_TASTE_MIN", "AI_RESEARCH_TASTE_MAX",
         "AI_RESEARCH_TASTE_MAX_SD", "BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT",
         "BASE_FOR_SOFTWARE_LOM", "MAX_RESEARCH_EFFORT", "MAX_NORMALIZED_PROGRESS_RATE",
         "TIME_EXTRAPOLATION_WINDOW", "PROGRESS_ODE_CLAMP_MAX", "RESEARCH_STOCK_ODE_CLAMP_MAX",
@@ -684,6 +687,70 @@ def main() -> None:
             print()
 
     print(f"Run complete. Artifacts in: {run_dir}")
+
+    # Always generate batch plots
+    python_exe = sys.executable
+    try:
+        print("\nGenerating batch plots (milestone histograms and transitions)...")
+        subprocess.run(
+            [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--batch-all"],
+            cwd=str(REPO_ROOT),
+            check=True
+        )
+        print("Batch plots complete!")
+    except Exception as e:
+        print(f"WARNING: batch plot_rollouts failed: {e}")
+
+    # Run post-processing scripts if requested
+    if args.post_process:
+        print("\nRunning post-processing scripts...")
+        python_exe = sys.executable
+
+        # 1. SC time histogram
+        try:
+            print("  - Generating SC time histogram...")
+            subprocess.run(
+                [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir)],
+                cwd=str(REPO_ROOT),
+                check=True
+            )
+        except Exception as e:
+            print(f"    WARNING: plot_rollouts failed: {e}")
+
+        # 2. Horizon trajectories plot
+        try:
+            print("  - Generating horizon trajectories plot...")
+            subprocess.run(
+                [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir), "--mode", "horizon_trajectories"],
+                cwd=str(REPO_ROOT),
+                check=True
+            )
+        except Exception as e:
+            print(f"    WARNING: plot_rollouts (horizon_trajectories) failed: {e}")
+
+        # 3. Sensitivity analysis
+        try:
+            print("  - Running sensitivity analysis...")
+            subprocess.run(
+                [python_exe, str(SCRIPTS_DIR / "sensitivity_analysis.py"), "--run-dir", str(run_dir), "--plot"],
+                cwd=str(REPO_ROOT),
+                check=True
+            )
+        except Exception as e:
+            print(f"    WARNING: sensitivity_analysis failed: {e}")
+
+        # 4. SC by quarter table
+        try:
+            print("  - Generating SC-by-quarter table...")
+            subprocess.run(
+                [python_exe, str(SCRIPTS_DIR / "sc_by_quarter.py"), "--run-dir", str(run_dir)],
+                cwd=str(REPO_ROOT),
+                check=True
+            )
+        except Exception as e:
+            print(f"    WARNING: sc_by_quarter failed: {e}")
+
+        print("Post-processing complete!")
 
 
 if __name__ == "__main__":

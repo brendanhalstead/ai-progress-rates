@@ -42,8 +42,8 @@ class TasteDistribution:
     
     The distribution is modeled as T ~ LogNormal(μ, σ²), where the parameters
     are derived from empirical anchors:
-    - top_percentile: fraction of researchers classified as "top"
-    - median_to_top_gap: ratio of threshold taste to median taste  
+    - top_percentile: quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)
+    - median_to_top_gap: ratio of threshold taste to median taste
     - baseline_mean: company-wide mean taste
     
     Example usage:
@@ -68,9 +68,9 @@ class TasteDistribution:
                  baseline_mean: float = cfg.AGGREGATE_RESEARCH_TASTE_BASELINE):
         """
         Initialize the taste distribution with empirical anchors.
-        
+
         Args:
-            top_percentile: Fraction of researchers classified as "top"
+            top_percentile: Quantile threshold for "top" researchers (e.g., 0.999 = 99.9th percentile)
             median_to_top_gap: Ratio of threshold taste to median taste
             baseline_mean: Company-wide mean taste
         """
@@ -91,8 +91,8 @@ class TasteDistribution:
             raise ValueError(f"baseline_mean must be > 0, got {baseline_mean}")
         
         # Compute log-normal distribution parameters
-        z_p = norm.ppf(1 - top_percentile)
-        print(f"z_p: {z_p}")
+        # top_percentile is now the quantile (e.g., 0.999), so we use it directly
+        z_p = norm.ppf(top_percentile)
         self.sigma = math.log(median_to_top_gap) / z_p
         self.mu = math.log(baseline_mean) - 0.5 * self.sigma ** 2
         
@@ -533,28 +533,28 @@ class Parameters:
     experiment_compute_exponent: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['experiment_compute_exponent'])
     
     # Automation parameters
-    automation_fraction_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder'])
+    automation_fraction_at_coding_automation_anchor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor'])
     automation_anchors: Optional[Dict[float, float]] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_anchors'])
     automation_model: Optional[AutomationModel] = field(default_factory=lambda: None)
     automation_interp_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
-    #ai_research_taste_at_superhuman_coder: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder'])
+    ai_research_taste_at_coding_automation_anchor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor'])
     # Optional: allow specifying the superhuman-coder taste as SD within the human range
-    ai_research_taste_at_superhuman_coder_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_superhuman_coder_sd'))
+    ai_research_taste_at_coding_automation_anchor_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd'))
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
-    sc_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes'])
+    aa_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes'])
     # Pre-gap SC horizon minutes (formerly saturation_horizon_minutes)
-    pre_gap_sc_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
+    pre_gap_aa_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'])
     horizon_extrapolation_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['horizon_extrapolation_type'])
     
     # Manual horizon fitting parameters
     present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_day'])
     present_horizon: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_horizon'])
     present_doubling_time: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['present_doubling_time'])
-    doubling_difficulty_growth_rate: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_difficulty_growth_rate'])
+    doubling_difficulty_growth_factor: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['doubling_difficulty_growth_factor'])
     
     # Normalization
     coding_labor_normalization: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['coding_labor_normalization'])
@@ -573,6 +573,7 @@ class Parameters:
 
     # Research taste distribution parameter
     median_to_top_taste_multiplier: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['median_to_top_taste_multiplier'])
+    top_percentile: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['top_percentile'])
 
     # Benchmarks and gaps mode
     include_gap: Union[str, bool] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['include_gap'])
@@ -597,31 +598,31 @@ class Parameters:
             self.r_software = 1.0
                 
         # Sanitize automation parameters
-        if not np.isfinite(self.automation_fraction_at_superhuman_coder):
-            logger.warning(f"Non-finite automation_fraction_at_superhuman_coder: {self.automation_fraction_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']}")
-            self.automation_fraction_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['automation_fraction_at_superhuman_coder']
+        if not np.isfinite(self.automation_fraction_at_coding_automation_anchor):
+            logger.warning(f"Non-finite automation_fraction_at_coding_automation_anchor: {self.automation_fraction_at_coding_automation_anchor}, setting to {cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor']}")
+            self.automation_fraction_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor']
                 
         # Sanitize AI research taste parameters
         # If SD-specification is provided, convert to raw taste via TasteDistribution
-        if self.ai_research_taste_at_superhuman_coder_sd is not None and np.isfinite(self.ai_research_taste_at_superhuman_coder_sd):
+        if self.ai_research_taste_at_coding_automation_anchor_sd is not None and np.isfinite(self.ai_research_taste_at_coding_automation_anchor_sd):
             try:
-                taste_distribution_tmp = TasteDistribution(median_to_top_gap=self.median_to_top_taste_multiplier)
-                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_superhuman_coder_sd))
+                taste_distribution_tmp = TasteDistribution(top_percentile=self.top_percentile, median_to_top_gap=self.median_to_top_taste_multiplier)
+                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_coding_automation_anchor_sd))
                 if np.isfinite(converted_taste):
-                    self.ai_research_taste_at_superhuman_coder = float(converted_taste)
+                    self.ai_research_taste_at_coding_automation_anchor = float(converted_taste)
             except Exception as e:
-                logger.warning(f"Failed converting ai_research_taste_at_superhuman_coder_sd to taste: {e}")
-        if not np.isfinite(self.ai_research_taste_at_superhuman_coder):
-            logger.warning(f"Non-finite ai_research_taste_at_superhuman_coder: {self.ai_research_taste_at_superhuman_coder}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']}")
-            self.ai_research_taste_at_superhuman_coder = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_superhuman_coder']
+                logger.warning(f"Failed converting ai_research_taste_at_coding_automation_anchor_sd to taste: {e}")
+        if not np.isfinite(self.ai_research_taste_at_coding_automation_anchor):
+            logger.warning(f"Non-finite ai_research_taste_at_coding_automation_anchor: {self.ai_research_taste_at_coding_automation_anchor}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']}")
+            self.ai_research_taste_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']
                 
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
             self.ai_research_taste_slope = 1.0        
         # Sanitize time horizon parameter
-        if not np.isfinite(self.sc_time_horizon_minutes) or self.sc_time_horizon_minutes <= 0:
-            logger.warning(f"Invalid sc_time_horizon_minutes: {self.sc_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']}")
-            self.sc_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['sc_time_horizon_minutes']
+        if not np.isfinite(self.aa_time_horizon_minutes) or self.aa_time_horizon_minutes <= 0:
+            logger.warning(f"Invalid aa_time_horizon_minutes: {self.aa_time_horizon_minutes}, setting to {cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes']}")
+            self.aa_time_horizon_minutes = cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes']
 
         # Sanitize parallel_penalty
         if not np.isfinite(self.parallel_penalty):
@@ -630,9 +631,9 @@ class Parameters:
         else:
             self.parallel_penalty = float(np.clip(self.parallel_penalty, cfg.PARALLEL_PENALTY_MIN, cfg.PARALLEL_PENALTY_MAX))
         # Validate pre-gap SC horizon
-        if not np.isfinite(self.pre_gap_sc_time_horizon) or self.pre_gap_sc_time_horizon <= 0:
-            logger.warning(f"Invalid pre_gap_sc_time_horizon: {self.pre_gap_sc_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon']}")
-            self.pre_gap_sc_time_horizon = float(cfg.DEFAULT_PARAMETERS['pre_gap_sc_time_horizon'])
+        if not np.isfinite(self.pre_gap_aa_time_horizon) or self.pre_gap_aa_time_horizon <= 0:
+            logger.warning(f"Invalid pre_gap_aa_time_horizon: {self.pre_gap_aa_time_horizon}, setting to {cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon']}")
+            self.pre_gap_aa_time_horizon = float(cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'])
         
         # Sanitize categorical parameters
         if self.horizon_extrapolation_type not in cfg.HORIZON_EXTRAPOLATION_TYPES:
@@ -658,10 +659,10 @@ class Parameters:
                 logger.warning(f"Invalid present_doubling_time: {self.present_doubling_time}, setting to None for optimization")
                 self.present_doubling_time = None
         
-        if self.doubling_difficulty_growth_rate is not None:
-            if not np.isfinite(self.doubling_difficulty_growth_rate):
-                logger.warning(f"Invalid doubling_difficulty_growth_rate: {self.doubling_difficulty_growth_rate}, setting to None for optimization")
-                self.doubling_difficulty_growth_rate = None
+        if self.doubling_difficulty_growth_factor is not None:
+            if not np.isfinite(self.doubling_difficulty_growth_factor):
+                logger.warning(f"Invalid doubling_difficulty_growth_factor: {self.doubling_difficulty_growth_factor}, setting to None for optimization")
+                self.doubling_difficulty_growth_factor = None
 
         if self.inv_compute_anchor_exp_cap is not None:
             logger.warning(f"inv_compute_anchor_exp_cap is not None, overriding compute_anchor_exp_cap to 1 / inv_compute_anchor_exp_cap")
@@ -1506,7 +1507,7 @@ def solve_lower_anchor_via_automation_model(
     """
     Solve for the lower anchor automation fraction at the anchor progress such that,
     when initializing AutomationModel with anchors
-        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_superhuman_coder },
+        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_coding_automation_anchor },
     the implied coding-labor multiplier at anchor_progress matches swe_multiplier.
 
     The multiplier is defined on coding labor after applying parallel_penalty and normalization, i.e.
@@ -1526,9 +1527,9 @@ def solve_lower_anchor_via_automation_model(
 
         # Ensure an upper anchor exists
         progress_at_sc = getattr(params, 'progress_at_sc', None)
-        aut_at_sc = getattr(params, 'automation_fraction_at_superhuman_coder', None)
+        aut_at_sc = getattr(params, 'automation_fraction_at_coding_automation_anchor', None)
         if progress_at_sc is None or not np.isfinite(progress_at_sc) or aut_at_sc is None:
-            logger.warning("Missing progress_at_sc or automation_fraction_at_superhuman_coder; falling back to direct solver")
+            logger.warning("Missing progress_at_sc or automation_fraction_at_coding_automation_anchor; falling back to direct solver")
             return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, inference_compute, params)
 
         # Target coding-labor ratio in parallel_penalty space
@@ -1740,7 +1741,7 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
     Sigmoid function for AI research taste: f(x) = L / (1 + e^(-k*(x-x0)))
     """
     # Extract sigmoid parameters
-    L = params.ai_research_taste_at_superhuman_coder  # Upper asymptote
+    L = params.ai_research_taste_at_coding_automation_anchor  # Upper asymptote
     # Midpoint parameter removed with legacy sigmoid
     x0 = None
     k = params.ai_research_taste_slope  # Slope parameter
@@ -1765,12 +1766,12 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
 def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
     """
     Exponential function for AI research taste that passes through 
-    (progress_at_sc, ai_research_taste_at_superhuman_coder) with logplot-slope ai_research_taste_slope.
+    (progress_at_sc, ai_research_taste_at_coding_automation_anchor) with logplot-slope ai_research_taste_slope.
     
     Formula: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
-    where taste_at_sc = ai_research_taste_at_superhuman_coder
+    where taste_at_sc = ai_research_taste_at_coding_automation_anchor
     """
-    taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope
     
@@ -1812,21 +1813,21 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     
     This schedule interprets the slope parameter as the number of standard deviations
     per progress unit in the underlying log-normal taste distribution. The curve
-    passes through (progress_at_sc, ai_research_taste_at_superhuman_coder).
+    passes through (progress_at_sc, ai_research_taste_at_coding_automation_anchor).
     
     Formula: taste(x) = taste_dist.get_taste_at_sd(slope * x + offset)
     where offset is computed to ensure the curve passes through the anchor point.
     """
     # Create taste distribution with default parameters
     try:
-        taste_distribution = TasteDistribution(median_to_top_gap=params.median_to_top_taste_multiplier)
+        taste_distribution = TasteDistribution(top_percentile=params.top_percentile, median_to_top_gap=params.median_to_top_taste_multiplier)
     except Exception as e:
         logger.warning(f"Error creating TasteDistribution: {e}")
         # Fallback to exponential schedule
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
     
     # Extract parameters
-    # taste_at_sc = params.ai_research_taste_at_superhuman_coder
+    # taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
     progress_at_sc = params.progress_at_sc
     slope = params.ai_research_taste_slope  # SD per progress unit
     
@@ -1842,7 +1843,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         # Clamp taste_at_sc to valid range to avoid log(0) issues
         # taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
-        target_sd = params.ai_research_taste_at_superhuman_coder_sd
+        target_sd = params.ai_research_taste_at_coding_automation_anchor_sd
         # Adjust offset to maintain the anchor point with unpenalized slope
         offset = target_sd - slope * progress_at_sc
         
@@ -2295,7 +2296,7 @@ class ProgressModel:
         self._horizon_params = None
         
         # Initialize taste distribution for working with research taste
-        self.taste_distribution = TasteDistribution(median_to_top_gap=self.params.median_to_top_taste_multiplier)
+        self.taste_distribution = TasteDistribution(top_percentile=self.params.top_percentile, median_to_top_gap=self.params.median_to_top_taste_multiplier)
     
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
@@ -2476,7 +2477,7 @@ class ProgressModel:
                         _include_gap_flag = bool(_inc)
                 except Exception:
                     _include_gap_flag = False
-                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.pre_gap_aa_time_horizon if _include_gap_flag else self.params.aa_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Solve: target_horizon = exp(slope * progress + intercept)
@@ -2496,13 +2497,13 @@ class ProgressModel:
                             except Exception:
                                 year_label = 'anchor'
                             logger.info(
-                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
+                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_aa_time_horizon} and "
                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                             )
                         self.params.progress_at_sc = calculated_progress_at_sc
                         logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
-                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
@@ -2534,9 +2535,9 @@ class ProgressModel:
                     else:
                         params_to_optimize.append('T_0')
                     
-                    # Handle A_0 (doubling_difficulty_growth_rate converted to decay_rate)
-                    if self.params.doubling_difficulty_growth_rate is not None:
-                        fixed_params['A_0'] = 1.0 - self.params.doubling_difficulty_growth_rate
+                    # Handle A_0 (doubling_difficulty_growth_factor converted to decay_rate)
+                    if self.params.doubling_difficulty_growth_factor is not None:
+                        fixed_params['A_0'] = 1.0 - self.params.doubling_difficulty_growth_factor
                     else:
                         params_to_optimize.append('A_0')
                     
@@ -2544,7 +2545,7 @@ class ProgressModel:
                         # All parameters specified (Case 8)
                         H_0 = self.params.present_horizon
                         T_0 = doubling_time_in_progress_units
-                        A_0 = 1.0 - self.params.doubling_difficulty_growth_rate
+                        A_0 = 1.0 - self.params.doubling_difficulty_growth_factor
                         logger.info(f"Manual decaying doubling time: All parameters specified")
                     elif len(params_to_optimize) == 1:
                         # Optimize one parameter
@@ -2768,7 +2769,7 @@ class ProgressModel:
                         _include_gap_flag = bool(_inc)
                 except Exception:
                     _include_gap_flag = False
-                target_horizon = self.params.pre_gap_sc_time_horizon if _include_gap_flag else self.params.sc_time_horizon_minutes
+                target_horizon = self.params.pre_gap_aa_time_horizon if _include_gap_flag else self.params.aa_time_horizon_minutes
                 if target_horizon > 0:
                     try:
                         # Add numerical safeguards
@@ -2776,7 +2777,7 @@ class ProgressModel:
                             logger.warning("Invalid parameters for progress_at_sc calculation")
                             self.params.progress_at_sc = None
                         elif target_horizon <= 0:
-                            logger.warning("Invalid sc_time_horizon_minutes for calculation")
+                            logger.warning("Invalid aa_time_horizon_minutes for calculation")
                             self.params.progress_at_sc = None
                         else:
                             # Check if the ratio is valid
@@ -2797,12 +2798,12 @@ class ProgressModel:
                                     else:
                                         # Use shifted form if we're in the manual parameter case
                                         if anchor_progress_for_trajectory is not None:
-                                            # Shifted form: sc_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
-                                            # progress = anchor_progress + T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            # Shifted form: aa_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
+                                            # progress = anchor_progress + T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
                                         else:
-                                            # Original form: sc_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
-                                            # progress = T_0 * (1 - (sc_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
+                                            # Original form: aa_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
+                                            # progress = T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
                                             calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
                                         
                                         # If in gap-included mode, add the gap (specified in anchor-progress-years)
@@ -2819,7 +2820,7 @@ class ProgressModel:
                                             except Exception:
                                                 year_label = 'anchor'
                                             logger.info(
-                                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_sc_time_horizon} and "
+                                                f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_aa_time_horizon} and "
                                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                                             )
                                         
@@ -2830,7 +2831,7 @@ class ProgressModel:
                                             self.params.progress_at_sc = calculated_progress_at_sc
                                             logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
                     except (ValueError, ZeroDivisionError, OverflowError) as e:
-                        logger.warning(f"Could not calculate progress at sc_time_horizon_minutes: {e}")
+                        logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
                         self.params.progress_at_sc = None
             
             else:
@@ -3030,9 +3031,9 @@ class ProgressModel:
         else:
             logger.info(f"using direct input exp capacity params: rho: {self.params.rho_experiment_capacity}, alpha: {self.params.alpha_experiment_capacity}, experiment_compute_exponent: {self.params.experiment_compute_exponent}")
         
-        # hackily handle doubling_difficulty_growth_rate = 1 case (equivalent to decay_rate = 0)
-        if self.params.doubling_difficulty_growth_rate == 1.0:
-            logger.info(f"doubling_difficulty_growth_rate is 1.0 (decay_rate = 0), setting to exponential")
+        # hackily handle doubling_difficulty_growth_factor = 1 case (equivalent to decay_rate = 0)
+        if self.params.doubling_difficulty_growth_factor == 1.0:
+            logger.info(f"doubling_difficulty_growth_factor is 1.0 (decay_rate = 0), setting to exponential")
             self.params.horizon_extrapolation_type = "exponential"
 
         # next compute human-only trajectory
@@ -3111,7 +3112,7 @@ class ProgressModel:
         logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             present_day_progress: anchor_aut_frac,
-            self.params.progress_at_sc: self.params.automation_fraction_at_superhuman_coder
+            self.params.progress_at_sc: self.params.automation_fraction_at_coding_automation_anchor
         }
         logger.info(f"Automation anchors: {automation_anchors}")
         self.params.automation_anchors = automation_anchors
@@ -3422,9 +3423,9 @@ class ProgressModel:
         ai2027_sc_time = None
         try:
             if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
-                ai2027_sc_required_mult = (
-                    cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty)
-                )
+                # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
+                serial_mult = cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30
+                ai2027_sc_required_mult = (serial_mult ** (1 / self.params.parallel_penalty)) * 30
                 ai2027_sc_time = _find_exponential_crossing_time(
                     np.asarray(times, dtype=float),
                     np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float),
@@ -3482,15 +3483,15 @@ class ProgressModel:
             logger.warning(f"Failed computing taste slope conversions: {e}")
         
         # Compute top taste percentile metrics for display
-        top_taste_percentile = cfg.TOP_PERCENTILE
+        top_taste_percentile = self.params.top_percentile
         top_taste_value = None
         top_taste_num_sds = None
         f_multiplier_per_sd = None
         slope_times_log_f = None
-        
+
         try:
-            # Get taste value at top percentile (e.g., 99th percentile if TOP_PERCENTILE = 0.01)
-            top_taste_value = self.taste_distribution.get_taste_at_quantile(1.0 - top_taste_percentile)
+            # Get taste value at top percentile (e.g., 99.9th percentile if top_percentile = 0.999)
+            top_taste_value = self.taste_distribution.get_taste_at_quantile(top_taste_percentile)
             
             # Get how many standard deviations this represents
             top_taste_num_sds = self.taste_distribution.get_sd_of_taste(top_taste_value)
@@ -3590,7 +3591,8 @@ class ProgressModel:
                 'interpolation_type': 'linear',            },
             'AI2027-SC': {
                 'metric': 'ai_coding_labor_mult_ref_present_day',
-                'target': cfg.LABOR_MULT_EXTRA_FOR_AI2027_SC * 30 * 30 ** (1 / self.params.parallel_penalty),
+                # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
+                'target': (cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30) ** (1 / self.params.parallel_penalty) * 30,
                 'interpolation_type': 'exponential',
             },
             '5x-AIR': {
