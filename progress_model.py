@@ -92,6 +92,7 @@ class TasteDistribution:
         
         # Compute log-normal distribution parameters
         z_p = norm.ppf(1 - top_percentile)
+        print(f"z_p: {z_p}")
         self.sigma = math.log(median_to_top_gap) / z_p
         self.mu = math.log(baseline_mean) - 0.5 * self.sigma ** 2
         
@@ -3633,6 +3634,7 @@ class ProgressModel:
                 'interpolation_type': 'exponential'
             }
         }
+
         for milestone in milestones.values():
             if milestone['interpolation_type'] == 'exponential':
                 time = _find_exponential_crossing_time(
@@ -3650,6 +3652,16 @@ class ProgressModel:
                     milestone['progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['ai_sw_progress_mult_ref_present_day'], dtype=float))
                 if 'effective_compute_ooms' not in milestone:
                     milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['effective_compute'], dtype=float))
+                milestone['research_effort'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['research_efforts'], dtype=float))
+                milestone['research_stock'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['research_stock'], dtype=float))
+
+        milestones_list = list(zip(milestones.keys(), milestones.values()))
+        milestones_list.sort(key=lambda x: x[1]['time'])
+        for i in range(len(milestones_list) - 1):
+            this_RS = milestones_list[i][1]['research_stock']
+            next_RS = milestones_list[i+1][1]['research_stock']
+            milestones[milestones_list[i][0]]['human_only_years_to_next_milestone'] = (next_RS - this_RS) / self.human_only_results['anchor_stats']['research_effort']
+        print(milestones_list)
         return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:
