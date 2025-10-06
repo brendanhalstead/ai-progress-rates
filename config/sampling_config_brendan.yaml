@@ -54,7 +54,7 @@ parameters:
   present_doubling_time:
     dist: lognormal
     ci80: [0.25, 0.667]
-  doubling_difficulty_growth_rate:
+  doubling_difficulty_growth_factor:
     dist: normal
     ci80:
     - 0.8  # 1 - 0.2

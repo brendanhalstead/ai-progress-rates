@@ -1894,7 +1894,7 @@ def params_to_dict(params: Parameters):
         'present_day': params.present_day,
         'present_horizon': params.present_horizon,
         'present_doubling_time': params.present_doubling_time,
-        'doubling_difficulty_growth_rate': params.doubling_difficulty_growth_rate,
+        'doubling_difficulty_growth_factor': params.doubling_difficulty_growth_factor,
         # Baseline Annual Compute Multiplier
         'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
         # Gap mode selection
@@ -2190,8 +2190,8 @@ def get_parameter_config():
                     'description': 'Doubling time parameter at the anchor point (leave empty for auto-fit)',
                     'units': 'progress units'
                 },
-                'doubling_difficulty_growth_rate': {
-                    'name': 'Doubling Difficulty Growth Rate',
+                'doubling_difficulty_growth_factor': {
+                    'name': 'Doubling Difficulty Growth Factor',
                     'description': 'Rate of growth for doubling difficulty (1 - decay rate, leave empty for auto-fit)',
                     'units': 'dimensionless'
                 },
@@ -2675,7 +2675,7 @@ def get_default_data():
             'present_day': params.present_day,
             'present_horizon': params.present_horizon,
             'present_doubling_time': params.present_doubling_time,
-            'doubling_difficulty_growth_rate': params.doubling_difficulty_growth_rate,
+            'doubling_difficulty_growth_factor': params.doubling_difficulty_growth_factor,
             # Baseline Annual Compute Multiplier
             'baseline_annual_compute_multiplier': params.baseline_annual_compute_multiplier,
             # Research taste distribution parameter
