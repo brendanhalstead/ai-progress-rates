@@ -300,7 +300,7 @@ PLOT_METADATA = {
     'plot_software_efficiency': {
         'title': 'Software Efficiency',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'OOMs', 'type': 'linear'},
+        'y_axis': {'title': f'log({round(TRAINING_COMPUTE_REFERENCE_YEAR)}-FLOP/FLOP)', 'type': 'linear'},
         'data_keys': ['times', 'software_efficiency']
     },
     'plot_labor_comparison': {
@@ -422,7 +422,7 @@ PLOT_METADATA = {
     'plot_cumulative_progress': {
         'title': 'Components of Effective Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'log(2022-FLOP)', 'type': 'linear'},
+        'y_axis': {'title': f'log({round(TRAINING_COMPUTE_REFERENCE_YEAR)}-FLOP)', 'type': 'linear'},
         'data_keys': ['times', 'effective_compute', 'training_compute']
     },
     'plot_progress_rate': {
