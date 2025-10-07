@@ -101,6 +101,7 @@ def _build_default_distribution_config() -> Dict[str, Any]:
         "parameters": param_cfg,
         "time_range": None,
         "initial_progress": 0.0,
+        "correlation_matrix": None,  # No correlations by default
     }
 
 
@@ -328,7 +329,7 @@ def get_default_sampling_config():
 def run_monte_carlo():
     try:
         payload = request.json or {}
-        # Expect a dict with keys: seed, num_samples, time_range, initial_progress, input_data, parameters
+        # Expect a dict with keys: seed, num_samples, time_range, initial_progress, input_data, parameters, correlation_matrix
         effective_cfg: Dict[str, Any] = {
             "seed": payload.get("seed", 42),
             "num_samples": payload.get("num_samples", payload.get("num_rollouts", 1000)),
@@ -336,6 +337,7 @@ def run_monte_carlo():
             "initial_progress": payload.get("initial_progress", 0.0),
             "input_data": payload.get("input_data"),
             "parameters": payload.get("parameters", {}),
+            "correlation_matrix": payload.get("correlation_matrix"),
             # Default timeout to 10s if not provided, to avoid stalls in web runs
             "per_sample_timeout": payload.get("per_sample_timeout", 10),
         }
@@ -497,6 +499,7 @@ def export_sampling_config():
             "num_rollouts": payload.get("num_samples", payload.get("num_rollouts", 1000)),
             "input_data": payload.get("input_data") or None,
             "parameters": payload.get("parameters", {}),
+            "correlation_matrix": payload.get("correlation_matrix"),
             "per_sample_timeout": payload.get("per_sample_timeout"),
         }
 
@@ -575,6 +578,7 @@ def import_sampling_config():
             "num_samples": num_rollouts,
             "input_data": data.get("input_data"),
             "parameters": params,
+            "correlation_matrix": data.get("correlation_matrix"),
             "per_sample_timeout": data.get("per_sample_timeout"),
         }
 

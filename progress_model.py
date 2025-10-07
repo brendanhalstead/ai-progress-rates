@@ -3658,6 +3658,8 @@ class ProgressModel:
                 milestone['research_stock'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['research_stock'], dtype=float))
 
         milestones_list = list(zip(milestones.keys(), milestones.values()))
+        # Filter out milestones without time and sort by time
+        milestones_list = [(name, milestone) for name, milestone in milestones_list if 'time' in milestone]
         milestones_list.sort(key=lambda x: x[1]['time'])
         for i in range(len(milestones_list) - 1):
             this_RS = milestones_list[i][1]['research_stock']
