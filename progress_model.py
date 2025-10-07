@@ -3244,10 +3244,7 @@ class ProgressModel:
         human_labor_contributions = []
         ai_coding_labor_multipliers = []
         ai_coding_labor_mult_ref_present_day = []
-        ai_research_stock_multipliers = []
-        ai_software_progress_multipliers = []
         ai_sw_progress_mult_ref_present_day = []
-        ai_overall_progress_multipliers = []
         discounted_exp_compute = []
         horizon_lengths = []
         effective_compute = []
@@ -3426,10 +3423,7 @@ class ProgressModel:
                     ai_coding_labor_mult_ref_present_day.append(coding_labor_with_present_resources / present_day_human_labor if ai_contrib > 0 else 1.0)
                 else:
                     ai_coding_labor_multipliers.append(0.0)
-                ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
-                ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_sw_progress_mult_ref_present_day.append(software_rate_present_resources / present_day_sw_progress_rate if present_day_sw_progress_rate > 0 else 0.0)
-                ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
 
                 
             except Exception as e:
@@ -3613,7 +3607,6 @@ class ProgressModel:
             'human_labor_contributions': human_labor_contributions,
             'ai_coding_labor_multipliers': ai_coding_labor_multipliers,
             'ai_coding_labor_mult_ref_present_day': ai_coding_labor_mult_ref_present_day,
-            'ai_research_stock_multipliers': ai_research_stock_multipliers,
             'ai_sw_progress_mult_ref_present_day': ai_sw_progress_mult_ref_present_day,
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
