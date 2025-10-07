@@ -77,9 +77,10 @@ REFERENCE_YEAR = 2024.8
 REFERENCE_LABOR_CHANGE = 30.0
 REFERENCE_COMPUTE_CHANGE = 0.1
 
-# Software progress scale reference year
+# This is used to set "r". The idea is that we know quickly software efficiency was growing in this year.
 SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR = 2023.0
 
+# Normalize "0 software efficiency" to Grok 3, which was released in 2025.13 and trained with 10^26.54 FLOPs.
 TRAINING_COMPUTE_REFERENCE_YEAR = 2025.13
 TRAINING_COMPUTE_REFERENCE_OOMS = 26.54
 
