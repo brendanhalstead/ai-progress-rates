@@ -445,18 +445,6 @@ PLOT_METADATA = {
         'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_research_stock_multipliers']
     },
-    'plot_ai_software_progress_multiplier': {
-        'title': 'AI Software Progress Multiplier',
-        'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': '???', 'type': 'log'},
-        'data_keys': ['times', 'ai_software_progress_multipliers']
-    },
-    'plot_ai_overall_progress_multiplier': {
-        'title': 'AI Overall Progress Multiplier',
-        'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': '???', 'type': 'log'},
-        'data_keys': ['times', 'ai_overall_progress_multipliers']
-    },
     'plot_ai_sw_progress_mult_ref_present_day': {
         'title': 'AI Software Progress Multiplier (Ref Present Day)',
         'x_axis': {'title': 'Time', 'type': 'linear'},
@@ -659,13 +647,11 @@ This is meant to be a clean measure of AI R&D capabilities, and depends on three
     'other_metrics': {
         'id': 'other-metrics',
         'name': 'Other Metrics / Debug',
-        'rows': 3, 'cols': 2,
+        'rows': 2, 'cols': 2,
         'plots': [
             {'function': 'plot_ai_coding_labor_multiplier', 'position': (1, 1)},
-            {'function': 'plot_ai_software_progress_multiplier', 'position': (1, 2)},
-            {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
-            {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
-            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)},
+            {'function': 'plot_human_only_progress_rate', 'position': (1, 2)},
+            {'function': 'plot_horizon_lengths_vs_progress', 'position': (2, 1)},
             
         ],
         'explanation': """
