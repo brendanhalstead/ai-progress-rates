@@ -984,6 +984,19 @@
                       />
                       <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
                     </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="sos_mode"
+                        />
+                        <label class="form-check-label" for="sos_mode">
+                          SOS Mode
+                        </label>
+                      </div>
+                      <small class="text-muted">Freezes input time series once the automation anchor is reached.</small>
+                    </div>
                     <div class="row">
                       <div class="col-4">
                         <label class="param-label">Start Year</label>
@@ -1242,6 +1255,8 @@
         "present_horizon",
         "present_doubling_time",
         "doubling_difficulty_growth_factor",
+        // Simulation settings
+        "sos_mode",
       ];
 
       // Load parameter configuration from server
@@ -1415,6 +1430,16 @@
           } else {
             // For dropdowns, always trigger recompute regardless of auto-update setting
             // since dropdown changes are typically intentional parameter changes
+            computeModel();
+          }
+        });
+
+        // Add event listener for SOS mode checkbox
+        $("#sos_mode").on("change", function () {
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else {
             computeModel();
           }
         });
@@ -1820,6 +1845,9 @@
           id === "coding_labor_mode"
             ) {
               value = element.val(); // Keep as string
+            } else if (id === "sos_mode") {
+              // Boolean checkbox
+              value = element.is(":checked");
             } else {
               value = parseFloat(element.val());
 
@@ -1864,6 +1892,7 @@
           id !== "automation_interp_type" &&
           id !== "coding_labor_mode" &&
               id !== "include_gap" &&
+              id !== "sos_mode" &&
               value !== null &&
               !isFinite(value)
             ) {
@@ -3079,6 +3108,16 @@
           }
         } catch (e) {
           console.warn("Failed to initialize parallel penalty toggle", e);
+        }
+
+        // Initialize SOS mode toggle state
+        try {
+          const sosToggle = document.getElementById("sos_mode");
+          if (sosToggle && parameterConfig?.defaults?.sos_mode !== undefined) {
+            sosToggle.checked = !!parameterConfig.defaults.sos_mode;
+          }
+        } catch (e) {
+          console.warn("Failed to initialize SOS mode toggle", e);
         }
 
         // Initialize Benchmarks & Gaps controls from defaults where appropriate

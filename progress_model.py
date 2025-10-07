@@ -584,6 +584,9 @@ class Parameters:
     coding_automation_efficiency_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('coding_automation_efficiency_slope', 1.0))
     optimal_ces_eta_init: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
     optimal_ces_grid_size: int = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
+
+    # SOS mode
+    sos_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sos_mode'])
     
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
@@ -2298,6 +2301,75 @@ class ProgressModel:
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution(top_percentile=self.params.top_percentile, median_to_top_gap=self.params.median_to_top_taste_multiplier)
     
+    def freeze_time_series_at_time(self, freeze_time: float):
+        """
+        Freeze time series data at a specified time.
+        
+        Human labor, experiment compute, and inference compute remain unchanged up to freeze_time,
+        then stay constant at their freeze_time values thereafter.
+        
+        Training compute growth rate is unchanged up to freeze_time, then abruptly goes to zero
+        after freeze_time.
+        
+        Args:
+            freeze_time: Time at which to freeze the time series (decimal year)
+        """
+        # Get the freeze_time values using log interpolation
+        freeze_human_labor = _log_interp(freeze_time, self.data.time, self.data.L_HUMAN)
+        freeze_experiment_compute = _log_interp(freeze_time, self.data.time, self.data.experiment_compute)
+        freeze_inference_compute = _log_interp(freeze_time, self.data.time, self.data.inference_compute)
+        freeze_training_compute_growth_rate = _log_interp(freeze_time, self.data.time, self.data.training_compute_growth_rate)
+        
+        insertion_idx = np.searchsorted(self.data.time, freeze_time)
+
+        time_with_freeze = np.insert(self.data.time, insertion_idx, freeze_time)
+        human_labor_with_freeze = np.insert(self.data.L_HUMAN, insertion_idx, freeze_human_labor)
+        experiment_compute_with_freeze = np.insert(self.data.experiment_compute, insertion_idx, freeze_experiment_compute)
+        inference_compute_with_freeze = np.insert(self.data.inference_compute, insertion_idx, freeze_inference_compute)
+        training_compute_growth_rate_with_freeze = np.insert(self.data.training_compute_growth_rate, insertion_idx, freeze_training_compute_growth_rate)
+        
+        # Find where to insert the freeze_time point
+        # Insert freeze_time + epsilon to ensure proper ordering and transition
+        epsilon = 1e-6  # Small epsilon to ensure freeze_time + epsilon comes after freeze_time
+        freeze_time_after = freeze_time + epsilon
+        
+        # Find the insertion point (first index where time > freeze_time)
+        new_insertion_idx = insertion_idx + 1
+        
+        # Create new arrays with the freeze point inserted
+        new_time = np.insert(time_with_freeze, new_insertion_idx, freeze_time_after)
+        new_L_HUMAN = np.insert(human_labor_with_freeze, new_insertion_idx, freeze_human_labor)
+        new_experiment_compute = np.insert(experiment_compute_with_freeze, new_insertion_idx, freeze_experiment_compute)
+        new_inference_compute = np.insert(inference_compute_with_freeze, new_insertion_idx, freeze_inference_compute)
+        new_training_compute_growth_rate = np.insert(training_compute_growth_rate_with_freeze, new_insertion_idx, 0.0)
+        
+        # Find indices where time >= freeze_time_after (including the newly inserted point)
+        freeze_mask = new_time >= freeze_time_after
+        
+        # Set frozen values for human labor, experiment compute, and inference compute
+        new_L_HUMAN[freeze_mask] = freeze_human_labor
+        new_experiment_compute[freeze_mask] = freeze_experiment_compute
+        new_inference_compute[freeze_mask] = freeze_inference_compute
+        new_training_compute_growth_rate[freeze_mask] = 0.0
+        
+        # Training compute growth rate is already set to 0.0 at insertion point and remains 0.0
+        
+        # Create new TimeSeriesData object
+        self.data = TimeSeriesData(
+            time=new_time,
+            L_HUMAN=new_L_HUMAN,
+            inference_compute=new_inference_compute,
+            experiment_compute=new_experiment_compute,
+            training_compute_growth_rate=new_training_compute_growth_rate
+        )
+        
+        logger.info(f"Frozen time series at time {freeze_time}:")
+        logger.info(f"  Human labor: {freeze_human_labor:.6f}")
+        logger.info(f"  Experiment compute: {freeze_experiment_compute:.6f}")
+        logger.info(f"  Inference compute: {freeze_inference_compute:.6f}")
+        logger.info(f"  Training compute growth rate: {freeze_training_compute_growth_rate:.6f} -> 0.0")
+        logger.info(f"  Inserted freeze point at time {freeze_time_after:.6f}")
+    
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
         Estimate horizon trajectory by fitting to log(p80_horizon_length) vs progress.
@@ -3127,6 +3199,12 @@ class ProgressModel:
         _dt_integrate = time.perf_counter() - _t_integrate_start
         logger.info(f"Timing: integrate_progress completed in {_dt_integrate:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
+        # SOS MODE
+        if self.params.sos_mode and progress_values[-1] > self.params.progress_at_sc:
+            full_automation_time = np.interp(self.params.progress_at_sc, progress_values, times)
+            logger.info(f"Full automation time: {full_automation_time}")
+            self.freeze_time_series_at_time(full_automation_time)
+            times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
         # This ensures that the horizon at present_day matches the specified present_horizon value
         if (self.horizon_trajectory is not None and 

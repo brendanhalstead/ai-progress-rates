@@ -196,20 +196,20 @@ def plot_software_efficiency(fig, times, values, row, col):
 def plot_labor_comparison(fig, time_series, row, col):
     """Plot human vs AI labor comparison"""
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.L_HUMAN.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['L_HUMAN'].tolist(),
                   name='Human Labor',
                   line=dict(color='#ff7f0e', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.inference_compute.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['inference_compute'].tolist(),
                   name='Inference Compute',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
@@ -217,20 +217,20 @@ def plot_labor_comparison(fig, time_series, row, col):
 def plot_compute_comparison(fig, time_series, row, col):
     """Plot experiment vs training compute comparison"""
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['experiment_compute'].tolist(),
                   name='Experiment Compute',
                   line=dict(color='#2ca02c', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute_growth_rate.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['training_compute_growth_rate'].tolist(),
                   name='Training Compute',
                   line=dict(color='#d62728', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
@@ -1447,13 +1447,13 @@ def get_tab_configurations():
     plot_function_map = {
         'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes')),
         'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes'), data.get('progress_at_sc')),
-        'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
-        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].inference_compute, r, c),
-        'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
-        'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['time_series'].time, data['time_series'].training_compute_growth_rate, r, c),
+        'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['L_HUMAN'], r, c),
+        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['inference_compute'], r, c),
+        'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['experiment_compute'], r, c),
+        'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['training_compute_growth_rate'], r, c),
         'plot_software_efficiency': lambda fig, data, r, c: plot_software_efficiency(fig, data['metrics']['times'], data['metrics']['software_efficiency'], r, c),
-        'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c),
-        'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c),
+        'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['metrics']['input_time_series'], r, c),
+        'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['metrics']['input_time_series'], r, c),
         'plot_automation_fraction': lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c),
         'plot_progress_vs_automation': lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c),
         'plot_ai_research_taste': lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c),
@@ -1472,7 +1472,7 @@ def get_tab_configurations():
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
         'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
         'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
-        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['time_series'].time, data['time_series'].training_compute_growth_rate), r, c),
+        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['training_compute_growth_rate']), r, c),
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
         'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
         'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),

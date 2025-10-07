@@ -247,6 +247,7 @@ DEFAULT_PARAMETERS = {
     'coding_automation_efficiency_slope': 2.0,
     'optimal_ces_eta_init': 0.05,
     'optimal_ces_grid_size': 4096,
+    'sos_mode': False,
 }
 
 # =============================================================================
