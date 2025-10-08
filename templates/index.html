@@ -70,15 +70,12 @@
                 <h5>Capability Milestones</h5>
                 <div class="table-responsive">
                   <table class="table table-sm table-striped align-middle">
-                    <thead>
+                    <thead id="milestonesTableHead">
                       <tr>
                         <th scope="col">Milestone</th>
                         <th scope="col">Time</th>
                         <th scope="col">2025-FLOP</th>
                         <th scope="col">PM</th>
-                        <th scope="col">Takeoff PM</th>
-                        <th scope="col">Research Stock</th>
-                        <th scope="col">Takeoff-start human-only years to next</th>
                       </tr>
                     </thead>
                     <tbody id="milestonesTableBody"></tbody>
@@ -1437,6 +1434,9 @@
 
         // Add event listener for SOS mode checkbox
         $("#sos_mode").on("change", function () {
+          // Update milestone table header immediately
+          updateMilestoneTableHeader();
+          
           if ($("#autoUpdate").is(":checked")) {
             clearTimeout(window.updateTimer);
             window.updateTimer = setTimeout(computeModel, 300);
@@ -1471,6 +1471,8 @@
         updateHorizonExtrapolationVisibility();
         // Initialize SD/fraction visibility per schedule type
         updateTasteUnitsVisibility();
+        // Initialize milestone table header based on sos_mode
+        updateMilestoneTableHeader();
       }
 
       function updateBenchmarksAndGapsVisibility() {
@@ -3934,23 +3936,60 @@
         }
       }
 
+      function updateMilestoneTableHeader() {
+        try {
+          const tableHead = document.getElementById("milestonesTableHead");
+          if (!tableHead) return;
+          
+          const sosMode = document.getElementById("sos_mode")?.checked || false;
+          
+          if (sosMode) {
+            // SOS mode: Milestone, Time, 2025-FLOP, Takeoff PM, Takeoff-start human-only years to next
+            tableHead.innerHTML = `
+              <tr>
+                <th scope="col">Milestone</th>
+                <th scope="col">Time</th>
+                <th scope="col">2025-FLOP</th>
+                <th scope="col">Takeoff PM</th>
+                <th scope="col">Takeoff-start human-only years to next</th>
+              </tr>
+            `;
+          } else {
+            // Normal mode: Milestone, Time, 2025-FLOP, PM
+            tableHead.innerHTML = `
+              <tr>
+                <th scope="col">Milestone</th>
+                <th scope="col">Time</th>
+                <th scope="col">2025-FLOP</th>
+                <th scope="col">PM</th>
+              </tr>
+            `;
+          }
+        } catch (e) {
+          console.warn("Failed to update milestone table header", e);
+        }
+      }
+
       function updateMilestonesFromResponse(response) {
         try {
           const tableBody = document.getElementById("milestonesTableBody");
           if (!tableBody) return;
+          
+          // Update header based on current sos_mode
+          updateMilestoneTableHeader();
+          
           // Prefer explicit milestones field if present; otherwise try to derive minimal entries from summary
           const milestones = response?.milestones || response?.results?.milestones || null;
           tableBody.innerHTML = "";
+          
+          const sosMode = document.getElementById("sos_mode")?.checked || false;
 
           const addRow = (name, timeVal, progressMult, effectiveCompute, takeoffPM, researchStock, humanOnlyYears) => {
             const tr = document.createElement("tr");
             const tdName = document.createElement("td");
             const tdTime = document.createElement("td");
             const tdEC = document.createElement("td");
-            const tdMult = document.createElement("td");
-            const tdTakeoffPM = document.createElement("td");
-            const tdResearchStock = document.createElement("td");
-            const tdHumanYears = document.createElement("td");
+            
             tdName.textContent = name;
             tdTime.textContent =
               timeVal != null && isFinite(timeVal)
@@ -3960,29 +3999,37 @@
               effectiveCompute != null && isFinite(effectiveCompute)
                 ? `1e${Number(effectiveCompute).toFixed(1)}`
                 : "—";
-            tdMult.textContent =
-              progressMult != null && isFinite(progressMult)
-                ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
-                : "—";
-            tdTakeoffPM.textContent =
-              takeoffPM != null && isFinite(takeoffPM)
-                ? Number(takeoffPM).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
-                : "—";
-            tdResearchStock.textContent =
-              researchStock != null && isFinite(researchStock)
-                ? Number(researchStock).toFixed(1)
-                : "—";
-            tdHumanYears.textContent =
-              humanOnlyYears != null && isFinite(humanOnlyYears)
-                ? Number(humanOnlyYears).toFixed(1)
-                : "—";
+            
             tr.appendChild(tdName);
             tr.appendChild(tdTime);
             tr.appendChild(tdEC);
-            tr.appendChild(tdMult);
-            tr.appendChild(tdTakeoffPM);
-            tr.appendChild(tdResearchStock);
-            tr.appendChild(tdHumanYears);
+            
+            if (sosMode) {
+              // SOS mode: add Takeoff PM and human-only years columns
+              const tdTakeoffPM = document.createElement("td");
+              const tdHumanYears = document.createElement("td");
+              
+              tdTakeoffPM.textContent =
+                takeoffPM != null && isFinite(takeoffPM)
+                  ? Number(takeoffPM).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                  : "—";
+              tdHumanYears.textContent =
+                humanOnlyYears != null && isFinite(humanOnlyYears)
+                  ? Number(humanOnlyYears).toFixed(1)
+                  : "—";
+              
+              tr.appendChild(tdTakeoffPM);
+              tr.appendChild(tdHumanYears);
+            } else {
+              // Normal mode: add PM column only
+              const tdMult = document.createElement("td");
+              tdMult.textContent =
+                progressMult != null && isFinite(progressMult)
+                  ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                  : "—";
+              tr.appendChild(tdMult);
+            }
+            
             tableBody.appendChild(tr);
           };
 
