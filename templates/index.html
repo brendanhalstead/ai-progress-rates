@@ -975,7 +975,7 @@
                           id="sos_mode"
                         />
                         <label class="form-check-label" for="sos_mode">
-                          SOS Mode
+                          SIE Mode
                         </label>
                       </div>
                       <small class="text-muted">Freezes input time series once the automation anchor is reached.</small>
@@ -1417,7 +1417,7 @@
           }
         });
 
-        // Add event listener for SOS mode checkbox
+        // Add event listener for SIE mode checkbox
         $("#sos_mode").on("change", function () {
           // Update milestone table header immediately
           updateMilestoneTableHeader();
@@ -3098,14 +3098,14 @@
           console.warn("Failed to initialize parallel penalty toggle", e);
         }
 
-        // Initialize SOS mode toggle state
+        // Initialize SIE mode toggle state
         try {
           const sosToggle = document.getElementById("sos_mode");
           if (sosToggle && parameterConfig?.defaults?.sos_mode !== undefined) {
             sosToggle.checked = !!parameterConfig.defaults.sos_mode;
           }
         } catch (e) {
-          console.warn("Failed to initialize SOS mode toggle", e);
+          console.warn("Failed to initialize SIE mode toggle", e);
         }
 
         // Initialize Benchmarks & Gaps controls from defaults where appropriate
@@ -3929,7 +3929,7 @@
           const sosMode = document.getElementById("sos_mode")?.checked || false;
           
           if (sosMode) {
-            // SOS mode: Milestone, Time, 2025-FLOP, Takeoff Uplift, Takeoff-start human-only years to next
+            // SIE mode: Milestone, Time, 2025-FLOP, Takeoff Uplift, Takeoff-start human-only years to next
             tableHead.innerHTML = `
               <tr>
                 <th scope="col">Milestone</th>
@@ -3990,7 +3990,7 @@
             tr.appendChild(tdEC);
             
             if (sosMode) {
-              // SOS mode: add Takeoff Uplift and human-only years columns
+              // SIE mode: add Takeoff Uplift and human-only years columns
               const tdTakeoffPM = document.createElement("td");
               const tdHumanYears = document.createElement("td");
               

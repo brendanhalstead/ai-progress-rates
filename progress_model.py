@@ -585,7 +585,7 @@ class Parameters:
     optimal_ces_eta_init: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
     optimal_ces_grid_size: int = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
 
-    # SOS mode
+    # SIE mode
     sos_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sos_mode'])
     
     def __post_init__(self):
@@ -3200,7 +3200,7 @@ class ProgressModel:
         _dt_integrate = time.perf_counter() - _t_integrate_start
         logger.info(f"Timing: integrate_progress completed in {_dt_integrate:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
-        # SOS MODE
+        # SIE MODE
         takeoff_start_human_only_stats = None
         if self.params.sos_mode and progress_values[-1] > self.params.progress_at_aa:
             full_automation_time = np.interp(self.params.progress_at_aa, progress_values, times)
