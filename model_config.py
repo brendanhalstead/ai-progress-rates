@@ -216,38 +216,40 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_at_coding_automation_anchor_fallback': 0.95, # Only used if conversion from SD to taste fails
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
+    # Automation anchor params
     'progress_at_aa': None,
     'aa_time_horizon_minutes': 6224000,
-    'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
     # Manual horizon fitting parameters
     'present_day': DEFAULT_present_day,
     'present_horizon': DEFAULT_present_horizon,
     'present_doubling_time': DEFAULT_present_doubling_time,
     'doubling_difficulty_growth_factor': DEFAULT_DOUBLING_DIFFICULTY_GROWTH_FACTOR,
+    'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     # Baseline Annual Compute Multiplier
     'baseline_annual_compute_multiplier': BASELINE_ANNUAL_COMPUTE_MULTIPLIER_DEFAULT,
-    # coding_labor_exponent deprecated in favor of parallel_penalty
     # exp capacity pseudoparameters
     'inf_labor_asymptote': 15.0,
     'inf_compute_asymptote': 5000,
     'labor_anchor_exp_cap': 1.6,
     'compute_anchor_exp_cap': None,
     'inv_compute_anchor_exp_cap': 3.33,
-    # benchmarks and gaps mode
+    # penalty on parallel coding labor contribution in exp capacity
+    'parallel_penalty': 0.52,
+    # Gap mode
     'include_gap': 'no gap',
     'gap_years': 1.5,
     'pre_gap_aa_time_horizon': 124600.0,
-    # penalty on parallel coding labor contribution in exp capacity
-    'parallel_penalty': 0.52,
     # Research taste distribution parameter
     'median_to_top_taste_multiplier': MEDIAN_TO_TOP_TASTE_MULTIPLIER,
     'top_percentile': TOP_PERCENTILE,
+    # Coding labor automation (OOMs/progress-year, converted to OOMs/OOM using anchor rate)
+    'coding_automation_efficiency_slope': 3.0,
+    'optimal_ces_eta_init': 0.05,
     # Optimal CES coding labor configuration
     'coding_labor_mode': 'optimal_ces',  # {'simple_ces','optimal_ces'}
-    'coding_automation_efficiency_slope': 2.0,
-    'optimal_ces_eta_init': 0.05,
     'optimal_ces_grid_size': 4096,
+    # SOS mode
     'sos_mode': False,
 }
 

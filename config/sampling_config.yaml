@@ -81,7 +81,7 @@ parameters:
     shift: 1.0
   coding_automation_efficiency_slope:
     dist: lognormal
-    ci80: [0.67, 6]  
+    ci80: [1, 9]  
 
 # Below set to roughly match 10th percentile = 0.3, 90th = 0.8
   parallel_penalty:
