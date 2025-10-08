@@ -756,7 +756,29 @@
                     </div>
 
                     <div class="row">
-                      <div class="col-6" id="sc_taste_sd_group">
+                      <div class="col-6" id="sc_taste_fraction_group">
+                        <label class="param-label"
+                          >ACD-AI Research Taste:
+                          <span id="ai_research_taste_at_coding_automation_anchor_val"
+                            >Loading...</span
+                          ></label
+                        >
+                        <input
+                          type="range"
+                          class="range-input form-range"
+                          id="ai_research_taste_at_coding_automation_anchor"
+                          step="0.01"
+                        />
+                        <small class="text-muted"
+                          >Research Taste at ACD-AI (units: multiplier on research
+                          effort)</small
+                        >
+                      </div>
+                      <div
+                        class="col-6"
+                        id="sc_taste_sd_group"
+                        style="display: none"
+                      >
                         <label class="param-label"
                           >ACD-AI Research Taste (SD):
                           <span
@@ -771,7 +793,7 @@
                           step="0.1"
                         />
                         <small class="text-muted"
-                          >ACD-AI taste in human-range standard deviations (taste value is computed from this)</small
+                          >ACD-AI taste in human-range standard deviations</small
                         >
                       </div>
                     </div>
@@ -1549,11 +1571,18 @@
       }
 
       function updateTasteUnitsVisibility() {
-        // SD-based input is now always shown
+        const typeSelect = document.getElementById("taste_schedule_type");
+        const scTasteFractionGroup = document.getElementById(
+          "sc_taste_fraction_group"
+        );
         const scTasteSdGroup = document.getElementById("sc_taste_sd_group");
-        if (scTasteSdGroup) {
-          scTasteSdGroup.style.display = "";
-        }
+        if (!typeSelect || !scTasteFractionGroup || !scTasteSdGroup) return;
+        const selected = typeSelect.value;
+        const useSD =
+          selected === "SDs per effective OOM" ||
+          selected === "SDs per progress-year";
+        scTasteSdGroup.style.display = useSD ? "" : "none";
+        scTasteFractionGroup.style.display = useSD ? "none" : "";
 
         // Adjust column widths to prevent squashing
         if (useSD) {
@@ -3539,6 +3568,11 @@
             value: 0.4,
             range: "[0.1, 1.0]",
           },
+          ai_research_taste_at_coding_automation_anchor: {
+            min: 0.1,
+            max: 5,
+            value: 0.95,
+          },
           ai_research_taste_slope: { min: 0.1, max: 10, value: 1.2 },
           aa_time_horizon_minutes: { min: 3, max: 6, value: 4.7 }, // Log scale: 10^3 to 10^6, default 10^4.7 ≈ 50000
           pre_gap_aa_time_horizon: { min: 3, max: 6, value: 4.016 },
@@ -3659,6 +3693,7 @@
             swe_multiplier_at_present_day: "SWE Multiplier at Present Day",
             coding_labor_normalization: "Parallel Coding Labor Normalization",
             experiment_compute_exponent: "Experiment Compute Discounting",
+            ai_research_taste_at_coding_automation_anchor: "ACD-AI Research Taste",
             ai_research_taste_slope: "AI Research Taste Slope",
             aa_time_horizon_minutes: "Time Horizon to Superhuman Coder",
           };
