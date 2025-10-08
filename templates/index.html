@@ -76,8 +76,9 @@
                         <th scope="col">Time</th>
                         <th scope="col">2025-FLOP</th>
                         <th scope="col">PM</th>
+                        <th scope="col">Takeoff PM</th>
                         <th scope="col">Research Stock</th>
-                        <th scope="col">2025OB years to next</th>
+                        <th scope="col">Takeoff-start human-only years to next</th>
                       </tr>
                     </thead>
                     <tbody id="milestonesTableBody"></tbody>
@@ -3941,12 +3942,13 @@
           const milestones = response?.milestones || response?.results?.milestones || null;
           tableBody.innerHTML = "";
 
-          const addRow = (name, timeVal, progressMult, effectiveCompute, researchStock, humanOnlyYears) => {
+          const addRow = (name, timeVal, progressMult, effectiveCompute, takeoffPM, researchStock, humanOnlyYears) => {
             const tr = document.createElement("tr");
             const tdName = document.createElement("td");
             const tdTime = document.createElement("td");
             const tdEC = document.createElement("td");
             const tdMult = document.createElement("td");
+            const tdTakeoffPM = document.createElement("td");
             const tdResearchStock = document.createElement("td");
             const tdHumanYears = document.createElement("td");
             tdName.textContent = name;
@@ -3962,6 +3964,10 @@
               progressMult != null && isFinite(progressMult)
                 ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
                 : "—";
+            tdTakeoffPM.textContent =
+              takeoffPM != null && isFinite(takeoffPM)
+                ? Number(takeoffPM).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                : "—";
             tdResearchStock.textContent =
               researchStock != null && isFinite(researchStock)
                 ? Number(researchStock).toFixed(1)
@@ -3974,6 +3980,7 @@
             tr.appendChild(tdTime);
             tr.appendChild(tdEC);
             tr.appendChild(tdMult);
+            tr.appendChild(tdTakeoffPM);
             tr.appendChild(tdResearchStock);
             tr.appendChild(tdHumanYears);
             tableBody.appendChild(tr);
@@ -3988,14 +3995,15 @@
                 time: info?.time,
                 pm: info?.progress_multiplier,
                 ec: info?.effective_compute_ooms,
+                takeoffPM: info?.takeoff_progress_multiplier,
                 researchStock: info?.research_stock,
                 humanYears: info?.human_only_years_to_next_milestone,
               });
             });
           } else {
             const summary = response?.summary || {};
-            entries.push({ name: "ACD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null, researchStock: null, humanYears: null });
-            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null, researchStock: null, humanYears: null });
+            entries.push({ name: "ACD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null, takeoffPM: null, researchStock: null, humanYears: null });
+            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null, takeoffPM: null, researchStock: null, humanYears: null });
           }
 
           entries.sort((a, b) => {
@@ -4004,7 +4012,7 @@
             return at - bt;
           });
 
-          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec, e.researchStock, e.humanYears));
+          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec, e.takeoffPM, e.researchStock, e.humanYears));
         } catch (e) {
           console.warn("Failed to render milestones table", e);
         }

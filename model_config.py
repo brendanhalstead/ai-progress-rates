@@ -365,7 +365,7 @@ PLOT_METADATA = {
         'title': 'Inputs to Experiment Capacity',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
-        'data_keys': ['times', 'coding_labors']
+        'data_keys': ['times', 'serial_coding_labors']
     },
     'plot_cognitive_components': {
         'title': 'Normalized Coding Labor, Humans and AIs',

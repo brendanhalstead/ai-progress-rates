@@ -344,11 +344,11 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                 row=row, col=col
             )
 
-def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondary_y=False):
+def plot_coding_labor_with_compute(fig, times, serial_coding_labors, row, col, secondary_y=False):
     """Plot cognitive output with discounted experiment compute"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=coding_labors.tolist(),
-                  name='Normalized Coding Labor',
+        go.Scatter(x=times.tolist(), y=serial_coding_labors.tolist(),
+                  name='Serial Coding Labor',
                   line=dict(color='#9467bd', width=3),
                   mode='lines+markers', marker=dict(size=4),
                   customdata=[format_decimal_year_to_month_year(t) for t in times],
@@ -1461,7 +1461,7 @@ def get_tab_configurations():
         'plot_ai_research_taste_quantile': lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c),
         'plot_aggregate_research_taste': lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c),
         'plot_ai_vs_aggregate_research_taste': lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c),
-        'plot_coding_labor_with_compute': lambda fig, data, r, c: plot_coding_labor_with_compute(fig, data['metrics']['times'], data['metrics']['coding_labors'], r, c),
+        'plot_coding_labor_with_compute': lambda fig, data, r, c: plot_coding_labor_with_compute(fig, data['metrics']['times'], data['metrics']['serial_coding_labors'], r, c),
         'plot_coding_labor_with_present_resources': lambda fig, data, r, c: plot_coding_labor_with_present_resources(fig, data['metrics']['times'], data['metrics']['coding_labors_with_present_resources'], r, c),
         'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['coding_labors'], data['metrics']['human_labor_contributions'], r, c),
         'plot_ai_coding_labor_multiplier': lambda fig, data, r, c: plot_ai_coding_labor_multiplier(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], r, c),
