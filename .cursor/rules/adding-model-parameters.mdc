@@ -280,4 +280,4 @@ After adding new parameters:
 
 ## Example: Recent Implementation
 
-See the `taste_schedule_type` and `progress_at_sc` parameters added in recent commits as a complete reference implementation following these patterns.
+See the `taste_schedule_type` and `progress_at_aa` parameters added in recent commits as a complete reference implementation following these patterns.

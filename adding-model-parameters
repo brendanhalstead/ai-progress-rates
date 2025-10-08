@@ -372,7 +372,7 @@ When reviewing parameter additions, check for:
 
 ## Example: Recent Implementation
 
-See the `taste_schedule_type` and `progress_at_sc` parameters added in recent commits as a complete reference implementation following these patterns.
+See the `taste_schedule_type` and `progress_at_aa` parameters added in recent commits as a complete reference implementation following these patterns.
 
 **AI Research Taste Fix Example:** The AI research taste parameter was being incorrectly hardcoded to clip at 1.0 in multiple functions. The fix involved:
 1. Adding `AI_RESEARCH_TASTE_MIN = 0.0` and `AI_RESEARCH_TASTE_MAX = 5.0` to model_config.py

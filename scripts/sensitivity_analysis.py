@@ -3,7 +3,7 @@
 Sensitivity analysis for batch rollout outputs.
 
 Reads a run directory produced by scripts/batch_rollout.py (or a direct path to
-rollouts.jsonl), extracts a target (default `sc_time` or a milestone transition
+rollouts.jsonl), extracts a target (default `aa_time` or a milestone transition
 duration if `--transition-pair FROM:TO` is provided) and input parameters, and
 reports how each parameter relates to the target via:
 
@@ -85,7 +85,7 @@ def _collect_dataset(
     From rollout records, build:
     - numeric_param_names: list of parameter names treated as numeric
     - categorical_param_names: list of parameter names treated as categorical
-    - y: np.ndarray of target values (sc_time or transition duration)
+    - y: np.ndarray of target values (aa_time or transition duration)
     - param_values_raw: dict param_name -> list of raw values (for correlation/ANOVA)
     """
     # Filter to usable records
@@ -101,12 +101,12 @@ def _collect_dataset(
         all_params = {**params, **ts_params} if params or ts_params else None
         if not all_params:
             continue
-        # Determine target y: either sc_time or milestone transition
+        # Determine target y: either aa_time or milestone transition
         y_val: Optional[float] = None
         if transition_pair is None:
-            sc_time = results.get("sc_time") if isinstance(results, dict) else None
-            if sc_time is not None and isinstance(sc_time, (int, float)) and np.isfinite(sc_time):
-                y_val = float(sc_time)
+            aa_time = results.get("aa_time") if isinstance(results, dict) else None
+            if aa_time is not None and isinstance(aa_time, (int, float)) and np.isfinite(aa_time):
+                y_val = float(aa_time)
         else:
             milestones = results.get("milestones") if isinstance(results, dict) else None
             if isinstance(milestones, dict):
@@ -129,7 +129,7 @@ def _collect_dataset(
         usable.append((all_params, float(y_val)))
 
     if not usable:
-        raise RuntimeError("No usable records with finite sc_time and parameters")
+        raise RuntimeError("No usable records with finite aa_time and parameters")
 
     # Determine param names and types by inspecting values across usable records
     all_param_names: List[str] = sorted({k for params, _ in usable for k in params.keys()})
@@ -376,7 +376,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
     permutation_summary = _permutation_importance(X_all, y, feature_groupings, num_folds=5)
 
-    target_label = "sc_time" if transition_pair is None else f"duration:{transition_pair[0]}->{transition_pair[1]}"
+    target_label = "aa_time" if transition_pair is None else f"duration:{transition_pair[0]}->{transition_pair[1]}"
 
     result: Dict[str, Any] = {
         "num_records_total": total_records,
@@ -402,7 +402,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
             def _safe_name(s: str) -> str:
                 return "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in s])
 
-            suffix = "_sc_time" if transition_pair is None else f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
+            suffix = "_aa_time" if transition_pair is None else f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
 
             # Pearson correlation for numeric parameters (+ special-case include_gap)
             pearson_names = list(numeric_names)
@@ -419,7 +419,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 y_pos = np.arange(len(names))
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names)
-                plt.xlabel('Pearson r with sc_time')
+                plt.xlabel('Pearson r with aa_time')
                 plt.title(f"Top numeric parameters by Pearson correlation (target: {target_label})")
                 plt.gca().invert_yaxis()
                 plot_path = rollouts_path.parent / f'sensitivity_pearson_top{suffix}.png'
@@ -442,7 +442,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 y_pos = np.arange(len(names))
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names)
-                plt.xlabel('Spearman rho with sc_time')
+                plt.xlabel('Spearman rho with aa_time')
                 plt.title(f"Top numeric parameters by Spearman correlation (target: {target_label})")
                 plt.gca().invert_yaxis()
                 plot_path = rollouts_path.parent / f'sensitivity_spearman_top{suffix}.png'
@@ -481,7 +481,7 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--rollouts", type=str, help="Direct path to a rollouts.jsonl file")
     parser.add_argument("--out-json", type=str, default=None, help="Path to write JSON summary (default: run_dir/sensitivity_summary.json)")
     parser.add_argument("--plot", action="store_true", help="Save summary plots alongside outputs")
-    parser.add_argument("--transition-pair", type=str, default=None, help="Analyze duration for milestone pair FROM:TO instead of sc_time")
+    parser.add_argument("--transition-pair", type=str, default=None, help="Analyze duration for milestone pair FROM:TO instead of aa_time")
     parser.add_argument("--upper-dummy-year", type=float, default=2200.0, help="If upper milestone missing, substitute this year for duration calculation")
     return parser.parse_args()
 
@@ -512,7 +512,7 @@ def main() -> None:
     result = analyze(rollouts_path, out_json=out_json, make_plots=args.plot, transition_pair=tp, upper_dummy_year=float(args.upper_dummy_year))
 
     # Print concise top-10 summary to stdout
-    print(f"Target: {result.get('target', 'sc_time')}")
+    print(f"Target: {result.get('target', 'aa_time')}")
     print(f"Loaded {result['num_samples_used']} usable samples (of {result['num_records_total']}).")
 
     # Numeric parameters - Pearson correlation (plus include_gap special-case)

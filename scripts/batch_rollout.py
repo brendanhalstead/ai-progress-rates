@@ -706,9 +706,9 @@ def main() -> None:
         print("\nRunning post-processing scripts...")
         python_exe = sys.executable
 
-        # 1. SC time histogram
+        # 1. ACD-AI time histogram
         try:
-            print("  - Generating SC time histogram...")
+            print("  - Generating ACD-AI time histogram...")
             subprocess.run(
                 [python_exe, str(SCRIPTS_DIR / "plot_rollouts.py"), "--run-dir", str(run_dir)],
                 cwd=str(REPO_ROOT),

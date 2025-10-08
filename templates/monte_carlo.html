@@ -31,9 +31,9 @@
                     </div>
                     <div class="card-body">
                         <div id="liveHistWrap" style="display:none;">
-                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live SC-time histogram" />
+                            <img id="imgLiveScHist" class="img-fluid rounded border" alt="Live ACD-AI time histogram" />
                         </div>
-                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating SC-time histogram while rollouts are running.</div>
+                        <div id="liveHistEmpty" class="text-muted small">Start a job to see a live-updating ACD-AI time histogram while rollouts are running.</div>
                     </div>
                 </div>
 
@@ -136,8 +136,8 @@
                                 <div id="quarterlyHorizonStats" class="table-responsive rounded border" style="background: var(--surface-1);"></div>
                             </div>
                             <div class="col-12">
-                                <label class="form-label small">SC-time Distribution</label>
-                                <img id="imgScHist" class="img-fluid rounded border" alt="SC-time histogram" />
+                                <label class="form-label small">ACD-AI Time Distribution</label>
+                                <img id="imgScHist" class="img-fluid rounded border" alt="ACD-AI time histogram" />
                             </div>
                             <div class="col-12">
                                 <label class="form-label small">Horizon Trajectories</label>
@@ -972,8 +972,8 @@
                     qhsDiv.innerHTML = '<div class="p-2 text-muted small">Failed to load quarterly horizon stats.</div>';
                 });
 
-            if (hasAny('sc_time_hist.png')) {
-                document.getElementById('imgScHist').src = base('sc_time_hist.png');
+            if (hasAny('aa_time_hist.png')) {
+                document.getElementById('imgScHist').src = base('aa_time_hist.png');
                 scWrap.style.display = '';
             } else {
                 scWrap.style.display = 'none';

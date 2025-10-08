@@ -544,7 +544,7 @@ class Parameters:
     ai_research_taste_at_coding_automation_anchor_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd'))
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
-    progress_at_sc: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_sc'))
+    progress_at_aa: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_aa'))
     aa_time_horizon_minutes: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['aa_time_horizon_minutes'])
     # Pre-gap SC horizon minutes (formerly saturation_horizon_minutes)
     pre_gap_aa_time_horizon: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['pre_gap_aa_time_horizon'])
@@ -1507,7 +1507,7 @@ def solve_lower_anchor_via_automation_model(
     """
     Solve for the lower anchor automation fraction at the anchor progress such that,
     when initializing AutomationModel with anchors
-        { anchor_progress: A_lower, params.progress_at_sc: params.automation_fraction_at_coding_automation_anchor },
+        { anchor_progress: A_lower, params.progress_at_aa: params.automation_fraction_at_coding_automation_anchor },
     the implied coding-labor multiplier at anchor_progress matches swe_multiplier.
 
     The multiplier is defined on coding labor after applying parallel_penalty and normalization, i.e.
@@ -1526,10 +1526,10 @@ def solve_lower_anchor_via_automation_model(
             return 0.01
 
         # Ensure an upper anchor exists
-        progress_at_sc = getattr(params, 'progress_at_sc', None)
+        progress_at_aa = getattr(params, 'progress_at_aa', None)
         aut_at_sc = getattr(params, 'automation_fraction_at_coding_automation_anchor', None)
-        if progress_at_sc is None or not np.isfinite(progress_at_sc) or aut_at_sc is None:
-            logger.warning("Missing progress_at_sc or automation_fraction_at_coding_automation_anchor; falling back to direct solver")
+        if progress_at_aa is None or not np.isfinite(progress_at_aa) or aut_at_sc is None:
+            logger.warning("Missing progress_at_aa or automation_fraction_at_coding_automation_anchor; falling back to direct solver")
             return aut_frac_from_swe_multiplier(swe_multiplier, L_HUMAN, inference_compute, params)
 
         # Target coding-labor ratio in parallel_penalty space
@@ -1554,7 +1554,7 @@ def solve_lower_anchor_via_automation_model(
             a_clipped = float(np.clip(a_lower, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN))
             p.automation_anchors = {
                 float(anchor_progress): a_clipped,
-                float(progress_at_sc): float(np.clip(aut_at_sc, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)),
+                float(progress_at_aa): float(np.clip(aut_at_sc, cfg.AUTOMATION_FRACTION_CLIP_MIN, 1.0 - cfg.AUTOMATION_FRACTION_CLIP_MIN)),
             }
             try:
                 am = AutomationModel(p)
@@ -1766,22 +1766,22 @@ def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Param
 def _compute_ai_research_taste_exponential(cumulative_progress: float, params: Parameters) -> float:
     """
     Exponential function for AI research taste that passes through 
-    (progress_at_sc, ai_research_taste_at_coding_automation_anchor) with logplot-slope ai_research_taste_slope.
+    (progress_at_aa, ai_research_taste_at_coding_automation_anchor) with logplot-slope ai_research_taste_slope.
     
-    Formula: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
+    Formula: taste(x) = taste_at_sc * exp(slope * (x - progress_at_aa))
     where taste_at_sc = ai_research_taste_at_coding_automation_anchor
     """
     taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
-    progress_at_sc = params.progress_at_sc
+    progress_at_aa = params.progress_at_aa
     slope = params.ai_research_taste_slope
     
-    # Handle case where progress_at_sc is None (bootstrap failed)
-    if progress_at_sc is None:
-        raise ValueError("progress_at_sc is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
+    # Handle case where progress_at_aa is None (bootstrap failed)
+    if progress_at_aa is None:
+        raise ValueError("progress_at_aa is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
     
     try:
-        # Calculate exponential: taste(x) = taste_at_sc * exp(slope * (x - progress_at_sc))
-        exponent = slope * (cumulative_progress - progress_at_sc)
+        # Calculate exponential: taste(x) = taste_at_sc * exp(slope * (x - progress_at_aa))
+        exponent = slope * (cumulative_progress - progress_at_aa)
         
         # Handle extreme exponents to prevent overflow/underflow
         if exponent > cfg.SIGMOID_EXPONENT_CLAMP:
@@ -1795,12 +1795,12 @@ def _compute_ai_research_taste_exponential(cumulative_progress: float, params: P
     except (OverflowError, ValueError) as e:
         logger.warning(f"Numerical error in AI research taste exponential calculation: {e}")
         # Fallback: linear approximation around the anchor point
-        if cumulative_progress <= progress_at_sc:
-            # Use linear approximation for x <= progress_at_sc
-            delta = cumulative_progress - progress_at_sc
+        if cumulative_progress <= progress_at_aa:
+            # Use linear approximation for x <= progress_at_aa
+            delta = cumulative_progress - progress_at_aa
             ai_research_taste = max(0.0, taste_at_sc + taste_at_sc * slope * delta)
         else:
-            # Use saturated value for x > progress_at_sc
+            # Use saturated value for x > progress_at_aa
             ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * 2.0)
     
     # Clamp to valid range as a final safeguard
@@ -1813,7 +1813,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     
     This schedule interprets the slope parameter as the number of standard deviations
     per progress unit in the underlying log-normal taste distribution. The curve
-    passes through (progress_at_sc, ai_research_taste_at_coding_automation_anchor).
+    passes through (progress_at_aa, ai_research_taste_at_coding_automation_anchor).
     
     Formula: taste(x) = taste_dist.get_taste_at_sd(slope * x + offset)
     where offset is computed to ensure the curve passes through the anchor point.
@@ -1828,24 +1828,24 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     
     # Extract parameters
     # taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
-    progress_at_sc = params.progress_at_sc
+    progress_at_aa = params.progress_at_aa
     slope = params.ai_research_taste_slope  # SD per progress unit
     
-    # Handle case where progress_at_sc is None (bootstrap failed)
-    if progress_at_sc is None:
-        raise ValueError("progress_at_sc is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
+    # Handle case where progress_at_aa is None (bootstrap failed)
+    if progress_at_aa is None:
+        raise ValueError("progress_at_aa is None - bootstrap process failed or was not run. Cannot compute AI research taste.")
     
     try:
-        # Compute offset so curve passes through (progress_at_sc, taste_at_sc)
-        # We want: taste_at_sc = taste_distribution.get_taste_at_sd(slope * progress_at_sc + offset)
-        # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_sc
+        # Compute offset so curve passes through (progress_at_aa, taste_at_sc)
+        # We want: taste_at_sc = taste_distribution.get_taste_at_sd(slope * progress_at_aa + offset)
+        # So: offset = taste_distribution.get_sd_of_taste(taste_at_sc) - slope * progress_at_aa
         
         # Clamp taste_at_sc to valid range to avoid log(0) issues
         # taste_at_sc_clamped = max(1e-10, min(taste_at_sc, cfg.AI_RESEARCH_TASTE_MAX))
         
         target_sd = params.ai_research_taste_at_coding_automation_anchor_sd
         # Adjust offset to maintain the anchor point with unpenalized slope
-        offset = target_sd - slope * progress_at_sc
+        offset = target_sd - slope * progress_at_aa
         
         # Compute AI research taste at current progress
         current_sd = slope * cumulative_progress + offset
@@ -1856,13 +1856,13 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
     except Exception as e:
         logger.warning(f"Error in SD per progress calculation: {e}")
         # Fallback: use linear approximation around anchor point
-        if cumulative_progress <= progress_at_sc:
+        if cumulative_progress <= progress_at_aa:
             # Linear decrease for progress < anchor
-            delta = cumulative_progress - progress_at_sc
+            delta = cumulative_progress - progress_at_aa
             ai_research_taste = max(0.0, taste_at_sc + taste_at_sc * slope * 0.1 * delta)
         else:
             # Linear increase for progress > anchor
-            delta = cumulative_progress - progress_at_sc
+            delta = cumulative_progress - progress_at_aa
             ai_research_taste = min(cfg.AI_RESEARCH_TASTE_MAX, taste_at_sc * (1 + slope * 0.1 * delta))
     
     # Clamp to valid range as a final safeguard
@@ -2482,7 +2482,7 @@ class ProgressModel:
                     try:
                         # Solve: target_horizon = exp(slope * progress + intercept)
                         # Therefore: progress = (log(target_horizon) - intercept) / slope
-                        calculated_progress_at_sc = (np.log(target_horizon) - intercept) / slope
+                        calculated_progress_at_aa = (np.log(target_horizon) - intercept) / slope
                         # If in gap-included mode, add the gap (specified in anchor-progress-years)
                         # Convert anchor-progress-years to progress units using anchor_progress_rate
                         if _include_gap_flag:
@@ -2491,7 +2491,7 @@ class ProgressModel:
                                 gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
                             except Exception:
                                 gap_progress_units = float(self.params.gap_years)
-                            calculated_progress_at_sc = calculated_progress_at_sc + gap_progress_units
+                            calculated_progress_at_aa = calculated_progress_at_aa + gap_progress_units
                             try:
                                 year_label = int(self.params.present_day) if getattr(self.params, 'present_day', None) is not None else 'anchor'
                             except Exception:
@@ -2500,11 +2500,11 @@ class ProgressModel:
                                 f"Gap-included mode: using pre-gap SC horizon {self.params.pre_gap_aa_time_horizon} and "
                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                             )
-                        self.params.progress_at_sc = calculated_progress_at_sc
-                        logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
+                        self.params.progress_at_aa = calculated_progress_at_aa
+                        logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_aa:.4f}")
                     except (ValueError, ZeroDivisionError) as e:
                         logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
-                        self.params.progress_at_sc = None
+                        self.params.progress_at_aa = None
             
             elif self.params.horizon_extrapolation_type == "decaying doubling time":
                 # Determine approach based on whether present_doubling_time is specified
@@ -2774,37 +2774,37 @@ class ProgressModel:
                     try:
                         # Add numerical safeguards
                         if T_0 <= 0 or H_0 <= 0 or A_0 >= 1 or A_0 == 0:
-                            logger.warning("Invalid parameters for progress_at_sc calculation")
-                            self.params.progress_at_sc = None
+                            logger.warning("Invalid parameters for progress_at_aa calculation")
+                            self.params.progress_at_aa = None
                         elif target_horizon <= 0:
                             logger.warning("Invalid aa_time_horizon_minutes for calculation")
-                            self.params.progress_at_sc = None
+                            self.params.progress_at_aa = None
                         else:
                             # Check if the ratio is valid
                             ratio = target_horizon / H_0
                             if ratio <= 0:
-                                logger.warning("Invalid ratio for progress_at_sc calculation")
-                                self.params.progress_at_sc = None
+                                logger.warning("Invalid ratio for progress_at_aa calculation")
+                                self.params.progress_at_aa = None
                             else:
                                 log_ratio = np.log(1-A_0) / np.log(2)
                                 if not np.isfinite(log_ratio):
-                                    logger.warning("Invalid log ratio for progress_at_sc calculation")
-                                    self.params.progress_at_sc = None
+                                    logger.warning("Invalid log ratio for progress_at_aa calculation")
+                                    self.params.progress_at_aa = None
                                 else:
                                     ratio_term = ratio ** log_ratio
                                     if not np.isfinite(ratio_term):
-                                        logger.warning("Invalid ratio_term for progress_at_sc calculation")
-                                        self.params.progress_at_sc = None
+                                        logger.warning("Invalid ratio_term for progress_at_aa calculation")
+                                        self.params.progress_at_aa = None
                                     else:
                                         # Use shifted form if we're in the manual parameter case
                                         if anchor_progress_for_trajectory is not None:
                                             # Shifted form: aa_time_horizon_minutes = H_0 * (1 - A_0 * (progress - anchor_progress) / T_0)^exponent
                                             # progress = anchor_progress + T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
-                                            calculated_progress_at_sc = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
+                                            calculated_progress_at_aa = anchor_progress_for_trajectory + T_0 * (1 - ratio_term) / A_0
                                         else:
                                             # Original form: aa_time_horizon_minutes = H_0 * (1 - A_0 * progress / T_0)^exponent
                                             # progress = T_0 * (1 - (aa_time_horizon_minutes / H_0)^(log(1-A_0)/log(2))) / A_0
-                                            calculated_progress_at_sc = T_0 * (1 - ratio_term) / A_0
+                                            calculated_progress_at_aa = T_0 * (1 - ratio_term) / A_0
                                         
                                         # If in gap-included mode, add the gap (specified in anchor-progress-years)
                                         # Convert anchor-progress-years to progress units using anchor_progress_rate
@@ -2814,7 +2814,7 @@ class ProgressModel:
                                                 gap_progress_units = float(anchor_progress_rate) * gap_anchor_years
                                             except Exception:
                                                 gap_progress_units = float(self.params.gap_years)
-                                            calculated_progress_at_sc = calculated_progress_at_sc + gap_progress_units
+                                            calculated_progress_at_aa = calculated_progress_at_aa + gap_progress_units
                                             try:
                                                 year_label = int(self.params.present_day) if getattr(self.params, 'present_day', None) is not None else 'anchor'
                                             except Exception:
@@ -2824,15 +2824,15 @@ class ProgressModel:
                                                 f"adding gap {self.params.gap_years} {year_label}-progress-years (~{gap_progress_units:.6f} progress units)"
                                             )
                                         
-                                        if not np.isfinite(calculated_progress_at_sc):
-                                            logger.warning("Invalid progress_at_sc result")
-                                            self.params.progress_at_sc = None
+                                        if not np.isfinite(calculated_progress_at_aa):
+                                            logger.warning("Invalid progress_at_aa result")
+                                            self.params.progress_at_aa = None
                                         else:
-                                            self.params.progress_at_sc = calculated_progress_at_sc
-                                            logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_sc:.4f}")
+                                            self.params.progress_at_aa = calculated_progress_at_aa
+                                            logger.info(f"Progress level at target horizon ({target_horizon} min): {calculated_progress_at_aa:.4f}")
                     except (ValueError, ZeroDivisionError, OverflowError) as e:
                         logger.warning(f"Could not calculate progress at aa_time_horizon_minutes: {e}")
-                        self.params.progress_at_sc = None
+                        self.params.progress_at_aa = None
             
             else:
                 logger.error(f"Unknown horizon_extrapolation_type: {self.params.horizon_extrapolation_type}")
@@ -3112,7 +3112,7 @@ class ProgressModel:
         logger.info(f"calculated anchor automation fraction (via AM solver): {anchor_aut_frac} from swe_multiplier_at_present_day: {self.params.swe_multiplier_at_present_day} and present_day: {present_day}")
         automation_anchors = {
             present_day_progress: anchor_aut_frac,
-            self.params.progress_at_sc: self.params.automation_fraction_at_coding_automation_anchor
+            self.params.progress_at_aa: self.params.automation_fraction_at_coding_automation_anchor
         }
         logger.info(f"Automation anchors: {automation_anchors}")
         self.params.automation_anchors = automation_anchors
@@ -3389,50 +3389,50 @@ class ProgressModel:
         _avg_iter_ms = (1000.0 * _dt_metrics_loop / _num_iters) if _num_iters > 0 else float('nan')
         logger.info(f"Timing: metrics loop processed {_num_iters} points in {_dt_metrics_loop:.3f}s (avg {_avg_iter_ms:.3f} ms/iter, elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         # Calculate time when superhuman coder level is reached
-        sc_time = None
-        if self.params.progress_at_sc is not None:
-            # Find the time when progress reaches progress_at_sc
-            sc_progress_target = self.params.progress_at_sc
+        aa_time = None
+        if self.params.progress_at_aa is not None:
+            # Find the time when progress reaches progress_at_aa
+            sc_progress_target = self.params.progress_at_aa
             
             # Check if SC is reached within the trajectory
             if progress_values[-1] >= sc_progress_target:
                 # Find the exact time by interpolation
                 if progress_values[0] >= sc_progress_target:
                     # SC level already reached at start
-                    sc_time = times[0]
+                    aa_time = times[0]
                 else:
                     # Interpolate to find when progress crosses sc_progress_target
                     try:
-                        sc_time = np.interp(sc_progress_target, progress_values, times)
+                        aa_time = np.interp(sc_progress_target, progress_values, times)
                     except Exception as e:
                         logger.warning(f"Error interpolating SC time: {e}")
-                        sc_time = None
+                        aa_time = None
                         
-                logger.info(f"Superhuman Coder level ({sc_progress_target:.3f}) reached at time {sc_time:.3f}")
+                logger.info(f"ACD-AI level ({sc_progress_target:.3f}) reached at time {aa_time:.3f}")
             else:
-                logger.info(f"Superhuman Coder level ({sc_progress_target:.3f}) not reached within trajectory (final progress: {progress_values[-1]:.3f})")
+                logger.info(f"ACD-AI level ({sc_progress_target:.3f}) not reached within trajectory (final progress: {progress_values[-1]:.3f})")
         
         # Calculate software progress multiplier at SC
-        if sc_time is not None:
-            self.sc_sw_multiplier = _log_interp(sc_time, times, np.asarray(ai_sw_progress_mult_ref_present_day, dtype=float))
+        if aa_time is not None:
+            self.sc_sw_multiplier = _log_interp(aa_time, times, np.asarray(ai_sw_progress_mult_ref_present_day, dtype=float))
         else:
             sc_sw_multiplier = None
         
         # Compute the time when ai_coding_labor_mult_ref_present_day first reaches the required threshold
         # using exponential (log-space) interpolation between adjacent samples.
-        ai2027_sc_time = None
+        ai2027_aa_time = None
         try:
             if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
                 # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
                 serial_mult = cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30
                 ai2027_sc_required_mult = (serial_mult ** (1 / self.params.parallel_penalty)) * 30
-                ai2027_sc_time = _find_exponential_crossing_time(
+                ai2027_aa_time = _find_exponential_crossing_time(
                     np.asarray(times, dtype=float),
                     np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float),
                     float(ai2027_sc_required_mult),
                 )
         except Exception as e:
-            logger.warning(f"Error computing ai2027_sc_time: {e}")
+            logger.warning(f"Error computing ai2027_aa_time: {e}")
             
         # Calculate progress rate at anchor time
         present_day = self.params.present_day
@@ -3544,10 +3544,10 @@ class ProgressModel:
             'effective_compute': effective_compute,
             'training_compute': training_compute,
             'experiment_capacity': experiment_capacity,
-            'sc_time': sc_time,  # Time when superhuman coder level is reached
-            'sc_progress_level': self.params.progress_at_sc,  # Progress level for SC
+            'aa_time': aa_time,  # Time when superhuman coder level is reached
+            'sc_progress_level': self.params.progress_at_aa,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
-            'ai2027_sc_time': ai2027_sc_time,  # Time when @AI2027 SC condition is met
+            'ai2027_aa_time': ai2027_aa_time,  # Time when @AI2027 SC condition is met
             'present_day': present_day,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)

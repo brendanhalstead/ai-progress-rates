@@ -212,7 +212,7 @@
                         >
                       </div>
                     </div>
-                    <div class="mb-3" id="sc_time_horizon_group">
+                    <div class="mb-3" id="aa_time_horizon_group">
                       <label class="param-label"
                         >80% Time Horizon at ACD-AI:
                         <span id="aa_time_horizon_minutes_val">Loading...</span>
@@ -1448,7 +1448,7 @@
       function updateBenchmarksAndGapsVisibility() {
         const toggle = document.getElementById("include_gap");
         const group = document.getElementById("gap_years_group");
-        const scGroup = document.getElementById("sc_time_horizon_group");
+        const scGroup = document.getElementById("aa_time_horizon_group");
         const satGroup = document.getElementById("pre_gap_aa_time_horizon_group");
         if (!toggle || !group) return;
         group.style.display = toggle.checked ? "" : "none";
@@ -3752,25 +3752,25 @@
               .replace(/\.([1-9])0+$/, ".$1");
           };
           // SC Time (formatted as month and year)
-          $("#summary_sc_time").text(
-            summary.sc_time != null
-              ? formatDecimalYearToMonthYear(summary.sc_time)
+          $("#summary_aa_time").text(
+            summary.aa_time != null
+              ? formatDecimalYearToMonthYear(summary.aa_time)
               : "—"
           );
-          $("#milestone_sc_time").text(
-            summary.sc_time != null
-              ? formatDecimalYearToMonthYear(summary.sc_time)
+          $("#milestone_aa_time").text(
+            summary.aa_time != null
+              ? formatDecimalYearToMonthYear(summary.aa_time)
               : "—"
           );
           // AI2027 SC Time (formatted as month and year)
-          $("#summary_ai2027_sc_time").text(
-            summary.ai2027_sc_time != null
-              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
+          $("#summary_ai2027_aa_time").text(
+            summary.ai2027_aa_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_aa_time)
               : "—"
           );
-          $("#milestone_ai2027_sc_time").text(
-            summary.ai2027_sc_time != null
-              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
+          $("#milestone_ai2027_aa_time").text(
+            summary.ai2027_aa_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_aa_time)
               : "—"
           );
           // SC R&D progress multiplier
@@ -3939,8 +3939,8 @@
             });
           } else {
             const summary = response?.summary || {};
-            entries.push({ name: "ACD-AI", time: summary.sc_time, pm: summary.sc_sw_multiplier, ec: null });
-            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null });
+            entries.push({ name: "ACD-AI", time: summary.aa_time, pm: summary.sc_sw_multiplier, ec: null });
+            entries.push({ name: "AI 2027 SC", time: summary.ai2027_aa_time, pm: null, ec: null });
           }
 
           entries.sort((a, b) => {

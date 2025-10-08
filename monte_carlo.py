@@ -269,7 +269,7 @@ def _launch_batch_rollout_job(effective_cfg: Dict[str, Any]) -> str:
                     # Collect known artifact filenames if present
                     try:
                         known = [
-                            "sc_time_hist.png",
+                            "aa_time_hist.png",
                             "horizon_trajectories.png",
                             "sensitivity_pearson_top.png",
                             "sensitivity_spearman_top.png",
@@ -703,7 +703,7 @@ def cleanup_jobs():
 
 @mc_bp.route("/api/monte-carlo/live-sc-hist/<job_id>.png", methods=["GET"])
 def live_sc_histogram(job_id: str):
-    """Serve a live-updating SC-time histogram PNG based on current rollouts.jsonl."""
+    """Serve a live-updating ACD-AI time histogram PNG based on current rollouts.jsonl."""
     if plt is None:
         return jsonify({"success": False, "error": "matplotlib not available"}), 500
 
@@ -719,7 +719,7 @@ def live_sc_histogram(job_id: str):
     if not rollouts_path.exists():
         return jsonify({"success": False, "error": "rollouts.jsonl not found yet"}), 404
 
-    sc_times: List[float] = []
+    aa_times: List[float] = []
     num_no_sc: int = 0
     try:
         with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
@@ -733,13 +733,13 @@ def live_sc_histogram(job_id: str):
                     continue
                 res = obj.get("results") if isinstance(obj, dict) else None
                 if isinstance(res, dict):
-                    val = res.get("sc_time")
+                    val = res.get("aa_time")
                     try:
                         v = float(val) if val is not None else np.nan
                     except Exception:
                         v = np.nan
                     if np.isfinite(v):
-                        sc_times.append(v)
+                        aa_times.append(v)
                     else:
                         num_no_sc += 1
     except Exception as e:
@@ -759,10 +759,10 @@ def live_sc_histogram(job_id: str):
 
     fig, ax = plt.subplots(figsize=(6, 3.2), dpi=150)
     try:
-        ax.set_title("Live SC-time Distribution", fontsize=10)
-        total_n = len(sc_times) + num_no_sc
+        ax.set_title("Live ACD-AI Time Distribution", fontsize=10)
+        total_n = len(aa_times) + num_no_sc
         if total_n > 0:
-            data = np.asarray(sc_times, dtype=float) if len(sc_times) > 0 else np.asarray([], dtype=float)
+            data = np.asarray(aa_times, dtype=float) if len(aa_times) > 0 else np.asarray([], dtype=float)
             kde_counts = np.array([])
             bin_edges = np.array([0.0, 1.0])
             counts = np.array([])
@@ -793,8 +793,8 @@ def live_sc_histogram(job_id: str):
 
             # Draw No SC bar if needed and adjust ticks/limits
             if num_no_sc > 0:
-                ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, label="No SC")
-                left = float(bin_edges[0]) if len(sc_times) > 0 else 0.0
+                ax.bar(nosc_x, num_no_sc, width=bin_width, edgecolor="black", alpha=0.6, label="No ACD-AI")
+                left = float(bin_edges[0]) if len(aa_times) > 0 else 0.0
                 right = float(nosc_x + bin_width)
                 ax.set_xlim(left, right)
 
@@ -813,7 +813,7 @@ def live_sc_histogram(job_id: str):
                 def _pos_and_label(qv: float) -> Tuple[float, str]:
                     if np.isfinite(qv):
                         return float(qv), _decimal_year_to_date_string(float(qv))
-                    return float(nosc_x), "No SC"
+                    return float(nosc_x), "No ACD-AI"
 
                 x10, lbl10 = _pos_and_label(q10)
                 x50, lbl50 = _pos_and_label(q50)
@@ -834,7 +834,7 @@ def live_sc_histogram(job_id: str):
             except Exception:
                 pass
 
-            ax.set_xlabel("SC Time (decimal year)")
+            ax.set_xlabel("ACD-AI Time (decimal year)")
             ax.set_ylabel("Count")
             ax.grid(True, axis='y', alpha=0.25)
             ax.legend(loc="upper left", fontsize=8)
@@ -842,7 +842,7 @@ def live_sc_histogram(job_id: str):
             ax.text(0.5, 0.5, "Collecting rollouts...", ha='center', va='center', fontsize=12)
             ax.axis('off')
 
-        ax.figure.text(0.99, 0.01, f"n={len(sc_times)}", ha='right', va='bottom', fontsize=8, color="#666666")
+        ax.figure.text(0.99, 0.01, f"n={len(aa_times)}", ha='right', va='bottom', fontsize=8, color="#666666")
 
         buf = io.BytesIO()
         fig.tight_layout()
@@ -859,7 +859,7 @@ def live_horizon_trajectories(job_id: str):
     
     Query params:
       - max: int, maximum trajectories to draw (default 2000)
-      - stop_at_sc: 0/1, mask each trajectory after its own sc_time (default 0)
+      - stop_at_sc: 0/1, mask each trajectory after its own aa_time (default 0)
     """
     if plt is None:
         return jsonify({"success": False, "error": "matplotlib not available"}), 500
@@ -886,7 +886,7 @@ def live_horizon_trajectories(job_id: str):
     # Read trajectories similar to scripts/plot_rollouts.py
     times_arr: Optional[np.ndarray] = None
     trajectories: List[np.ndarray] = []
-    sc_times: List[Optional[float]] = []
+    aa_times: List[Optional[float]] = []
     try:
         with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -902,7 +902,7 @@ def live_horizon_trajectories(job_id: str):
                     continue
                 t = results.get("times")
                 h = results.get("horizon_lengths")
-                sc_val = results.get("sc_time")
+                sc_val = results.get("aa_time")
                 if t is None or h is None:
                     continue
                 try:
@@ -916,9 +916,9 @@ def live_horizon_trajectories(job_id: str):
                     times_arr = t_np
                 trajectories.append(h_np)
                 try:
-                    sc_times.append(float(sc_val) if sc_val is not None and np.isfinite(float(sc_val)) else None)
+                    aa_times.append(float(sc_val) if sc_val is not None and np.isfinite(float(sc_val)) else None)
                 except Exception:
-                    sc_times.append(None)
+                    aa_times.append(None)
     except Exception as e:
         return jsonify({"success": False, "error": f"Failed to read rollouts: {e}"}), 500
 
@@ -945,8 +945,8 @@ def live_horizon_trajectories(job_id: str):
         arr[~np.isfinite(arr)] = np.nan
         arr[arr <= 0] = np.nan
         arr = np.clip(arr, min_horizon_minutes, max_work_year_minutes)
-        if stop_at_sc and idx < len(sc_times) and sc_times[idx] is not None:
-            sc = sc_times[idx]
+        if stop_at_sc and idx < len(aa_times) and aa_times[idx] is not None:
+            sc = aa_times[idx]
             if sc is not None:
                 arr = arr.copy()
                 arr[times_arr > float(sc)] = np.nan

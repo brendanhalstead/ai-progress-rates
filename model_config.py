@@ -126,7 +126,7 @@ PARAMETER_BOUNDS = {
     # AI Research Taste parameter bounds
     'ai_research_taste_at_coding_automation_anchor_sd': (-10, AI_RESEARCH_TASTE_MAX_SD),
     'ai_research_taste_slope': (0.1, 10.0),
-    'progress_at_sc': (1.0, 500),
+    'progress_at_aa': (1.0, 500),
     'aa_time_horizon_minutes': (1000, 100000000000),
     'pre_gap_aa_time_horizon': (1000, 100000000000),
     # Manual horizon fitting parameter bounds
@@ -215,7 +215,7 @@ DEFAULT_PARAMETERS = {
     'ai_research_taste_at_coding_automation_anchor_sd': 0,  # Optional: specify SC taste in SD-within-human-range
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
-    'progress_at_sc': None,
+    'progress_at_aa': None,
     'aa_time_horizon_minutes': 6224000,
     'horizon_extrapolation_type': DEFAULT_HORIZON_EXTRAPOLATION_TYPE,
     'automation_anchors': None,
@@ -267,7 +267,7 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Cumulative Progress', 'type': 'linear'},
         'y_axis': {'title': 'Horizon Length (log scale)', 'type': 'log', 'range': [-3, 11], 'custom_ticks': True},
         'data_keys': ['progress_values', 'horizon_lengths'],
-        'special_handling': ['metr_data', 'aa_time_horizon_minutes', 'progress_at_sc']
+        'special_handling': ['metr_data', 'aa_time_horizon_minutes', 'progress_at_aa']
     },
     
     # Input plots
@@ -494,7 +494,7 @@ TAB_CONFIGURATIONS = {
         'explanation': """
 ## Time Horizons
 
-This tab shows how the 80% time horizon of frontier AI systems evolves over time. The red dashed line shows the required time horizon for the Superhuman Coder milestone. The SC time horizon can be adjusted in the sidebar.
+This tab shows how the 80% time horizon of frontier AI systems evolves over time. The red dashed line shows the required time horizon for the ACD-AI milestone. The ACD-AI time horizon can be adjusted in the sidebar.
         """
     },
     'inputs': {
@@ -537,14 +537,14 @@ Factor by which frontier training run compute grows each year, measured in OOMs.
             {'function': 'plot_aggregate_research_taste', 'position': (3, 1)}
         ],
         'explanation': """
-## Automation (from SC time horizon and effective compute)
+## Automation (from ACD-AI time horizon and effective compute)
 
 This tab shows how the current capability level feeds into the production function.
 
 ### Coding Automation Fraction (Top Left)
 Abstract "percentage of coding tasks performed by AI". Exponentially interpolates between two anchors, using the current effective OOMs:
 1. At (anchor time), it should equal (whatever percentage makes the coding labor multiplier equal a given value). set both of these in the sidebar.
-2. At SC, it should equal 100%.
+2. At ACD-AI, it should equal 100%.
 
 ### Various plots of research taste
 We assume that each OOM of effective compute increases AI research taste by a fixed number of standard deviations within the human range. 

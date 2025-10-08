@@ -3,13 +3,13 @@
 Plot utilities for analyzing batch rollout results.
 
 Currently supported:
-- Plot distribution (histogram) of SC times from a rollouts.jsonl file
-- Plot distribution (histogram) of horizon length at SC across rollouts
+- Plot distribution (histogram) of ACD-AI times from a rollouts.jsonl file
+- Plot distribution (histogram) of horizon length at ACD-AI across rollouts
 - Plot distribution (histogram) of arrival time for arbitrary milestones
 
 Usage examples:
   python scripts/plot_rollouts.py --run-dir outputs/20250813_020347 \
-    --out outputs/20250813_020347/sc_time_hist.png
+    --out outputs/20250813_020347/aa_time_hist.png
 
   python scripts/plot_rollouts.py --rollouts outputs/20250813_020347/rollouts.jsonl
 """
@@ -50,15 +50,15 @@ def _resolve_rollouts_path(run_dir: Optional[str], rollouts_path: Optional[str])
     return p
 
 
-def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int, Optional[float]]:
+def _read_aa_times(rollouts_file: Path) -> Tuple[List[float], int, Optional[float]]:
     """Read SC arrival times from rollouts.
 
     Returns:
-        sc_times: list of SC arrival times (only for rollouts that achieved SC)
+        aa_times: list of SC arrival times (only for rollouts that achieved SC)
         num_no_sc: count of rollouts where SC was not achieved
         typical_sim_end: typical simulation end time (for display purposes), or None
     """
-    sc_times: List[float] = []
+    aa_times: List[float] = []
     num_no_sc: int = 0
     sim_end_times: List[float] = []
 
@@ -83,19 +83,19 @@ def _read_sc_times(rollouts_file: Path) -> Tuple[List[float], int, Optional[floa
                 except Exception:
                     pass
 
-            sc_time = results.get("sc_time")
+            aa_time = results.get("aa_time")
             try:
-                x = float(sc_time) if sc_time is not None else np.nan
+                x = float(aa_time) if aa_time is not None else np.nan
             except (TypeError, ValueError):
                 x = np.nan
             if np.isfinite(x):
-                sc_times.append(x)
+                aa_times.append(x)
             else:
                 num_no_sc += 1
 
     # Use median simulation end time for display
     typical_sim_end = float(np.median(sim_end_times)) if sim_end_times else None
-    return sc_times, num_no_sc, typical_sim_end
+    return aa_times, num_no_sc, typical_sim_end
 
 
 def _decimal_year_to_date_string(decimal_year: float) -> str:
@@ -157,7 +157,7 @@ def _read_horizon_trajectories(rollouts_file: Path) -> Tuple[np.ndarray, List[np
         trajectories: list of horizon length arrays (one per rollout)
     """
     trajectories: List[np.ndarray] = []
-    sc_times: List[Optional[float]] = []
+    aa_times: List[Optional[float]] = []
     common_times: Optional[np.ndarray] = None
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -173,7 +173,7 @@ def _read_horizon_trajectories(rollouts_file: Path) -> Tuple[np.ndarray, List[np
                 continue
             times = results.get("times")
             horizon = results.get("horizon_lengths")
-            sc_time_val = results.get("sc_time")
+            aa_time_val = results.get("aa_time")
             if times is None or horizon is None:
                 continue
             try:
@@ -187,12 +187,12 @@ def _read_horizon_trajectories(rollouts_file: Path) -> Tuple[np.ndarray, List[np
                 common_times = times_arr
             trajectories.append(horizon_arr)
             try:
-                sc_times.append(float(sc_time_val) if sc_time_val is not None and np.isfinite(float(sc_time_val)) else None)
+                aa_times.append(float(aa_time_val) if aa_time_val is not None and np.isfinite(float(aa_time_val)) else None)
             except Exception:
-                sc_times.append(None)
+                aa_times.append(None)
     if common_times is None or len(trajectories) == 0:
         raise ValueError("No horizon trajectories found in rollouts file")
-    return common_times, trajectories, sc_times
+    return common_times, trajectories, aa_times
 
 
 def _get_time_tick_values_and_labels() -> Tuple[List[float], List[str]]:
@@ -302,7 +302,7 @@ def plot_horizon_trajectories(
     overlay_metr: bool = True,
     title: Optional[str] = None,
     stop_at_sc: bool = False,
-    sc_times: Optional[List[Optional[float]]] = None,
+    aa_times: Optional[List[Optional[float]]] = None,
 ) -> None:
     """Render horizon length trajectories similar to the reference figure.
 
@@ -322,9 +322,9 @@ def plot_horizon_trajectories(
         arr[~np.isfinite(arr)] = np.nan
         arr[arr <= 0] = np.nan
         arr = np.clip(arr, min_horizon_minutes, max_work_year_minutes)
-        # If requested, mask values after this rollout's sc_time
-        if stop_at_sc and sc_times is not None and idx < len(sc_times) and sc_times[idx] is not None:
-            sc = sc_times[idx]
+        # If requested, mask values after this rollout's aa_time
+        if stop_at_sc and aa_times is not None and idx < len(aa_times) and aa_times[idx] is not None:
+            sc = aa_times[idx]
             if sc is not None:
                 arr = arr.copy()
                 arr[times > float(sc)] = np.nan
@@ -381,7 +381,7 @@ def plot_horizon_trajectories(
 
 
 def _read_horizon_at_sc(rollouts_file: Path) -> List[float]:
-    """Compute horizon length at SC time for each rollout where available."""
+    """Compute horizon length at ACD-AI time for each rollout where available."""
     values: List[float] = []
     with rollouts_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -397,13 +397,13 @@ def _read_horizon_at_sc(rollouts_file: Path) -> List[float]:
                 continue
             times = results.get("times")
             horizon = results.get("horizon_lengths")
-            sc_time = results.get("sc_time")
-            if times is None or horizon is None or sc_time is None:
+            aa_time = results.get("aa_time")
+            if times is None or horizon is None or aa_time is None:
                 continue
             try:
                 times_arr = np.asarray(times, dtype=float)
                 horizon_arr = np.asarray(horizon, dtype=float)
-                sc_t = float(sc_time)
+                sc_t = float(aa_time)
             except Exception:
                 continue
             if not (np.isfinite(sc_t) and times_arr.ndim == 1 and horizon_arr.ndim == 1 and times_arr.size == horizon_arr.size):
@@ -418,7 +418,7 @@ def _read_horizon_at_sc(rollouts_file: Path) -> List[float]:
             # Clip to plotting cap to avoid absurd tails
             cap = float(120000 * 52 * 40 * 60)
             horizon_arr = np.clip(horizon_arr, 0.001, cap)
-            # Interpolate horizon at sc time
+            # Interpolate horizon at ACD-AI time
             if sc_t <= times_arr.min():
                 val = horizon_arr[0]
             elif sc_t >= times_arr.max():
@@ -1070,9 +1070,9 @@ def plot_horizon_at_sc_histogram(values: List[float], out_path: Path, bins: int 
     plt.xscale("log")
     ticks, labels = _get_time_tick_values_and_labels()
     plt.xticks(ticks, labels, rotation=0)
-    plt.xlabel("Horizon at SC (minutes)")
+    plt.xlabel("Horizon at ACD-AI (minutes)")
     plt.ylabel("Count")
-    plt.title(title or "Distribution of Horizon Length at SC")
+    plt.title(title or "Distribution of Horizon Length at ACD-AI")
     plt.grid(True, axis="y", alpha=0.25)
     plt.legend(loc="upper left")
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1081,18 +1081,18 @@ def plot_horizon_at_sc_histogram(values: List[float], out_path: Path, bins: int 
     plt.close()
 
 
-def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path, bins: int = 50, title: Optional[str] = None, sim_end: Optional[float] = None) -> None:
-    """Plot histogram of SC arrival times.
+def plot_aa_time_histogram(aa_times: List[float], num_no_sc: int, out_path: Path, bins: int = 50, title: Optional[str] = None, sim_end: Optional[float] = None) -> None:
+    """Plot histogram of ACD-AI arrival times.
 
     Args:
-        sc_times: list of SC arrival times (only for rollouts that achieved SC)
+        aa_times: list of SC arrival times (only for rollouts that achieved SC)
         num_no_sc: count of rollouts where SC was not achieved
         sim_end: typical simulation end time for labeling "not achieved" bar
     """
-    total_n = int(len(sc_times) + max(0, num_no_sc))
+    total_n = int(len(aa_times) + max(0, num_no_sc))
     if total_n == 0:
         raise ValueError("No rollouts found to plot")
-    data = np.asarray(sc_times, dtype=float) if len(sc_times) > 0 else np.asarray([], dtype=float)
+    data = np.asarray(aa_times, dtype=float) if len(aa_times) > 0 else np.asarray([], dtype=float)
 
     plt.figure(figsize=(10, 6))
     ax = plt.gca()
@@ -1186,9 +1186,9 @@ def plot_sc_time_histogram(sc_times: List[float], num_no_sc: int, out_path: Path
             plt.text(x50, y_annot, f"Median: {lbl50}", rotation=90, va="top", ha="right", color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
             plt.text(x90, y_annot, f"P90: {lbl90}", rotation=90, va="top", ha="right", color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
 
-    plt.xlabel("SC Time (decimal year)")
+    plt.xlabel("ACD-AI Time (decimal year)")
     plt.ylabel("Count")
-    plt.title(title or "Distribution of SC Times")
+    plt.title(title or "Distribution of ACD-AI Times")
     plt.grid(True, axis="y", alpha=0.25)
     plt.legend(loc="upper left")
 
@@ -1386,7 +1386,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha", type=float, default=0.08, help="Transparency for individual trajectories")
     parser.add_argument("--max-trajectories", type=int, default=2000, help="Maximum number of trajectories to draw")
     parser.add_argument("--no-metr", action="store_true", help="Disable overlay of METR p80 benchmark points")
-    parser.add_argument("--stop-at-sc", action="store_true", help="Mask each trajectory after its own sc_time")
+    parser.add_argument("--stop-at-sc", action="store_true", help="Mask each trajectory after its own aa_time")
     return parser.parse_args()
 
 
@@ -1407,7 +1407,7 @@ def main() -> None:
         out_path = Path(args.out)
     else:
         if args.mode == "sc_hist":
-            out_path = default_dir / "sc_time_hist.png"
+            out_path = default_dir / "aa_time_hist.png"
         elif args.mode == "horizon_at_sc_hist":
             out_path = default_dir / "horizon_at_sc_hist.png"
         elif args.mode == "milestone_time_hist":
@@ -1423,19 +1423,19 @@ def main() -> None:
                 out_path = default_dir / ("horizon_trajectories_stop_at_sc.png" if args.stop_at_sc else "horizon_trajectories.png")
 
     if args.mode == "sc_hist":
-        sc_times, num_no_sc, sim_end = _read_sc_times(rollouts_path)
-        if (len(sc_times) + num_no_sc) > 0 and len(sc_times) > 0:
-            arr = np.asarray(sc_times, dtype=float)
-            print(f"Loaded {len(arr)} finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
+        aa_times, num_no_sc, sim_end = _read_aa_times(rollouts_path)
+        if (len(aa_times) + num_no_sc) > 0 and len(aa_times) > 0:
+            arr = np.asarray(aa_times, dtype=float)
+            print(f"Loaded {len(arr)} finite ACD-AI times (+{num_no_sc} No ACD-AI) from {rollouts_path}")
             print(f"Finite Min/Median/Max: {arr.min():.3f} / {np.median(arr):.3f} / {arr.max():.3f}")
             with_inf = np.concatenate([arr, np.full(int(num_no_sc), np.inf)]) if num_no_sc > 0 else arr
             q10, q50, q90 = np.quantile(with_inf, [0.1, 0.5, 0.9])
             def _fmt_q(qv: float) -> str:
-                return f"{qv:.3f}" if np.isfinite(qv) else "No SC"
-            print(f"P10/Median/P90 (incl. No SC): {_fmt_q(q10)} / {_fmt_q(q50)} / {_fmt_q(q90)}")
-        elif (len(sc_times) + num_no_sc) > 0:
-            print(f"Loaded 0 finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
-        plot_sc_time_histogram(sc_times, num_no_sc=num_no_sc, out_path=out_path, bins=int(args.bins), sim_end=sim_end)
+                return f"{qv:.3f}" if np.isfinite(qv) else "No ACD-AI"
+            print(f"P10/Median/P90 (incl. No ACD-AI): {_fmt_q(q10)} / {_fmt_q(q50)} / {_fmt_q(q90)}")
+        elif (len(aa_times) + num_no_sc) > 0:
+            print(f"Loaded 0 finite ACD-AI times (+{num_no_sc} No ACD-AI) from {rollouts_path}")
+        plot_aa_time_histogram(aa_times, num_no_sc=num_no_sc, out_path=out_path, bins=int(args.bins), sim_end=sim_end)
         print(f"Saved histogram to: {out_path}")
         return
 
@@ -1557,7 +1557,7 @@ def main() -> None:
         return
 
     # horizon_trajectories mode
-    times, trajectories, sc_times = _read_horizon_trajectories(rollouts_path)
+    times, trajectories, aa_times = _read_horizon_trajectories(rollouts_path)
     print(f"Loaded {len(trajectories)} trajectories with {len(times)} time points each from {rollouts_path}")
     plot_horizon_trajectories(
         times,
@@ -1568,7 +1568,7 @@ def main() -> None:
         max_trajectories=int(args.max_trajectories),
         overlay_metr=(not args.no_metr),
         stop_at_sc=bool(args.stop_at_sc),
-        sc_times=sc_times,
+        aa_times=aa_times,
     )
     print(f"Saved horizon trajectories to: {out_path}")
 

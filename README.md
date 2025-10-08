@@ -27,7 +27,7 @@
 | :---- | :---- |
  | monte\_carlo.py | Flask blueprint for Monte Carlo: builds default sampling configs from `model_config`, launches batch runs, tracks job status, serves artifacts, and renders `templates/monte_carlo.html`. |
  | scripts/batch\_rollout.py | CLI to sample parameter distributions, run many rollouts, and write `outputs/<timestamp>/` artifacts: `samples.jsonl`, `rollouts.jsonl`, `model_config_snapshot.*`, `metadata.json`. |
- | scripts/plot\_rollouts.py | CLI to plot SC time histogram, horizon trajectories, and horizon-at-SC distributions from a run; saves PNGs to the run directory. |
+ | scripts/plot\_rollouts.py | CLI to plot ACD-AI time histogram, horizon trajectories, and horizon-at-ACD-AI distributions from a run; saves PNGs to the run directory. |
  | scripts/run\_all.py | One-command pipeline: batch rollout → plots → sensitivity; resolves the new run directory and logs locations. |
  | scripts/sensitivity\_analysis.py | Sensitivity over `rollouts.jsonl`: numeric correlations, categorical ANOVA, and permutation importance; optional plots and JSON summary. |
  | config/sampling\_config.yaml | Example sampling config for batch runs: parameter distributions, `num_rollouts`, `time_range`, `input_data`; CLI flags can override. |

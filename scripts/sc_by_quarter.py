@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a table showing the probability of achieving SC by each calendar quarter.
+Generate a table showing the probability of achieving ACD-AI by each calendar quarter.
 
 Inputs:
   - --run-dir DIR: directory containing rollouts.jsonl (outputs/<timestamp>/)
@@ -11,9 +11,9 @@ Outputs (written into the run directory):
   - sc_by_quarter.html (Bootstrap-styled table fragment)
 
 Notes:
-  - Probabilities are computed over ALL rollouts, including those with no SC.
+  - Probabilities are computed over ALL rollouts, including those with no ACD-AI.
   - "P(by end)" is cumulative up to the end of the quarter.
-  - A final "No SC" row is included showing probability of no SC by end of data.
+  - A final "No ACD-AI" row is included showing probability of no ACD-AI by end of data.
 """
 
 from __future__ import annotations
@@ -79,8 +79,8 @@ class QuarterRow:
     p_by_end: float
 
 
-def _read_sc_times(rollouts_path: Path) -> Tuple[List[float], int, int]:
-    sc_times: List[float] = []
+def _read_aa_times(rollouts_path: Path) -> Tuple[List[float], int, int]:
+    aa_times: List[float] = []
     num_no_sc = 0
     total = 0
     with rollouts_path.open("r", encoding="utf-8", errors="ignore") as f:
@@ -96,26 +96,26 @@ def _read_sc_times(rollouts_path: Path) -> Tuple[List[float], int, int]:
             res = obj.get("results") if isinstance(obj, dict) else None
             if not isinstance(res, dict):
                 continue
-            val = res.get("sc_time")
+            val = res.get("aa_time")
             try:
                 v = float(val) if val is not None else np.nan
             except Exception:
                 v = np.nan
             if np.isfinite(v):
-                sc_times.append(float(v))
+                aa_times.append(float(v))
             else:
                 num_no_sc += 1
     # Recompute total from counts in case of parsing issues
-    total = len(sc_times) + num_no_sc
-    return sc_times, num_no_sc, total
+    total = len(aa_times) + num_no_sc
+    return aa_times, num_no_sc, total
 
 
-def compute_quarter_table(sc_times: List[float], num_no_sc: int) -> Tuple[List[QuarterRow], float]:
-    total = len(sc_times) + num_no_sc
-    if total == 0 or len(sc_times) == 0:
+def compute_quarter_table(aa_times: List[float], num_no_sc: int) -> Tuple[List[QuarterRow], float]:
+    total = len(aa_times) + num_no_sc
+    if total == 0 or len(aa_times) == 0:
         return [], 0.0
 
-    dts = [_decimal_year_to_datetime(v) for v in sc_times]
+    dts = [_decimal_year_to_datetime(v) for v in aa_times]
     qidx_counts: Dict[int, int] = {}
     for dt in dts:
         qi = _quarter_index(dt)
@@ -208,7 +208,7 @@ def write_html(rows: List[QuarterRow], p_no_sc: float, out_dir: Path) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Generate SC-by-quarter probability table")
+    p = argparse.ArgumentParser(description="Generate ACD-AI-by-quarter probability table")
     p.add_argument("--run-dir", type=Path, default=None, help="Output run directory containing rollouts.jsonl")
     p.add_argument("--rollouts", type=Path, default=None, help="Explicit path to rollouts.jsonl")
     return p.parse_args()
@@ -219,9 +219,9 @@ def main() -> None:
     rollouts_path = _resolve_rollouts_path(args.run_dir, args.rollouts)
     out_dir = rollouts_path.parent
 
-    sc_times, num_no_sc, total = _read_sc_times(rollouts_path)
-    print(f"Loaded {len(sc_times)} finite SC times (+{num_no_sc} No SC) from {rollouts_path}")
-    rows, p_no_sc = compute_quarter_table(sc_times, num_no_sc)
+    aa_times, num_no_sc, total = _read_aa_times(rollouts_path)
+    print(f"Loaded {len(aa_times)} finite ACD-AI times (+{num_no_sc} No ACD-AI) from {rollouts_path}")
+    rows, p_no_sc = compute_quarter_table(aa_times, num_no_sc)
     csv_path = write_csv(rows, p_no_sc, out_dir)
     html_path = write_html(rows, p_no_sc, out_dir)
     print(f"Wrote: {csv_path}")

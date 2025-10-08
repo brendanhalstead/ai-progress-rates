@@ -248,7 +248,7 @@ def plot_cumulative_progress(fig, times, progress, row, col):
         row=row, col=col
     )
     
-    # Add training compute and vertical line for SC time if available
+    # Add training compute and vertical line for ACD-AI time if available
     results = session_data.get('results')
     
     # Add training compute if available
@@ -263,17 +263,17 @@ def plot_cumulative_progress(fig, times, progress, row, col):
                       hovertemplate='Year: %{customdata[0]}<br>Training Compute: %{customdata[1]}<extra></extra>'),
             row=row, col=col
         )
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[progress.min(), progress.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -288,19 +288,19 @@ def plot_automation_fraction(fig, times, automation_fraction, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[(automation_fraction*100).min(), (automation_fraction*100).max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -328,19 +328,19 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[software_progress_rates.min(), software_progress_rates.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -369,20 +369,20 @@ def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondar
             row=row, col=col, secondary_y=secondary_y
         )
     
-    # Add vertical line for SC time if available
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    # Add vertical line for ACD-AI time if available
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             y_min = min(coding_labors.min(), min(results.get('discounted_exp_compute', [coding_labors.min()])))
             y_max = max(coding_labors.max(), max(results.get('discounted_exp_compute', [coding_labors.max()])))
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[y_min, y_max],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -397,19 +397,19 @@ def plot_coding_labor_with_present_resources(fig, times, coding_labors_with_pres
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[coding_labors_with_present_resources.min(), coding_labors_with_present_resources.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -465,21 +465,21 @@ def plot_cognitive_components(fig, times, coding_labors, human_labor_contributio
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             y_min = min(coding_labors.min(), human_labor_contributions.min())
             y_max = max(coding_labors.max(), human_labor_contributions.max())
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[y_min, y_max],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -495,19 +495,19 @@ def plot_research_stock(fig, times, research_stocks, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[research_stocks.min(), research_stocks.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -523,19 +523,19 @@ def plot_research_effort(fig, times, research_efforts, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[research_efforts.min(), research_efforts.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -551,19 +551,19 @@ def plot_experiment_capacity(fig, times, experiment_capacity, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[experiment_capacity.min(), experiment_capacity.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -607,19 +607,19 @@ def plot_ai_coding_labor_multiplier(fig, times, ai_coding_labor_multipliers, row
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_coding_labor_multipliers.min(), ai_coding_labor_multipliers.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -637,19 +637,19 @@ def plot_ai_coding_labor_mult_ref_present_day(fig, times, ai_coding_labor_mult_r
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
 
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_coding_labor_mult_ref_present_day.min(), ai_coding_labor_mult_ref_present_day.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -667,19 +667,19 @@ def plot_ai_research_stock_multiplier(fig, times, ai_research_stock_multipliers,
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_research_stock_multipliers.min(), ai_research_stock_multipliers.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -697,19 +697,19 @@ def plot_ai_software_progress_multiplier(fig, times, ai_software_progress_multip
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_software_progress_multipliers.min(), ai_software_progress_multipliers.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -727,19 +727,19 @@ def plot_ai_overall_progress_multiplier(fig, times, ai_overall_progress_multipli
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_overall_progress_multipliers.min(), ai_overall_progress_multipliers.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -799,19 +799,19 @@ def plot_ai_sw_progress_mult_ref_present_day(fig, times, ai_sw_progress_mult_ref
     # Add horizontal reference line at y=1
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_sw_progress_mult_ref_present_day.min(), ai_sw_progress_mult_ref_present_day.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -825,19 +825,19 @@ def plot_ai_research_taste(fig, times, ai_research_taste, row, col):
         row=row, col=col
     )
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_research_taste.min(), ai_research_taste.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -855,19 +855,19 @@ def plot_ai_research_taste_sd(fig, times, ai_research_taste_sd, row, col):
     # Add horizontal reference line at y=0 (mean of human distribution)
     fig.add_hline(y=0.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_research_taste_sd.min(), ai_research_taste_sd.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -887,19 +887,19 @@ def plot_ai_research_taste_quantile(fig, times, ai_research_taste_quantile, row,
     fig.add_hline(y=0.9, line_dash="dot", line_color="red", opacity=0.3, row=row, col=col)   # 90th percentile
     fig.add_hline(y=0.95, line_dash="dot", line_color="red", opacity=0.5, row=row, col=col)  # 95th percentile
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[ai_research_taste_quantile.min(), ai_research_taste_quantile.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -917,19 +917,19 @@ def plot_aggregate_research_taste(fig, times, aggregate_research_taste, row, col
     # Add horizontal reference line at y=1 (no research taste enhancement)
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
     
-    # Add vertical line for SC time if available
+    # Add vertical line for ACD-AI time if available
     results = session_data.get('results')
-    if results and results.get('sc_time') is not None:
-        sc_time = results['sc_time']
+    if results and results.get('aa_time') is not None:
+        aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
-        if sc_time >= times.min() and sc_time <= times.max():
+        if aa_time >= times.min() and aa_time <= times.max():
             fig.add_trace(
-                go.Scatter(x=[sc_time, sc_time], 
+                go.Scatter(x=[aa_time, aa_time], 
                           y=[aggregate_research_taste.min(), aggregate_research_taste.max()],
                           name='ACD-AI Time',
                           line=dict(color='#d62728', width=2, dash='dash'),
                           mode='lines',
-                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(aa_time)}<extra></extra>'),
                 row=row, col=col
             )
 
@@ -1308,7 +1308,7 @@ def plot_horizon_lengths(fig, times, horizon_lengths, row, col, metr_data=None, 
     # )
     # logger.info(f"Set y-axis range to [-3, 6] with custom time formatting for horizon length plot at row={row}, col={col}")
 
-def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, aa_time_horizon_minutes=None, progress_at_sc=None):
+def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row, col, metr_data=None, aa_time_horizon_minutes=None, progress_at_aa=None):
     """Plot horizon lengths vs progress with METR benchmark points"""
     # Cap horizon lengths at 1 million minutes to prevent scale distortion
     max_horizon = PARAMETER_BOUNDS['aa_time_horizon_minutes'][1]  # 1 million minutes
@@ -1409,14 +1409,14 @@ def plot_horizon_lengths_vs_progress(fig, progress_values, horizon_lengths, row,
         )
     
     # Add vertical dashed line for progress at superhuman coder
-    if progress_at_sc is not None:
+    if progress_at_aa is not None:
         fig.add_trace(
-            go.Scatter(x=[progress_at_sc, progress_at_sc], 
+            go.Scatter(x=[progress_at_aa, progress_at_aa], 
                       y=[horizon_lengths.min(), horizon_lengths.max()],
                       name='Progress at SC',
                       line=dict(color='#ff7f0e', width=2, dash='dash'),
                       mode='lines',
-                      hovertemplate=f'Progress at ACD-AI: {progress_at_sc:.1f}<extra></extra>'),
+                      hovertemplate=f'Progress at ACD-AI: {progress_at_aa:.1f}<extra></extra>'),
             row=row, col=col
         )
     
@@ -1446,7 +1446,7 @@ def get_tab_configurations():
     # Mapping of plot function names to actual functions
     plot_function_map = {
         'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes')),
-        'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes'), data.get('progress_at_sc')),
+        'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes'), data.get('progress_at_aa')),
         'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
         'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].inference_compute, r, c),
         'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
@@ -1886,7 +1886,7 @@ def params_to_dict(params: Parameters):
             'ai_research_taste_at_coding_automation_anchor_sd': params.ai_research_taste_at_coding_automation_anchor_sd,
             'ai_research_taste_slope': params.ai_research_taste_slope,
         'taste_schedule_type': params.taste_schedule_type,
-        'progress_at_sc': params.progress_at_sc,
+        'progress_at_aa': params.progress_at_aa,
         'aa_time_horizon_minutes': params.aa_time_horizon_minutes,
         'pre_gap_aa_time_horizon': getattr(params, 'pre_gap_aa_time_horizon', None),
         'horizon_extrapolation_type': params.horizon_extrapolation_type,
@@ -1908,8 +1908,8 @@ def params_to_dict(params: Parameters):
     # Add calculated SC information if available from the current session
     if session_data.get('results'):
         results = session_data['results']
-        if results.get('sc_time') is not None:
-            param_dict['calculated_sc_time'] = float(results['sc_time'])
+        if results.get('aa_time') is not None:
+            param_dict['calculated_aa_time'] = float(results['aa_time'])
         if results.get('sc_progress_level') is not None:
             param_dict['calculated_sc_progress_level'] = float(results['sc_progress_level'])
             
@@ -2011,16 +2011,16 @@ def compute_model():
 
     # Add SC timing information if available
     if model.results.get('sc_progress_level') is not None and model.results.get('sc_sw_multiplier') is not None:
-        summary['sc_time'] = float(model.results['sc_time'])
+        summary['aa_time'] = float(model.results['aa_time'])
         summary['sc_progress_level'] = float(model.results['sc_progress_level'])
         summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
-        logger.info(f"SC time: {summary['sc_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
+        logger.info(f"SC time: {summary['aa_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
     # Add AI2027 SC time if computed
-    if model.results.get('ai2027_sc_time') is not None:
+    if model.results.get('ai2027_aa_time') is not None:
         try:
-            summary['ai2027_sc_time'] = float(model.results.get('ai2027_sc_time'))
+            summary['ai2027_aa_time'] = float(model.results.get('ai2027_aa_time'))
         except Exception:
-            summary['ai2027_sc_time'] = None
+            summary['ai2027_aa_time'] = None
     return jsonify({
         'success': True,
         'plots': plots,
@@ -2144,7 +2144,7 @@ def get_parameter_config():
                     'description': 'Unit convention for SD-based schedule',
                     'units': 'categorical'
                 },
-                'progress_at_sc': {
+                'progress_at_aa': {
                     'name': 'Progress at ACD-AI',
                     'description': 'Progress level where AI reaches superhuman coding ability (exponential mode)',
                     'units': 'dimensionless'
@@ -2355,8 +2355,8 @@ def export_csv():
         writer.writerow(['time', 'cumulative_progress', 'automation_fraction', 'progress_rate', 'software_progress_rate', 'coding_labor', 'research_stock', 'research_effort', 'experiment_capacity', 'human_only_progress_rate', 'ai_labor_contribution', 'human_labor_contribution'])
         
         # Write metadata header with SC information if available
-        if results.get('sc_time') is not None:
-            writer.writerow(['# ACD-AI Level Reached at:', f"Time: {results['sc_time']:.4f}", f"Progress Level: {results.get('sc_progress_level', 'N/A'):.4f}" if results.get('sc_progress_level') is not None else 'Progress Level: N/A'])
+        if results.get('aa_time') is not None:
+            writer.writerow(['# ACD-AI Level Reached at:', f"Time: {results['aa_time']:.4f}", f"Progress Level: {results.get('sc_progress_level', 'N/A'):.4f}" if results.get('sc_progress_level') is not None else 'Progress Level: N/A'])
             writer.writerow([])  # Empty row for separation
         
         # Write data
@@ -2668,7 +2668,7 @@ def get_default_data():
             'ai_research_taste_at_coding_automation_anchor': params.ai_research_taste_at_coding_automation_anchor,
             'ai_research_taste_slope': params.ai_research_taste_slope,
             'taste_schedule_type': params.taste_schedule_type,
-            'progress_at_sc': params.progress_at_sc,
+            'progress_at_aa': params.progress_at_aa,
             'aa_time_horizon_minutes': params.aa_time_horizon_minutes,
             'horizon_extrapolation_type': params.horizon_extrapolation_type,
             # Manual horizon fitting parameters
