@@ -212,8 +212,8 @@ DEFAULT_PARAMETERS = {
     'coding_labor_normalization': 1,
     'experiment_compute_exponent': 0.562,
     # AI Research Taste parameters
-    'ai_research_taste_at_coding_automation_anchor': 0.95,
-    'ai_research_taste_at_coding_automation_anchor_sd': 0,  # Optional: specify SC taste in SD-within-human-range
+    'ai_research_taste_at_coding_automation_anchor_sd': 0.5,
+    'ai_research_taste_at_coding_automation_anchor_fallback': 0.95, # Only used if conversion from SD to taste fails
     'ai_research_taste_slope': TASTE_SLOPE_DEFAULTS[DEFAULT_TASTE_SCHEDULE_TYPE],
     'taste_schedule_type': DEFAULT_TASTE_SCHEDULE_TYPE,
     'progress_at_aa': None,

@@ -91,7 +91,7 @@ parameters:
 
   swe_multiplier_at_present_day:
     dist: shifted_lognormal
-    ci80: [0.18, 2]
+    ci80: [0.2, 1.8]
     shift: 1.0
   automation_interp_type:
     dist: fixed
@@ -100,7 +100,7 @@ parameters:
   # Research taste dynamics
   ai_research_taste_at_coding_automation_anchor_sd:
     dist: normal
-    ci80: [-3.5, 3.5]
+    ci80: [-2.5, 3.5]
   ai_research_taste_slope:
     dist: lognormal
     ci80: [0.8, 7.8]

@@ -539,9 +539,9 @@ class Parameters:
     automation_interp_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['automation_interp_type'])
     swe_multiplier_at_present_day: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['swe_multiplier_at_present_day'])
     # AI Research Taste sigmoid parameters
-    ai_research_taste_at_coding_automation_anchor: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor'])
-    # Optional: allow specifying the superhuman-coder taste as SD within the human range
-    ai_research_taste_at_coding_automation_anchor_sd: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd'))
+    ai_research_taste_at_coding_automation_anchor: float = field(default=None, init=False)  # Computed from _sd
+    # Always specify the superhuman-coder taste as SD within the human range
+    ai_research_taste_at_coding_automation_anchor_sd: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd', 0.5))
     ai_research_taste_slope: float = field(default_factory=lambda: cfg.TASTE_SLOPE_DEFAULTS.get(cfg.DEFAULT_TASTE_SCHEDULE_TYPE, cfg.DEFAULT_PARAMETERS['ai_research_taste_slope']))
     taste_schedule_type: str = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['taste_schedule_type'])
     progress_at_aa: Optional[float] = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('progress_at_aa'))
@@ -606,18 +606,26 @@ class Parameters:
             self.automation_fraction_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['automation_fraction_at_coding_automation_anchor']
                 
         # Sanitize AI research taste parameters
-        # If SD-specification is provided, convert to raw taste via TasteDistribution
-        if self.ai_research_taste_at_coding_automation_anchor_sd is not None and np.isfinite(self.ai_research_taste_at_coding_automation_anchor_sd):
-            try:
-                taste_distribution_tmp = TasteDistribution(top_percentile=self.top_percentile, median_to_top_gap=self.median_to_top_taste_multiplier)
-                converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_coding_automation_anchor_sd))
-                if np.isfinite(converted_taste):
-                    self.ai_research_taste_at_coding_automation_anchor = float(converted_taste)
-            except Exception as e:
-                logger.warning(f"Failed converting ai_research_taste_at_coding_automation_anchor_sd to taste: {e}")
-        if not np.isfinite(self.ai_research_taste_at_coding_automation_anchor):
-            logger.warning(f"Non-finite ai_research_taste_at_coding_automation_anchor: {self.ai_research_taste_at_coding_automation_anchor}, setting to {cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']}")
-            self.ai_research_taste_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS['ai_research_taste_at_coding_automation_anchor']
+        # Always compute ai_research_taste_at_coding_automation_anchor from _sd
+        if self.ai_research_taste_at_coding_automation_anchor_sd is None:
+            self.ai_research_taste_at_coding_automation_anchor_sd = cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd', 0.5)
+
+        if not np.isfinite(self.ai_research_taste_at_coding_automation_anchor_sd):
+            logger.warning(f"Non-finite ai_research_taste_at_coding_automation_anchor_sd: {self.ai_research_taste_at_coding_automation_anchor_sd}, using default")
+            self.ai_research_taste_at_coding_automation_anchor_sd = cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_sd', 0.5)
+
+        # Convert SD to taste value using TasteDistribution
+        try:
+            taste_distribution_tmp = TasteDistribution(top_percentile=self.top_percentile, median_to_top_gap=self.median_to_top_taste_multiplier)
+            converted_taste = taste_distribution_tmp.get_taste_at_sd(float(self.ai_research_taste_at_coding_automation_anchor_sd))
+            if np.isfinite(converted_taste):
+                self.ai_research_taste_at_coding_automation_anchor = float(converted_taste)
+            else:
+                logger.warning(f"Converted taste is non-finite, using fallback")
+                self.ai_research_taste_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_fallback', 0.95)
+        except Exception as e:
+            logger.warning(f"Failed converting ai_research_taste_at_coding_automation_anchor_sd to taste: {e}, using fallback")
+            self.ai_research_taste_at_coding_automation_anchor = cfg.DEFAULT_PARAMETERS.get('ai_research_taste_at_coding_automation_anchor_fallback', 0.95)
                 
         if not np.isfinite(self.ai_research_taste_slope):
             logger.warning(f"Non-finite ai_research_taste_slope: {self.ai_research_taste_slope}, setting to 1.0")
@@ -1742,6 +1750,7 @@ def compute_ai_research_taste(cumulative_progress: float, params: Parameters) ->
 def _compute_ai_research_taste_sigmoid(cumulative_progress: float, params: Parameters) -> float:
     """
     Sigmoid function for AI research taste: f(x) = L / (1 + e^(-k*(x-x0)))
+    No longer used!
     """
     # Extract sigmoid parameters
     L = params.ai_research_taste_at_coding_automation_anchor  # Upper asymptote
@@ -1830,7 +1839,7 @@ def _compute_ai_research_taste_sd_per_progress(cumulative_progress: float, param
         return _compute_ai_research_taste_exponential(cumulative_progress, params)
     
     # Extract parameters
-    # taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
+    taste_at_sc = params.ai_research_taste_at_coding_automation_anchor
     progress_at_aa = params.progress_at_aa
     slope = params.ai_research_taste_slope  # SD per progress unit
     
