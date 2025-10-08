@@ -77,11 +77,12 @@ REFERENCE_YEAR = 2024.8
 REFERENCE_LABOR_CHANGE = 30.0
 REFERENCE_COMPUTE_CHANGE = 0.1
 
-# Software progress scale reference year
+# This is used to set "r". The idea is that we know quickly software efficiency was growing in this year.
 SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR = 2023.0
 
-TRAINING_COMPUTE_REFERENCE_YEAR = 2022.1
-TRAINING_COMPUTE_REFERENCE_OOMS = 23.5
+# Normalize "0 software efficiency" to Grok 3, which was released in 2025.13 and trained with 10^26.54 FLOPs.
+TRAINING_COMPUTE_REFERENCE_YEAR = 2025.13
+TRAINING_COMPUTE_REFERENCE_OOMS = 26.54
 
 # benchmarks and gaps mode
 
@@ -247,6 +248,7 @@ DEFAULT_PARAMETERS = {
     'coding_automation_efficiency_slope': 2.0,
     'optimal_ces_eta_init': 0.05,
     'optimal_ces_grid_size': 4096,
+    'sos_mode': False,
 }
 
 # =============================================================================
@@ -298,7 +300,7 @@ PLOT_METADATA = {
     'plot_software_efficiency': {
         'title': 'Software Efficiency',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'OOMs', 'type': 'linear'},
+        'y_axis': {'title': f'log({round(TRAINING_COMPUTE_REFERENCE_YEAR)}-FLOP/FLOP)', 'type': 'linear'},
         'data_keys': ['times', 'software_efficiency']
     },
     'plot_labor_comparison': {
@@ -363,7 +365,7 @@ PLOT_METADATA = {
         'title': 'Inputs to Experiment Capacity',
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Nonsense units', 'type': 'log'},
-        'data_keys': ['times', 'coding_labors']
+        'data_keys': ['times', 'serial_coding_labors']
     },
     'plot_cognitive_components': {
         'title': 'Normalized Coding Labor, Humans and AIs',
@@ -420,7 +422,7 @@ PLOT_METADATA = {
     'plot_cumulative_progress': {
         'title': 'Components of Effective Compute',
         'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': 'log(2022-FLOP)', 'type': 'linear'},
+        'y_axis': {'title': f'log({round(TRAINING_COMPUTE_REFERENCE_YEAR)}-FLOP)', 'type': 'linear'},
         'data_keys': ['times', 'effective_compute', 'training_compute']
     },
     'plot_progress_rate': {
@@ -442,18 +444,6 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': '???', 'type': 'log'},
         'data_keys': ['times', 'ai_research_stock_multipliers']
-    },
-    'plot_ai_software_progress_multiplier': {
-        'title': 'AI Software Progress Multiplier',
-        'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': '???', 'type': 'log'},
-        'data_keys': ['times', 'ai_software_progress_multipliers']
-    },
-    'plot_ai_overall_progress_multiplier': {
-        'title': 'AI Overall Progress Multiplier',
-        'x_axis': {'title': 'Time', 'type': 'linear'},
-        'y_axis': {'title': '???', 'type': 'log'},
-        'data_keys': ['times', 'ai_overall_progress_multipliers']
     },
     'plot_ai_sw_progress_mult_ref_present_day': {
         'title': 'AI Software Progress Multiplier (Ref Present Day)',
@@ -479,6 +469,18 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Automation Multiplier', 'type': 'linear'},
         'data_keys': ['times', 'automation_multipliers']
+    },
+    'plot_exp_cap_mult_with_infinite_compute': {
+        'title': 'Experiment Capacity Multiplier (Infinite Compute)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'exp_cap_mult_with_infinite_compute']
+    },
+    'plot_exp_cap_mult_with_infinite_labor': {
+        'title': 'Experiment Capacity Multiplier (Infinite Labor)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'exp_cap_mult_with_infinite_labor']
     }
 }
 
@@ -660,11 +662,10 @@ This is meant to be a clean measure of AI R&D capabilities, and depends on three
         'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_ai_coding_labor_multiplier', 'position': (1, 1)},
-            {'function': 'plot_ai_software_progress_multiplier', 'position': (1, 2)},
-            {'function': 'plot_ai_overall_progress_multiplier', 'position': (2, 1)},
-            {'function': 'plot_human_only_progress_rate', 'position': (2, 2)},
-            {'function': 'plot_horizon_lengths_vs_progress', 'position': (3, 1)},
-            
+            {'function': 'plot_human_only_progress_rate', 'position': (1, 2)},
+            {'function': 'plot_horizon_lengths_vs_progress', 'position': (2, 1)},
+            {'function': 'plot_exp_cap_mult_with_infinite_compute', 'position': (2, 2)},
+            {'function': 'plot_exp_cap_mult_with_infinite_labor', 'position': (3, 1)},
         ],
         'explanation': """
 ## Additional Metrics and Multipliers

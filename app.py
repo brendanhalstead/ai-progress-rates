@@ -196,20 +196,20 @@ def plot_software_efficiency(fig, times, values, row, col):
 def plot_labor_comparison(fig, time_series, row, col):
     """Plot human vs AI labor comparison"""
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.L_HUMAN.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['L_HUMAN'].tolist(),
                   name='Human Labor',
                   line=dict(color='#ff7f0e', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.inference_compute.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['inference_compute'].tolist(),
                   name='Inference Compute',
                   line=dict(color='#1f77b4', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
@@ -217,20 +217,20 @@ def plot_labor_comparison(fig, time_series, row, col):
 def plot_compute_comparison(fig, time_series, row, col):
     """Plot experiment vs training compute comparison"""
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.experiment_compute.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['experiment_compute'].tolist(),
                   name='Experiment Compute',
                   line=dict(color='#2ca02c', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
     fig.add_trace(
-        go.Scatter(x=time_series.time.tolist(), y=time_series.training_compute_growth_rate.tolist(),
+        go.Scatter(x=time_series['time'].tolist(), y=time_series['training_compute_growth_rate'].tolist(),
                   name='Training Compute',
                   line=dict(color='#d62728', width=2),
                   mode='lines+markers', marker=dict(size=4),
-                  customdata=[format_decimal_year_to_month_year(t) for t in time_series.time],
+                  customdata=[format_decimal_year_to_month_year(t) for t in time_series['time']],
                   hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
         row=row, col=col
     )
@@ -344,11 +344,11 @@ def plot_software_progress_rate(fig, times, software_progress_rates, row, col):
                 row=row, col=col
             )
 
-def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondary_y=False):
+def plot_coding_labor_with_compute(fig, times, serial_coding_labors, row, col, secondary_y=False):
     """Plot cognitive output with discounted experiment compute"""
     fig.add_trace(
-        go.Scatter(x=times.tolist(), y=coding_labors.tolist(),
-                  name='Normalized Coding Labor',
+        go.Scatter(x=times.tolist(), y=serial_coding_labors.tolist(),
+                  name='Serial Coding Labor',
                   line=dict(color='#9467bd', width=3),
                   mode='lines+markers', marker=dict(size=4),
                   customdata=[format_decimal_year_to_month_year(t) for t in times],
@@ -374,8 +374,8 @@ def plot_coding_labor_with_compute(fig, times, coding_labors, row, col, secondar
         aa_time = results['aa_time']
         sc_progress = results.get('sc_progress_level')
         if aa_time >= times.min() and aa_time <= times.max():
-            y_min = min(coding_labors.min(), min(results.get('discounted_exp_compute', [coding_labors.min()])))
-            y_max = max(coding_labors.max(), max(results.get('discounted_exp_compute', [coding_labors.max()])))
+            y_min = min(serial_coding_labors.min(), min(results.get('discounted_exp_compute', [serial_coding_labors.min()])))
+            y_max = max(serial_coding_labors.max(), max(results.get('discounted_exp_compute', [serial_coding_labors.max()])))
             fig.add_trace(
                 go.Scatter(x=[aa_time, aa_time], 
                           y=[y_min, y_max],
@@ -943,6 +943,66 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
         row=row, col=col
     )
 
+def plot_exp_cap_mult_with_infinite_compute(fig, times, exp_cap_mult_with_infinite_compute, row, col):
+    """Plot experiment capacity multiplier with infinite compute"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=exp_cap_mult_with_infinite_compute.tolist(),
+                  name='Exp Cap Mult (Infinite Compute)',
+                  line=dict(color='#7f7f7f', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[exp_cap_mult_with_infinite_compute.min(), exp_cap_mult_with_infinite_compute.max()],
+                          name='ACD-AI Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
+def plot_exp_cap_mult_with_infinite_labor(fig, times, exp_cap_mult_with_infinite_labor, row, col):
+    """Plot experiment capacity multiplier with infinite labor"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=exp_cap_mult_with_infinite_labor.tolist(),
+                  name='Exp Cap Mult (Infinite Labor)',
+                  line=dict(color='#c7c7c7', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[exp_cap_mult_with_infinite_labor.min(), exp_cap_mult_with_infinite_labor.max()],
+                          name='ACD-AI Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
 def format_time_duration(minutes):
     """Convert minutes to appropriate time unit string"""
     if minutes < 1:
@@ -1447,13 +1507,13 @@ def get_tab_configurations():
     plot_function_map = {
         'plot_horizon_lengths': lambda fig, data, r, c: plot_horizon_lengths(fig, data['metrics']['times'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes')),
         'plot_horizon_lengths_vs_progress': lambda fig, data, r, c: plot_horizon_lengths_vs_progress(fig, data['metrics']['progress'], data['metrics']['horizon_lengths'], r, c, data.get('metr_data'), data.get('parameters', {}).get('aa_time_horizon_minutes'), data.get('progress_at_aa')),
-        'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['time_series'].time, data['time_series'].L_HUMAN, r, c),
-        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['time_series'].time, data['time_series'].inference_compute, r, c),
-        'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['time_series'].time, data['time_series'].experiment_compute, r, c),
-        'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['time_series'].time, data['time_series'].training_compute_growth_rate, r, c),
+        'plot_human_labor': lambda fig, data, r, c: plot_human_labor(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['L_HUMAN'], r, c),
+        'plot_ai_labor': lambda fig, data, r, c: plot_ai_labor(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['inference_compute'], r, c),
+        'plot_experiment_compute': lambda fig, data, r, c: plot_experiment_compute(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['experiment_compute'], r, c),
+        'plot_training_compute_growth_rate': lambda fig, data, r, c: plot_training_compute_growth_rate(fig, data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['training_compute_growth_rate'], r, c),
         'plot_software_efficiency': lambda fig, data, r, c: plot_software_efficiency(fig, data['metrics']['times'], data['metrics']['software_efficiency'], r, c),
-        'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['time_series'], r, c),
-        'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['time_series'], r, c),
+        'plot_labor_comparison': lambda fig, data, r, c: plot_labor_comparison(fig, data['metrics']['input_time_series'], r, c),
+        'plot_compute_comparison': lambda fig, data, r, c: plot_compute_comparison(fig, data['metrics']['input_time_series'], r, c),
         'plot_automation_fraction': lambda fig, data, r, c: plot_automation_fraction(fig, data['metrics']['times'], data['metrics']['automation_fraction'], r, c),
         'plot_progress_vs_automation': lambda fig, data, r, c: plot_progress_vs_automation(fig, data['metrics']['progress'], data['metrics']['automation_fraction'], r, c),
         'plot_ai_research_taste': lambda fig, data, r, c: plot_ai_research_taste(fig, data['metrics']['times'], data['metrics']['ai_research_taste'], r, c),
@@ -1461,7 +1521,7 @@ def get_tab_configurations():
         'plot_ai_research_taste_quantile': lambda fig, data, r, c: plot_ai_research_taste_quantile(fig, data['metrics']['times'], data['metrics']['ai_research_taste_quantile'], r, c),
         'plot_aggregate_research_taste': lambda fig, data, r, c: plot_aggregate_research_taste(fig, data['metrics']['times'], data['metrics']['aggregate_research_taste'], r, c),
         'plot_ai_vs_aggregate_research_taste': lambda fig, data, r, c: plot_ai_vs_aggregate_research_taste(fig, data['metrics']['ai_research_taste'], data['metrics']['aggregate_research_taste'], r, c),
-        'plot_coding_labor_with_compute': lambda fig, data, r, c: plot_coding_labor_with_compute(fig, data['metrics']['times'], data['metrics']['coding_labors'], r, c),
+        'plot_coding_labor_with_compute': lambda fig, data, r, c: plot_coding_labor_with_compute(fig, data['metrics']['times'], data['metrics']['serial_coding_labors'], r, c),
         'plot_coding_labor_with_present_resources': lambda fig, data, r, c: plot_coding_labor_with_present_resources(fig, data['metrics']['times'], data['metrics']['coding_labors_with_present_resources'], r, c),
         'plot_cognitive_components': lambda fig, data, r, c: plot_cognitive_components(fig, data['metrics']['times'], data['metrics']['coding_labors'], data['metrics']['human_labor_contributions'], r, c),
         'plot_ai_coding_labor_multiplier': lambda fig, data, r, c: plot_ai_coding_labor_multiplier(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], r, c),
@@ -1472,7 +1532,7 @@ def get_tab_configurations():
         'plot_software_progress_rate': lambda fig, data, r, c: plot_software_progress_rate(fig, data['metrics']['times'], data['metrics']['software_progress_rates'], r, c),
         'plot_cumulative_progress': lambda fig, data, r, c: plot_cumulative_progress(fig, data['metrics']['times'], data['metrics']['effective_compute'], r, c),
         'plot_progress_rate': lambda fig, data, r, c: plot_progress_rate(fig, data['metrics']['times'], data['metrics']['progress_rates'], r, c),
-        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['time_series'].time, data['time_series'].training_compute_growth_rate), r, c),
+        'plot_rate_components': lambda fig, data, r, c: plot_rate_components(fig, data['metrics']['times'], data['metrics']['progress_rates'], np.interp(data['metrics']['times'], data['metrics']['input_time_series']['time'], data['metrics']['input_time_series']['training_compute_growth_rate']), r, c),
         'plot_ai_research_stock_multiplier': lambda fig, data, r, c: plot_ai_research_stock_multiplier(fig, data['metrics']['times'], data['metrics']['ai_research_stock_multipliers'], r, c),
         'plot_ai_software_progress_multiplier': lambda fig, data, r, c: plot_ai_software_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_software_progress_multipliers'], r, c),
         'plot_ai_overall_progress_multiplier': lambda fig, data, r, c: plot_ai_overall_progress_multiplier(fig, data['metrics']['times'], data['metrics']['ai_overall_progress_multipliers'], r, c),
@@ -1480,6 +1540,8 @@ def get_tab_configurations():
         'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
         'plot_human_only_progress_rate': lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c),
         'plot_automation_multiplier': lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c),
+        'plot_exp_cap_mult_with_infinite_compute': lambda fig, data, r, c: plot_exp_cap_mult_with_infinite_compute(fig, data['metrics']['times'], data['metrics']['exp_cap_mult_with_infinite_compute'], r, c),
+        'plot_exp_cap_mult_with_infinite_labor': lambda fig, data, r, c: plot_exp_cap_mult_with_infinite_labor(fig, data['metrics']['times'], data['metrics']['exp_cap_mult_with_infinite_labor'], r, c),
     }
     
     # Generate tab configurations from centralized config
@@ -2016,11 +2078,11 @@ def compute_model():
         summary['sc_sw_multiplier'] = float(model.results['sc_sw_multiplier']) 
         logger.info(f"SC time: {summary['aa_time']}, SC progress level: {summary['sc_progress_level']}, SC SW multiplier: {summary['sc_sw_multiplier']}")
     # Add AI2027 SC time if computed
-    if model.results.get('ai2027_aa_time') is not None:
+    if model.results.get('ai2027_sc_time') is not None:
         try:
-            summary['ai2027_aa_time'] = float(model.results.get('ai2027_aa_time'))
+            summary['ai2027_sc_time'] = float(model.results.get('ai2027_sc_time'))
         except Exception:
-            summary['ai2027_aa_time'] = None
+            summary['ai2027_sc_time'] = None
     return jsonify({
         'success': True,
         'plots': plots,

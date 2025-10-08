@@ -584,6 +584,9 @@ class Parameters:
     coding_automation_efficiency_slope: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('coding_automation_efficiency_slope', 1.0))
     optimal_ces_eta_init: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_eta_init', 1.0))
     optimal_ces_grid_size: int = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS.get('optimal_ces_grid_size', 4096))
+
+    # SOS mode
+    sos_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sos_mode'])
     
     def __post_init__(self):
         """Validate and sanitize parameters after initialization"""
@@ -2298,6 +2301,75 @@ class ProgressModel:
         # Initialize taste distribution for working with research taste
         self.taste_distribution = TasteDistribution(top_percentile=self.params.top_percentile, median_to_top_gap=self.params.median_to_top_taste_multiplier)
     
+    def freeze_time_series_at_time(self, freeze_time: float):
+        """
+        Freeze time series data at a specified time.
+        
+        Human labor, experiment compute, and inference compute remain unchanged up to freeze_time,
+        then stay constant at their freeze_time values thereafter.
+        
+        Training compute growth rate is unchanged up to freeze_time, then abruptly goes to zero
+        after freeze_time.
+        
+        Args:
+            freeze_time: Time at which to freeze the time series (decimal year)
+        """
+        # Get the freeze_time values using log interpolation
+        freeze_human_labor = _log_interp(freeze_time, self.data.time, self.data.L_HUMAN)
+        freeze_experiment_compute = _log_interp(freeze_time, self.data.time, self.data.experiment_compute)
+        freeze_inference_compute = _log_interp(freeze_time, self.data.time, self.data.inference_compute)
+        freeze_training_compute_growth_rate = _log_interp(freeze_time, self.data.time, self.data.training_compute_growth_rate)
+        
+        insertion_idx = np.searchsorted(self.data.time, freeze_time)
+
+        time_with_freeze = np.insert(self.data.time, insertion_idx, freeze_time)
+        human_labor_with_freeze = np.insert(self.data.L_HUMAN, insertion_idx, freeze_human_labor)
+        experiment_compute_with_freeze = np.insert(self.data.experiment_compute, insertion_idx, freeze_experiment_compute)
+        inference_compute_with_freeze = np.insert(self.data.inference_compute, insertion_idx, freeze_inference_compute)
+        training_compute_growth_rate_with_freeze = np.insert(self.data.training_compute_growth_rate, insertion_idx, freeze_training_compute_growth_rate)
+        
+        # Find where to insert the freeze_time point
+        # Insert freeze_time + epsilon to ensure proper ordering and transition
+        epsilon = 1e-6  # Small epsilon to ensure freeze_time + epsilon comes after freeze_time
+        freeze_time_after = freeze_time + epsilon
+        
+        # Find the insertion point (first index where time > freeze_time)
+        new_insertion_idx = insertion_idx + 1
+        
+        # Create new arrays with the freeze point inserted
+        new_time = np.insert(time_with_freeze, new_insertion_idx, freeze_time_after)
+        new_L_HUMAN = np.insert(human_labor_with_freeze, new_insertion_idx, freeze_human_labor)
+        new_experiment_compute = np.insert(experiment_compute_with_freeze, new_insertion_idx, freeze_experiment_compute)
+        new_inference_compute = np.insert(inference_compute_with_freeze, new_insertion_idx, freeze_inference_compute)
+        new_training_compute_growth_rate = np.insert(training_compute_growth_rate_with_freeze, new_insertion_idx, 0.0)
+        
+        # Find indices where time >= freeze_time_after (including the newly inserted point)
+        freeze_mask = new_time >= freeze_time_after
+        
+        # Set frozen values for human labor, experiment compute, and inference compute
+        new_L_HUMAN[freeze_mask] = freeze_human_labor
+        new_experiment_compute[freeze_mask] = freeze_experiment_compute
+        new_inference_compute[freeze_mask] = freeze_inference_compute
+        new_training_compute_growth_rate[freeze_mask] = 0.0
+        
+        # Training compute growth rate is already set to 0.0 at insertion point and remains 0.0
+        
+        # Create new TimeSeriesData object
+        self.data = TimeSeriesData(
+            time=new_time,
+            L_HUMAN=new_L_HUMAN,
+            inference_compute=new_inference_compute,
+            experiment_compute=new_experiment_compute,
+            training_compute_growth_rate=new_training_compute_growth_rate
+        )
+        
+        logger.info(f"Frozen time series at time {freeze_time}:")
+        logger.info(f"  Human labor: {freeze_human_labor:.6f}")
+        logger.info(f"  Experiment compute: {freeze_experiment_compute:.6f}")
+        logger.info(f"  Inference compute: {freeze_inference_compute:.6f}")
+        logger.info(f"  Training compute growth rate: {freeze_training_compute_growth_rate:.6f} -> 0.0")
+        logger.info(f"  Inserted freeze point at time {freeze_time_after:.6f}")
+    
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
         Estimate horizon trajectory by fitting to log(p80_horizon_length) vs progress.
@@ -2956,8 +3028,8 @@ class ProgressModel:
         present_day_progress_rate = np.interp(present_day, times, progress_rates)
         reference_sw_progress_rate = np.interp(cfg.SOFTWARE_PROGRESS_SCALE_REFERENCE_YEAR, times, sw_progress_rates)
         present_day_sw_progress_rate = np.interp(present_day, times, sw_progress_rates)
-        present_day_research_effort = np.interp(present_day, times, research_efforts)
-        present_day_research_stock = np.interp(present_day, times, research_stock_values)
+        present_day_research_effort = _log_interp(present_day, times, np.array(research_efforts))
+        present_day_research_stock = _log_interp(present_day, times, np.array(research_stock_values))
         # Interpolate human and AI labor at anchor time using log-space when positive
         if np.all(self.data.L_HUMAN > 0):
             present_day_human_labor = _log_interp(present_day, self.data.time, self.data.L_HUMAN)
@@ -2977,6 +3049,7 @@ class ProgressModel:
             'research_stock': research_stock_values,
             'progress_rates': progress_rates,
             'research_efforts': research_efforts,
+            'sw_progress_rates': sw_progress_rates,
             'reference_sw_progress_rate': reference_sw_progress_rate,
             'anchor_stats': {
                 'progress': present_day_progress,
@@ -3127,6 +3200,23 @@ class ProgressModel:
         _dt_integrate = time.perf_counter() - _t_integrate_start
         logger.info(f"Timing: integrate_progress completed in {_dt_integrate:.3f}s (elapsed {time.perf_counter() - _fn_start_time:.3f}s)")
         
+        # SOS MODE
+        takeoff_start_human_only_stats = None
+        if self.params.sos_mode and progress_values[-1] > self.params.progress_at_sc:
+            full_automation_time = np.interp(self.params.progress_at_sc, progress_values, times)
+            takeoff_start_human_only_stats = {
+                'time': full_automation_time,
+                'human_labor': _log_interp(full_automation_time, self.data.time, self.data.L_HUMAN),
+                'inference_compute': _log_interp(full_automation_time, self.data.time, self.data.inference_compute),
+                'experiment_compute': _log_interp(full_automation_time, self.data.time, self.data.experiment_compute),
+                'research_stock': _log_interp(full_automation_time, np.array(times), np.array(self.human_only_results['research_stock'])),
+                'research_effort': _log_interp(full_automation_time, np.array(times), np.array(self.human_only_results['research_efforts'])),
+            }
+            logger.info(f"Full automation time: {full_automation_time}")
+            self.freeze_time_series_at_time(full_automation_time)
+            times, progress_values, research_stock_values = integrate_progress(time_range, initial_progress, self.data, self.params)
+            takeoff_start_research_stock = _log_interp(full_automation_time, times, research_stock_values)
+            self.human_only_results['takeoff_start_stats'] = takeoff_start_human_only_stats
         # Fix for Case 2 anchor horizon blowup: Update anchor_progress after ODE integration
         # This ensures that the horizon at present_day matches the specified present_horizon value
         if (self.horizon_trajectory is not None and 
@@ -3156,6 +3246,7 @@ class ProgressModel:
         aggregate_research_tastes = []
         coding_labors = []
         coding_labors_with_present_resources = []
+        serial_coding_labors = []
         software_progress_rates = []
         software_progress_rates_present_resources = []
         software_efficiency = []  # Integral of software_progress_rate
@@ -3166,15 +3257,15 @@ class ProgressModel:
         human_labor_contributions = []
         ai_coding_labor_multipliers = []
         ai_coding_labor_mult_ref_present_day = []
-        ai_research_stock_multipliers = []
-        ai_software_progress_multipliers = []
         ai_sw_progress_mult_ref_present_day = []
-        ai_overall_progress_multipliers = []
+        takeoff_progress_multipliers = []
         discounted_exp_compute = []
         horizon_lengths = []
         effective_compute = []
         training_compute = []
         experiment_capacity = []
+        exp_cap_mult_with_infinite_labor = []
+        exp_cap_mult_with_infinite_compute = []
         
         # logger.info(f"Computing comprehensive metrics for {len(times)} time points")
         
@@ -3219,6 +3310,8 @@ class ProgressModel:
                         automation_model = self.params.automation_model
                         L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
                         L_opt_present_resources = automation_model.coding_labor_optimal_ces(present_day_human_labor, present_day_inference_compute, logE, self.params)
+                        if takeoff_start_human_only_stats is not None:
+                            L_opt_takeoff_start = automation_model.coding_labor_optimal_ces(takeoff_start_human_only_stats['human_labor'], takeoff_start_human_only_stats['inference_compute'], logE, self.params)
                         if L_opt is None or not np.isfinite(L_opt):
                             assert False, "L_opt is None or not np.isfinite(L_opt)"
                         else:
@@ -3227,6 +3320,8 @@ class ProgressModel:
                             coding_labor_with_present_resources = L_opt_present_resources
                             serial_coding_labor = float((L_opt ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
                             serial_coding_labor_with_present_resources = float((L_opt_present_resources ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
+                            if takeoff_start_human_only_stats is not None:
+                                serial_coding_labor_takeoff_start = float((L_opt_takeoff_start ** self.params.parallel_penalty) * self.params.coding_labor_normalization)
                     except Exception as e:
                         assert False, f"Falling back to simple CES in metrics due to optimal_ces error: {e}"
                 else:
@@ -3236,18 +3331,28 @@ class ProgressModel:
                     )
                 coding_labors.append(coding_labor if np.isfinite(coding_labor) else 0.0)
                 coding_labors_with_present_resources.append(coding_labor_with_present_resources if np.isfinite(coding_labor_with_present_resources) else 0.0)
-                
+                serial_coding_labors.append(serial_coding_labor if np.isfinite(serial_coding_labor) else 0.0)
 
                 # EXPERIMENT CAPACITY
                 current_research_effort = research_efforts[i]
                 exp_capacity = current_research_effort / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
                 experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
 
+                exp_cap_with_infinite_compute = (1-self.params.alpha_experiment_capacity) ** (1/self.params.rho_experiment_capacity) * serial_coding_labor
+                exp_cap_with_infinite_labor = self.params.alpha_experiment_capacity ** (1/self.params.rho_experiment_capacity) * discounted_exp_compute_val
+                exp_cap_mult_with_infinite_labor.append(exp_cap_with_infinite_labor / exp_capacity if exp_capacity > 0 else 0.0)
+                exp_cap_mult_with_infinite_compute.append(exp_cap_with_infinite_compute / exp_capacity if exp_capacity > 0 else 0.0)
+                
                 # RESEARCH EFFORT
                 research_effort_present_resources = compute_research_effort(
                     present_day_experiment_compute, serial_coding_labor_with_present_resources, 
                     self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
                 )
+                if takeoff_start_human_only_stats is not None:
+                    research_effort_takeoff_start_resources = compute_research_effort(
+                        takeoff_start_human_only_stats['experiment_compute'], serial_coding_labor_takeoff_start, 
+                        self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
+                    )
 
                 # SOFTWARE PROGRESS RATE
                 assert current_research_effort == compute_research_effort(
@@ -3269,7 +3374,13 @@ class ProgressModel:
                     self.params.r_software
                 )
                 software_progress_rates_present_resources.append(software_rate_present_resources if np.isfinite(software_rate_present_resources) else 0.0)
-                
+                if takeoff_start_human_only_stats is not None:
+                    software_rate_takeoff_start = compute_software_progress_rate(
+                        takeoff_start_research_stock, research_effort_takeoff_start_resources, 
+                        initial_research_stock_val,
+                        initial_research_effort_val,
+                        self.params.r_software
+                    )
                 # SOFTWARE EFFICIENCY (OOMS)
                 if i == 0:
                     # Initialize software efficiency at 0
@@ -3348,11 +3459,9 @@ class ProgressModel:
                     ai_coding_labor_mult_ref_present_day.append(coding_labor_with_present_resources / present_day_human_labor if ai_contrib > 0 else 1.0)
                 else:
                     ai_coding_labor_multipliers.append(0.0)
-                ai_research_stock_multipliers.append(research_efforts[i] / human_only_research_effort if human_only_research_effort > 0 else 0.0)
-                ai_software_progress_multipliers.append(software_rate / human_only_software_progress_rates[i] if human_only_software_progress_rates[i] > 0 else 0.0)
                 ai_sw_progress_mult_ref_present_day.append(software_rate_present_resources / present_day_sw_progress_rate if present_day_sw_progress_rate > 0 else 0.0)
-                ai_overall_progress_multipliers.append(progress_rates[i] / human_only_progress_rates[i] if human_only_progress_rates[i] > 0 else 0.0)
-
+                if takeoff_start_human_only_stats is not None:
+                    takeoff_progress_multipliers.append(research_effort_takeoff_start_resources / takeoff_start_human_only_stats['research_effort'] if takeoff_start_human_only_stats['research_effort'] > 0 else 0.0)
                 
             except Exception as e:
                 assert False, f"Error calculating metrics at t={t}: {e}"
@@ -3420,19 +3529,19 @@ class ProgressModel:
         
         # Compute the time when ai_coding_labor_mult_ref_present_day first reaches the required threshold
         # using exponential (log-space) interpolation between adjacent samples.
-        ai2027_aa_time = None
+        ai2027_sc_time = None
         try:
             if self.params.parallel_penalty is not None and self.params.parallel_penalty != 0:
                 # Serial multiplier converted to parallel: (serial_mult)^(1/penalty) * base
                 serial_mult = cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30
                 ai2027_sc_required_mult = (serial_mult ** (1 / self.params.parallel_penalty)) * 30
-                ai2027_aa_time = _find_exponential_crossing_time(
+                ai2027_sc_time = _find_exponential_crossing_time(
                     np.asarray(times, dtype=float),
                     np.asarray(ai_coding_labor_mult_ref_present_day, dtype=float),
                     float(ai2027_sc_required_mult),
                 )
         except Exception as e:
-            logger.warning(f"Error computing ai2027_aa_time: {e}")
+            logger.warning(f"Error computing ai2027_sc_time: {e}")
             
         # Calculate progress rate at anchor time
         present_day = self.params.present_day
@@ -3527,6 +3636,7 @@ class ProgressModel:
             'progress_rates': progress_rates,
             'research_efforts': research_efforts,
             'coding_labors': coding_labors,
+            'serial_coding_labors': serial_coding_labors,
             'coding_labors_with_present_resources': coding_labors_with_present_resources,
             'software_progress_rates': software_progress_rates,
             'software_efficiency': software_efficiency,
@@ -3535,10 +3645,8 @@ class ProgressModel:
             'human_labor_contributions': human_labor_contributions,
             'ai_coding_labor_multipliers': ai_coding_labor_multipliers,
             'ai_coding_labor_mult_ref_present_day': ai_coding_labor_mult_ref_present_day,
-            'ai_research_stock_multipliers': ai_research_stock_multipliers,
-            'ai_software_progress_multipliers': ai_software_progress_multipliers,
             'ai_sw_progress_mult_ref_present_day': ai_sw_progress_mult_ref_present_day,
-            'ai_overall_progress_multipliers': ai_overall_progress_multipliers,
+            'takeoff_progress_multipliers': takeoff_progress_multipliers,
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
             'effective_compute': effective_compute,
@@ -3547,7 +3655,7 @@ class ProgressModel:
             'aa_time': aa_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_aa,  # Progress level for SC
             'sc_sw_multiplier': self.sc_sw_multiplier if hasattr(self, 'sc_sw_multiplier') else None,  # Software progress multiplier at SC
-            'ai2027_aa_time': ai2027_aa_time,  # Time when @AI2027 SC condition is met
+            'ai2027_sc_time': ai2027_sc_time,  # Time when @AI2027 SC condition is met
             'present_day': present_day,  # Anchor time for manual horizon fitting
             'anchor_progress_rate': anchor_progress_rate,  # Progress rate at anchor time
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
@@ -3571,6 +3679,8 @@ class ProgressModel:
             'top_taste_num_sds': top_taste_num_sds,  # Number of SDs the top percentile represents
             'f_multiplier_per_sd': f_multiplier_per_sd,  # Multiplier per standard deviation
             'slope_times_log_f': slope_times_log_f,  # s * log10(f), where s is SDs per effective OOM
+            'exp_cap_mult_with_infinite_labor': exp_cap_mult_with_infinite_labor,
+            'exp_cap_mult_with_infinite_compute': exp_cap_mult_with_infinite_compute,
         }
         self.results['milestones'] = self.compute_milestones()
         # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
@@ -3636,6 +3746,7 @@ class ProgressModel:
                 'interpolation_type': 'exponential'
             }
         }
+
         for milestone in milestones.values():
             if milestone['interpolation_type'] == 'exponential':
                 time = _find_exponential_crossing_time(
@@ -3653,6 +3764,20 @@ class ProgressModel:
                     milestone['progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['ai_sw_progress_mult_ref_present_day'], dtype=float))
                 if 'effective_compute_ooms' not in milestone:
                     milestone['effective_compute_ooms'] = np.interp(milestone['time'], self.results['times'], np.asarray(self.results['effective_compute'], dtype=float))
+                milestone['research_effort'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['research_efforts'], dtype=float))
+                milestone['research_stock'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['research_stock'], dtype=float))
+                if self.results['takeoff_progress_multipliers']:
+                    milestone['takeoff_progress_multiplier'] = _log_interp(milestone['time'], self.results['times'], np.asarray(self.results['takeoff_progress_multipliers'], dtype=float))
+        milestones_list = list(zip(milestones.keys(), milestones.values()))
+        # Filter out milestones without time and sort by time
+        milestones_list = [(name, milestone) for name, milestone in milestones_list if 'time' in milestone]
+        milestones_list.sort(key=lambda x: x[1]['time'])
+        for i in range(len(milestones_list) - 1):
+            this_RS = milestones_list[i][1]['research_stock']
+            next_RS = milestones_list[i+1][1]['research_stock']
+            if self.results['takeoff_progress_multipliers']:
+                milestones[milestones_list[i][0]]['human_only_years_to_next_milestone'] = (next_RS - this_RS) / self.human_only_results['takeoff_start_stats']['research_effort']
+        # print(milestones_list)
         return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:

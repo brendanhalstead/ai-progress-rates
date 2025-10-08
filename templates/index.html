@@ -70,11 +70,11 @@
                 <h5>Capability Milestones</h5>
                 <div class="table-responsive">
                   <table class="table table-sm table-striped align-middle">
-                    <thead>
+                    <thead id="milestonesTableHead">
                       <tr>
                         <th scope="col">Milestone</th>
                         <th scope="col">Time</th>
-                        <th scope="col">2022-FLOP</th>
+                        <th scope="col">2025-FLOP</th>
                         <th scope="col">PM</th>
                       </tr>
                     </thead>
@@ -689,22 +689,7 @@
                           >Compared to 2024 baseline</small
                         >
                       </div>
-                      <div class="mb-3">
-                        <label class="param-label"
-                          >Exp. Cap. with 30x labor:
-                          <span id="labor_anchor_exp_cap_val">Loading...</span
-                          >x</label
-                        >
-                        <input
-                          type="range"
-                          class="range-input form-range"
-                          id="labor_anchor_exp_cap"
-                          step="0.01"
-                        />
-                        <small class="text-muted"
-                          >Compared to 2024 baseline</small
-                        >
-                      </div>
+
                       <div class="mb-3">
                         <label class="param-label"
                           >Exp. Cap. Reduction with 0.1x compute:
@@ -982,6 +967,19 @@
                       />
                       <small class="text-muted">Number of grid points for the precomputed frontier lookup.</small>
                     </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="sos_mode"
+                        />
+                        <label class="form-check-label" for="sos_mode">
+                          SOS Mode
+                        </label>
+                      </div>
+                      <small class="text-muted">Freezes input time series once the automation anchor is reached.</small>
+                    </div>
                     <div class="row">
                       <div class="col-4">
                         <label class="param-label">Start Year</label>
@@ -1240,6 +1238,8 @@
         "present_horizon",
         "present_doubling_time",
         "doubling_difficulty_growth_factor",
+        // Simulation settings
+        "sos_mode",
       ];
 
       // Load parameter configuration from server
@@ -1417,6 +1417,19 @@
           }
         });
 
+        // Add event listener for SOS mode checkbox
+        $("#sos_mode").on("change", function () {
+          // Update milestone table header immediately
+          updateMilestoneTableHeader();
+          
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else {
+            computeModel();
+          }
+        });
+
         // Wire include_gap toggle
         $("#include_gap").on("change", function () {
           updateBenchmarksAndGapsVisibility();
@@ -1443,6 +1456,8 @@
         updateHorizonExtrapolationVisibility();
         // Initialize SD/fraction visibility per schedule type
         updateTasteUnitsVisibility();
+        // Initialize milestone table header based on sos_mode
+        updateMilestoneTableHeader();
       }
 
       function updateBenchmarksAndGapsVisibility() {
@@ -1818,6 +1833,9 @@
           id === "coding_labor_mode"
             ) {
               value = element.val(); // Keep as string
+            } else if (id === "sos_mode") {
+              // Boolean checkbox
+              value = element.is(":checked");
             } else {
               value = parseFloat(element.val());
 
@@ -1862,6 +1880,7 @@
           id !== "automation_interp_type" &&
           id !== "coding_labor_mode" &&
               id !== "include_gap" &&
+              id !== "sos_mode" &&
               value !== null &&
               !isFinite(value)
             ) {
@@ -3079,6 +3098,16 @@
           console.warn("Failed to initialize parallel penalty toggle", e);
         }
 
+        // Initialize SOS mode toggle state
+        try {
+          const sosToggle = document.getElementById("sos_mode");
+          if (sosToggle && parameterConfig?.defaults?.sos_mode !== undefined) {
+            sosToggle.checked = !!parameterConfig.defaults.sos_mode;
+          }
+        } catch (e) {
+          console.warn("Failed to initialize SOS mode toggle", e);
+        }
+
         // Initialize Benchmarks & Gaps controls from defaults where appropriate
         try {
           const gapSlider = document.getElementById("gap_years");
@@ -3763,14 +3792,14 @@
               : "—"
           );
           // AI2027 SC Time (formatted as month and year)
-          $("#summary_ai2027_aa_time").text(
-            summary.ai2027_aa_time != null
-              ? formatDecimalYearToMonthYear(summary.ai2027_aa_time)
+          $("#summary_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
               : "—"
           );
-          $("#milestone_ai2027_aa_time").text(
-            summary.ai2027_aa_time != null
-              ? formatDecimalYearToMonthYear(summary.ai2027_aa_time)
+          $("#milestone_ai2027_sc_time").text(
+            summary.ai2027_sc_time != null
+              ? formatDecimalYearToMonthYear(summary.ai2027_sc_time)
               : "—"
           );
           // SC R&D progress multiplier
@@ -3892,20 +3921,60 @@
         }
       }
 
+      function updateMilestoneTableHeader() {
+        try {
+          const tableHead = document.getElementById("milestonesTableHead");
+          if (!tableHead) return;
+          
+          const sosMode = document.getElementById("sos_mode")?.checked || false;
+          
+          if (sosMode) {
+            // SOS mode: Milestone, Time, 2025-FLOP, Takeoff PM, Takeoff-start human-only years to next
+            tableHead.innerHTML = `
+              <tr>
+                <th scope="col">Milestone</th>
+                <th scope="col">Time</th>
+                <th scope="col">2025-FLOP</th>
+                <th scope="col">Takeoff PM</th>
+                <th scope="col">Takeoff-start human-only years to next</th>
+              </tr>
+            `;
+          } else {
+            // Normal mode: Milestone, Time, 2025-FLOP, PM
+            tableHead.innerHTML = `
+              <tr>
+                <th scope="col">Milestone</th>
+                <th scope="col">Time</th>
+                <th scope="col">2025-FLOP</th>
+                <th scope="col">PM</th>
+              </tr>
+            `;
+          }
+        } catch (e) {
+          console.warn("Failed to update milestone table header", e);
+        }
+      }
+
       function updateMilestonesFromResponse(response) {
         try {
           const tableBody = document.getElementById("milestonesTableBody");
           if (!tableBody) return;
+          
+          // Update header based on current sos_mode
+          updateMilestoneTableHeader();
+          
           // Prefer explicit milestones field if present; otherwise try to derive minimal entries from summary
           const milestones = response?.milestones || response?.results?.milestones || null;
           tableBody.innerHTML = "";
+          
+          const sosMode = document.getElementById("sos_mode")?.checked || false;
 
-          const addRow = (name, timeVal, progressMult, effectiveCompute) => {
+          const addRow = (name, timeVal, progressMult, effectiveCompute, takeoffPM, researchStock, humanOnlyYears) => {
             const tr = document.createElement("tr");
             const tdName = document.createElement("td");
             const tdTime = document.createElement("td");
             const tdEC = document.createElement("td");
-            const tdMult = document.createElement("td");
+            
             tdName.textContent = name;
             tdTime.textContent =
               timeVal != null && isFinite(timeVal)
@@ -3915,14 +3984,37 @@
               effectiveCompute != null && isFinite(effectiveCompute)
                 ? `1e${Number(effectiveCompute).toFixed(1)}`
                 : "—";
-            tdMult.textContent =
-              progressMult != null && isFinite(progressMult)
-                ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
-                : "—";
+            
             tr.appendChild(tdName);
             tr.appendChild(tdTime);
             tr.appendChild(tdEC);
-            tr.appendChild(tdMult);
+            
+            if (sosMode) {
+              // SOS mode: add Takeoff PM and human-only years columns
+              const tdTakeoffPM = document.createElement("td");
+              const tdHumanYears = document.createElement("td");
+              
+              tdTakeoffPM.textContent =
+                takeoffPM != null && isFinite(takeoffPM)
+                  ? Number(takeoffPM).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                  : "—";
+              tdHumanYears.textContent =
+                humanOnlyYears != null && isFinite(humanOnlyYears)
+                  ? Number(humanOnlyYears).toFixed(1)
+                  : "—";
+              
+              tr.appendChild(tdTakeoffPM);
+              tr.appendChild(tdHumanYears);
+            } else {
+              // Normal mode: add PM column only
+              const tdMult = document.createElement("td");
+              tdMult.textContent =
+                progressMult != null && isFinite(progressMult)
+                  ? Number(progressMult).toFixed(2).replace(/\.0+$/, "").replace(/\.([1-9])0+$/, ".$1") + "x"
+                  : "—";
+              tr.appendChild(tdMult);
+            }
+            
             tableBody.appendChild(tr);
           };
 
@@ -3935,12 +4027,15 @@
                 time: info?.time,
                 pm: info?.progress_multiplier,
                 ec: info?.effective_compute_ooms,
+                takeoffPM: info?.takeoff_progress_multiplier,
+                researchStock: info?.research_stock,
+                humanYears: info?.human_only_years_to_next_milestone,
               });
             });
           } else {
             const summary = response?.summary || {};
-            entries.push({ name: "ACD-AI", time: summary.aa_time, pm: summary.sc_sw_multiplier, ec: null });
-            entries.push({ name: "AI 2027 SC", time: summary.ai2027_aa_time, pm: null, ec: null });
+            entries.push({ name: "ACD-AI", time: summary.aa_time, pm: summary.sc_sw_multiplier, ec: null, takeoffPM: null, researchStock: null, humanYears: null });
+            entries.push({ name: "AI 2027 SC", time: summary.ai2027_sc_time, pm: null, ec: null, takeoffPM: null, researchStock: null, humanYears: null });
           }
 
           entries.sort((a, b) => {
@@ -3949,7 +4044,7 @@
             return at - bt;
           });
 
-          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec));
+          entries.forEach((e) => addRow(e.name, e.time, e.pm, e.ec, e.takeoffPM, e.researchStock, e.humanYears));
         } catch (e) {
           console.warn("Failed to render milestones table", e);
         }

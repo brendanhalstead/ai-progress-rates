@@ -42,6 +42,7 @@ import importlib
 import logging
 import signal
 import multiprocessing as mp
+import scipy.special
 
 try:
     _tqdm = importlib.import_module("tqdm").tqdm  # type: ignore[attr-defined]
@@ -338,6 +339,141 @@ def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator, param
     raise ValueError(f"Unknown distribution kind: {kind}")
 
 
+def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, param_name: Optional[str] = None) -> Any:
+    """Sample from a distribution using a specific quantile (for correlated sampling).
+    
+    Args:
+        dist_spec: Distribution specification
+        quantile: Quantile value in [0, 1]
+        param_name: Parameter name for error messages
+        
+    Returns:
+        Sampled value
+    """
+    kind = dist_spec.get("dist", "fixed")
+
+    if kind == "fixed":
+        return dist_spec.get("value")
+
+    if kind == "uniform":
+        a = float(dist_spec["min"])
+        b = float(dist_spec["max"])
+        return a + quantile * (b - a)
+
+    if kind == "normal":
+        # Support parameterization by mean/sd (or sigma) OR by 80% CI (q10,q90)
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            if has_array:
+                ci = dist_spec["ci80"]
+                q10 = float(ci[0])
+                q90 = float(ci[1])
+            else:
+                q10 = float(dist_spec["ci80_low"])
+                q90 = float(dist_spec["ci80_high"])
+            if q10 > q90:
+                q10, q90 = q90, q10
+            z = 1.2815515655446004
+            mu = 0.5 * (q10 + q90)
+            sigma = (q90 - q10) / (2.0 * z)
+        else:
+            mu = float(dist_spec["mean"])
+            sigma = float(dist_spec["sd"]) if "sd" in dist_spec else float(dist_spec.get("sigma", 1.0))
+
+        # Use inverse normal CDF
+        x = mu + sigma * np.sqrt(2) * scipy.special.erfinv(2 * quantile - 1)
+        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
+            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
+        return x
+
+    if kind == "lognormal":
+        # Support parameterization by mu/sigma in log-space OR by 80% CI in original space
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            if has_array:
+                ci = dist_spec["ci80"]
+                q10 = float(ci[0])
+                q90 = float(ci[1])
+            else:
+                q10 = float(dist_spec["ci80_low"])
+                q90 = float(dist_spec["ci80_high"])
+            if q10 > q90:
+                q10, q90 = q90, q10
+            z = 1.2815515655446004
+            ln_q10 = float(np.log(q10))
+            ln_q90 = float(np.log(q90))
+            mu = 0.5 * (ln_q10 + ln_q90)
+            sigma = (ln_q90 - ln_q10) / (2.0 * z)
+        else:
+            mu = float(dist_spec["mu"])
+            sigma = float(dist_spec["sigma"])
+
+        # Use inverse lognormal CDF
+        x = np.exp(mu + sigma * np.sqrt(2) * scipy.special.erfinv(2 * quantile - 1))
+        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
+            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
+        return x
+
+    if kind == "shifted_lognormal":
+        # Shifted lognormal: x = shift + LogNormal(mu, sigma)
+        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
+        has_array = "ci80" in dist_spec
+        if has_array or has_pair:
+            if has_array:
+                ci = dist_spec["ci80"]
+                q10 = float(ci[0])
+                q90 = float(ci[1])
+            else:
+                q10 = float(dist_spec["ci80_low"])
+                q90 = float(dist_spec["ci80_high"])
+            if q10 > q90:
+                q10, q90 = q90, q10
+            z = 1.2815515655446004
+            ln_q10 = float(np.log(q10))
+            ln_q90 = float(np.log(q90))
+            mu = 0.5 * (ln_q10 + ln_q90)
+            sigma = (ln_q90 - ln_q10) / (2.0 * z)
+        else:
+            mu = float(dist_spec["mu"])
+            sigma = float(dist_spec["sigma"])
+
+        # Use inverse shifted lognormal CDF
+        x_core = np.exp(mu + sigma * np.sqrt(2) * scipy.special.erfinv(2 * quantile - 1))
+        shift = float(dist_spec.get("shift", 0.0))
+        x = float(shift + x_core)
+        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
+            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
+        return x
+
+    if kind == "beta":
+        a = float(dist_spec["alpha"])
+        b = float(dist_spec["beta"])
+        lo = float(dist_spec.get("min", 0.0))
+        hi = float(dist_spec.get("max", 1.0))
+        # Use inverse beta CDF
+        x01 = scipy.special.betaincinv(a, b, quantile)
+        return lo + (hi - lo) * x01
+
+    if kind == "choice":
+        values = dist_spec["values"]
+        p = dist_spec.get("p")
+        if p is None:
+            # Uniform choice
+            idx = int(quantile * len(values))
+            idx = min(idx, len(values) - 1)
+            return values[idx]
+        else:
+            # Weighted choice - find cumulative sum
+            cumsum = np.cumsum(p)
+            idx = np.searchsorted(cumsum, quantile)
+            idx = min(idx, len(values) - 1)
+            return values[idx]
+
+    raise ValueError(f"Unknown distribution kind: {kind}")
+
+
 def _clip_to_param_bounds(param_name: str, value: Any) -> Any:
     bounds = cfg.PARAMETER_BOUNDS.get(param_name)
     if bounds is None:
@@ -349,11 +485,266 @@ def _clip_to_param_bounds(param_name: str, value: Any) -> Any:
         return value
 
 
-def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator) -> Dict[str, Any]:
+# =======================
+# Correlation calibration
+# =======================
+
+def _gaussian_cdf(x: np.ndarray) -> np.ndarray:
+    return 0.5 * (1.0 + scipy.special.erf(x / np.sqrt(2.0)))
+
+
+def _quantile_transform_vectorized(dist_spec: Dict[str, Any], u: np.ndarray, param_name: Optional[str] = None) -> np.ndarray:
+    # Thin wrapper to reuse the scalar quantile sampler in vectorized fashion
+    # Using np.vectorize keeps code simple; performance is adequate for calibration sizes (~1e4-5e4)
+    vec = np.vectorize(lambda q: _sample_from_dist_with_quantile(dist_spec, float(q), param_name), otypes=[float])
+    return vec(u)
+
+
+def _estimate_pearson_for_rho(
+    spec_i: Dict[str, Any],
+    spec_j: Dict[str, Any],
+    rho_z: float,
+    base_normals: Tuple[np.ndarray, np.ndarray],
+    param_i_name: str,
+    param_j_name: str,
+) -> float:
+    # Build correlated normals from shared base normals (A,B) for reproducibility across rho values
+    A, B = base_normals
+    # Guard against numerical issues near |rho|=1
+    rho = float(np.clip(rho_z, -0.9999, 0.9999))
+    Z1 = A
+    Z2 = rho * A + np.sqrt(max(0.0, 1.0 - rho * rho)) * B
+    U1 = _gaussian_cdf(Z1)
+    U2 = _gaussian_cdf(Z2)
+    X1 = _quantile_transform_vectorized(spec_i, U1, param_i_name)
+    X2 = _quantile_transform_vectorized(spec_j, U2, param_j_name)
+    c = np.corrcoef(X1, X2)[0, 1]
+    if not np.isfinite(c):
+        return 0.0
+    return float(c)
+
+
+def _solve_latent_rho_for_pair(
+    spec_i: Dict[str, Any],
+    spec_j: Dict[str, Any],
+    target_corr: float,
+    base_normals: Tuple[np.ndarray, np.ndarray],
+    param_i_name: str,
+    param_j_name: str,
+    tol: float = 1e-2,
+    max_iter: int = 40,
+) -> float:
+    # Bisection on rho_z in [-0.999, 0.999] to achieve target Pearson correlation after transforms
+    lo, hi = -0.999, 0.999
+    f_lo = _estimate_pearson_for_rho(spec_i, spec_j, lo, base_normals, param_i_name, param_j_name)
+    f_hi = _estimate_pearson_for_rho(spec_i, spec_j, hi, base_normals, param_i_name, param_j_name)
+
+    # If target is outside achievable range, clamp to nearest endpoint
+    if target_corr <= min(f_lo, f_hi):
+        return lo if f_lo <= f_hi else hi
+    if target_corr >= max(f_lo, f_hi):
+        return lo if f_lo >= f_hi else hi
+
+    # Ensure f is increasing with rho for bisection; if not, swap ends
+    increasing = f_lo < f_hi
+    left, right = (lo, hi) if increasing else (hi, lo)
+    f_left = f_lo if increasing else f_hi
+    f_right = f_hi if increasing else f_lo
+
+    for _ in range(max_iter):
+        mid = 0.5 * (left + right)
+        f_mid = _estimate_pearson_for_rho(spec_i, spec_j, mid, base_normals, param_i_name, param_j_name)
+        if abs(f_mid - target_corr) <= tol:
+            return float(mid)
+        if f_mid < target_corr:
+            left, f_left = mid, f_mid
+        else:
+            right, f_right = mid, f_mid
+
+    return float(0.5 * (left + right))
+
+
+def _nearest_correlation_matrix(A: np.ndarray, tol: float = 1e-8, max_iters: int = 100) -> np.ndarray:
+    # Higham's nearest correlation matrix algorithm (simplified)
+    Y = A.copy()
+    np.fill_diagonal(Y, 1.0)
+    delta_S = np.zeros_like(Y)
+    for _ in range(max_iters):
+        R = Y - delta_S
+        # PSD projection
+        eigvals, eigvecs = np.linalg.eigh((R + R.T) * 0.5)
+        eigvals_clipped = np.clip(eigvals, a_min=0.0, a_max=None)
+        X = eigvecs @ np.diag(eigvals_clipped) @ eigvecs.T
+        delta_S = X - R
+        Y = X
+        # Unit diagonal and symmetry
+        np.fill_diagonal(Y, 1.0)
+        Y = (Y + Y.T) * 0.5
+        # Convergence check (diagonal already unit; check min eigenvalue)
+        if np.min(eigvals_clipped) >= -tol:
+            break
+    # Ensure strict PD by jitter if needed
+    try:
+        np.linalg.cholesky(Y)
+    except np.linalg.LinAlgError:
+        # Add a small jitter
+        jitter = 1e-8
+        for _ in range(5):
+            try:
+                Y_j = Y + np.eye(Y.shape[0]) * jitter
+                np.fill_diagonal(Y_j, 1.0)
+                np.linalg.cholesky(Y_j)
+                Y = Y_j
+                break
+            except np.linalg.LinAlgError:
+                jitter *= 10
+    return Y
+
+
+def _calibrate_gaussian_copula_latent_corr(
+    param_dists: Dict[str, Any],
+    correlated_params: List[str],
+    target_corr: np.ndarray,
+    rng: np.random.Generator,
+    interpretation: str = "pearson",
+    calibration_samples: int = 20000,
+    tol: float = 1e-2,
+) -> np.ndarray:
+    n = len(correlated_params)
+    if n <= 1:
+        return np.eye(n)
+
+    # If interpreting as Spearman rank correlation, convert to latent Gaussian Pearson via closed form
+    if interpretation.lower() in {"spearman", "rank", "spearman_rho"}:
+        # For a Gaussian copula: rho_S = (6/pi) * arcsin(rho/2)  =>  rho = 2 * sin(pi * rho_S / 6)
+        rho_latent = 2.0 * np.sin(np.pi * target_corr / 6.0)
+        rho_latent = np.clip(rho_latent, -0.9999, 0.9999)
+        np.fill_diagonal(rho_latent, 1.0)
+        return _nearest_correlation_matrix(rho_latent)
+
+    # Otherwise, interpret target_corr as Pearson in original space; use NORTA pairwise calibration
+    # Pre-generate base normals shared across all pairs and iterations for reproducibility and monotonic mapping
+    A = rng.standard_normal(calibration_samples)
+    B = rng.standard_normal(calibration_samples)
+    base_normals = (A, B)
+
+    rho_latent = np.eye(n)
+    for i in range(n):
+        for j in range(i + 1, n):
+            name_i = correlated_params[i]
+            name_j = correlated_params[j]
+            spec_i = param_dists[name_i]
+            spec_j = param_dists[name_j]
+            target = float(target_corr[i, j])
+            # Solve latent rho
+            rho_ij = _solve_latent_rho_for_pair(spec_i, spec_j, target, base_normals, name_i, name_j, tol=tol)
+            rho_latent[i, j] = rho_ij
+            rho_latent[j, i] = rho_ij
+
+    # Project to nearest valid correlation matrix
+    rho_latent = _nearest_correlation_matrix(rho_latent)
+    return rho_latent
+
+
+def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator, correlation_matrix: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Sample parameters, optionally applying correlations between specified parameters.
+    
+    Args:
+        param_dists: Parameter distribution specifications
+        rng: Random number generator
+        correlation_matrix: Optional correlation specification with format:
+            {
+                "parameters": ["param1", "param2", ...],  # List of parameter names
+                "correlation_matrix": [[1.0, 0.5, ...], [0.5, 1.0, ...], ...],  # Correlation matrix
+                "method": "gaussian_copula"  # Sampling method (only gaussian_copula supported)
+            }
+    """
     sampled: Dict[str, Any] = {}
+    
+    # Handle correlated parameters if specified
+    if correlation_matrix is not None:
+        correlated_params = correlation_matrix.get("parameters", [])
+        corr_matrix = correlation_matrix.get("correlation_matrix")
+        method = correlation_matrix.get("method", "gaussian_copula")
+        
+        if correlated_params and corr_matrix is not None:
+            # Validate correlation matrix
+            n_params = len(correlated_params)
+            if len(corr_matrix) != n_params:
+                raise ValueError(f"Correlation matrix must be {n_params}x{n_params} for {n_params} parameters")
+            for i, row in enumerate(corr_matrix):
+                if len(row) != n_params:
+                    raise ValueError(f"Correlation matrix row {i} must have {n_params} elements")
+            
+            # Convert to numpy array and validate
+            # Prefer a pre-calibrated latent correlation matrix if provided
+            latent_corr = correlation_matrix.get("latent_correlation_matrix")
+            corr_array = np.array(latent_corr if latent_corr is not None else corr_matrix, dtype=float)
+            if not np.allclose(corr_array, corr_array.T):
+                raise ValueError("Correlation matrix must be symmetric")
+            if not np.allclose(np.diag(corr_array), 1.0):
+                raise ValueError("Correlation matrix diagonal must be 1.0")
+            
+            # Check if correlation matrix is positive semi-definite
+            try:
+                np.linalg.cholesky(corr_array)
+            except np.linalg.LinAlgError:
+                raise ValueError("Correlation matrix must be positive semi-definite")
+            
+            # Sample correlated parameters using Gaussian copula
+            if method == "gaussian_copula":
+                # Generate multivariate normal samples
+                mv_samples = rng.multivariate_normal(np.zeros(n_params), corr_array)
+                
+                # Convert to uniform marginals using normal CDF
+                uniform_samples = np.array([0.5 * (1 + scipy.special.erf(x / np.sqrt(2))) for x in mv_samples])
+                
+                # Sample each correlated parameter using its distribution
+                for i, param_name in enumerate(correlated_params):
+                    if param_name not in param_dists:
+                        raise ValueError(f"Correlated parameter '{param_name}' not found in parameter distributions")
+                    
+                    spec = param_dists[param_name]
+                    val = _sample_from_dist_with_quantile(spec, uniform_samples[i], param_name)
+                    
+                    # Clip to bounds unless explicitly disabled
+                    clip_requested = spec.get("clip_to_bounds", True)
+                    if clip_requested:
+                        val = _clip_to_param_bounds(param_name, val)
+                    
+                    sampled[param_name] = val
+            elif method == "rank_correlation":
+                # Use rank correlation to preserve correlations across different distribution types
+                # Generate multivariate normal samples
+                mv_samples = rng.multivariate_normal(np.zeros(n_params), corr_array)
+                
+                # Convert to uniform marginals using normal CDF
+                uniform_samples = np.array([0.5 * (1 + scipy.special.erf(x / np.sqrt(2))) for x in mv_samples])
+                
+                # Sample each correlated parameter using its distribution with the uniform quantile
+                for i, param_name in enumerate(correlated_params):
+                    if param_name not in param_dists:
+                        raise ValueError(f"Correlated parameter '{param_name}' not found in parameter distributions")
+                    
+                    spec = param_dists[param_name]
+                    val = _sample_from_dist_with_quantile(spec, uniform_samples[i], param_name)
+                    
+                    # Clip to bounds unless explicitly disabled
+                    clip_requested = spec.get("clip_to_bounds", True)
+                    if clip_requested:
+                        val = _clip_to_param_bounds(param_name, val)
+                    
+                    sampled[param_name] = val
+            else:
+                raise ValueError(f"Unsupported correlation method: {method}")
+    
+    # Sample remaining independent parameters
     for name, spec in param_dists.items():
         if name == "automation_anchors":
             continue
+        if name in sampled:  # Skip if already sampled as part of correlated group
+            continue
+            
         val = _sample_from_dist(spec, rng, name)
 
         # Clip to bounds unless explicitly disabled, when bounds exist
@@ -431,7 +822,8 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dic
         model.compute_progress_trajectory(time_range, initial_progress)
         conn.send({"ok": True, "results": _to_jsonable(model.results)})
     except Exception as e:  # pragma: no cover
-        conn.send({"ok": False, "error": str(e)})
+        import traceback
+        conn.send({"ok": False, "error": str(e), "traceback": traceback.format_exc()})
     finally:
         try:
             conn.close()
@@ -471,7 +863,11 @@ def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: D
             pass
         if not isinstance(result, dict) or not result.get("ok"):
             err = None if not isinstance(result, dict) else result.get("error")
-            raise RuntimeError(err or "Unknown rollout failure")
+            traceback = None if not isinstance(result, dict) else result.get("traceback")
+            error_msg = err or "Unknown rollout failure"
+            if traceback:
+                error_msg += f"\nSubprocess traceback:\n{traceback}"
+            raise RuntimeError(error_msg)
         return result["results"]
     finally:
         try:
@@ -593,6 +989,7 @@ def main() -> None:
     # Avoid holding everything in memory: stream as NDJSON
     param_dists: Dict[str, Any] = user_cfg.get("parameters", {})
     ts_param_dists: Dict[str, Any] = user_cfg.get("time_series_parameters", {})
+    correlation_matrix: Optional[Dict[str, Any]] = user_cfg.get("correlation_matrix")
 
     # print(param_dists["saturation_horizon_minutes"])
 
@@ -606,13 +1003,37 @@ def main() -> None:
         "per_sample_timeout": per_sample_timeout,
     })
 
+    # Precompute latent correlation (Gaussian space) once, if correlations are configured
+    if correlation_matrix is not None:
+        try:
+            correlated_params = correlation_matrix.get("parameters", [])
+            target_corr = correlation_matrix.get("correlation_matrix")
+            if correlated_params and target_corr is not None:
+                # Allow specifying interpretation of provided correlations: 'pearson' (default) or 'spearman'
+                interpretation = str(correlation_matrix.get("correlation_type", correlation_matrix.get("interpretation", "pearson")))
+                calib_samples = int(correlation_matrix.get("calibration_samples", 20000))
+                # Use a derived RNG for calibration to keep overall reproducibility
+                calib_rng = np.random.default_rng(rng.integers(0, 2**32 - 1))
+                latent = _calibrate_gaussian_copula_latent_corr(
+                    param_dists,
+                    correlated_params,
+                    np.array(target_corr, dtype=float),
+                    calib_rng,
+                    interpretation=interpretation,
+                    calibration_samples=calib_samples,
+                )
+                correlation_matrix["latent_correlation_matrix"] = latent.tolist()
+        except Exception as e:
+            # If calibration fails, fall back to user-provided matrix; sampling will validate PSD
+            print(f"WARNING: correlation calibration failed; using provided correlation_matrix. Error: {e}")
+
     # Sampling and rollouts
     with samples_out_path.open("w", encoding="utf-8") as f_samples, rollouts_out_path.open("w", encoding="utf-8") as f_rollouts:
         iterable = range(int(num_samples))
         progress_iter = _tqdm(iterable, desc="Rollouts", unit="run") if _tqdm is not None else iterable
         for i in progress_iter:
             try:
-                sampled_params = _sample_parameter_dict(param_dists, rng)
+                sampled_params = _sample_parameter_dict(param_dists, rng, correlation_matrix)
                 # Make sure categorical defaults exist if user omitted
                 sampled_params.setdefault("horizon_extrapolation_type", cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE)
                 sampled_params.setdefault("taste_schedule_type", cfg.DEFAULT_TASTE_SCHEDULE_TYPE)
@@ -670,10 +1091,11 @@ def main() -> None:
                 f_rollouts.write(json.dumps({"sample_id": i, "parameters": _to_jsonable(sampled_params), "time_series_parameters": _to_jsonable(sampled_ts_params), "results": None, "error": str(e)}) + "\n")
                 f_rollouts.flush()
             except Exception as e:
+                import traceback
                 # Persist failure info to keep alignment between files
-                f_samples.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "error": str(e)}) + "\n")
+                f_samples.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "error": str(e), "traceback": traceback.format_exc()}) + "\n")
                 f_samples.flush()
-                f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "results": None, "error": str(e)}) + "\n")
+                f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "results": None, "error": str(e), "traceback": traceback.format_exc()}) + "\n")
                 f_rollouts.flush()
             # Manual progress update when tqdm is unavailable
             if _tqdm is None:
