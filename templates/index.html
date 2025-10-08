@@ -75,7 +75,7 @@
                         <th scope="col">Milestone</th>
                         <th scope="col">Time</th>
                         <th scope="col">2025-FLOP</th>
-                        <th scope="col">PM</th>
+                        <th scope="col">Uplift</th>
                       </tr>
                     </thead>
                     <tbody id="milestonesTableBody"></tbody>
@@ -3929,24 +3929,24 @@
           const sosMode = document.getElementById("sos_mode")?.checked || false;
           
           if (sosMode) {
-            // SOS mode: Milestone, Time, 2025-FLOP, Takeoff PM, Takeoff-start human-only years to next
+            // SOS mode: Milestone, Time, 2025-FLOP, Takeoff Uplift, Takeoff-start human-only years to next
             tableHead.innerHTML = `
               <tr>
                 <th scope="col">Milestone</th>
                 <th scope="col">Time</th>
                 <th scope="col">2025-FLOP</th>
-                <th scope="col">Takeoff PM</th>
+                <th scope="col">Takeoff Uplift</th>
                 <th scope="col">Takeoff-start human-only years to next</th>
               </tr>
             `;
           } else {
-            // Normal mode: Milestone, Time, 2025-FLOP, PM
+            // Normal mode: Milestone, Time, 2025-FLOP, Uplift
             tableHead.innerHTML = `
               <tr>
                 <th scope="col">Milestone</th>
                 <th scope="col">Time</th>
                 <th scope="col">2025-FLOP</th>
-                <th scope="col">PM</th>
+                <th scope="col">Uplift</th>
               </tr>
             `;
           }
@@ -3990,7 +3990,7 @@
             tr.appendChild(tdEC);
             
             if (sosMode) {
-              // SOS mode: add Takeoff PM and human-only years columns
+              // SOS mode: add Takeoff Uplift and human-only years columns
               const tdTakeoffPM = document.createElement("td");
               const tdHumanYears = document.createElement("td");
               
@@ -4006,7 +4006,7 @@
               tr.appendChild(tdTakeoffPM);
               tr.appendChild(tdHumanYears);
             } else {
-              // Normal mode: add PM column only
+              // Normal mode: add Uplift column only
               const tdMult = document.createElement("td");
               tdMult.textContent =
                 progressMult != null && isFinite(progressMult)
