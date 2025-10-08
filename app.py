@@ -374,8 +374,8 @@ def plot_coding_labor_with_compute(fig, times, serial_coding_labors, row, col, s
         sc_time = results['sc_time']
         sc_progress = results.get('sc_progress_level')
         if sc_time >= times.min() and sc_time <= times.max():
-            y_min = min(coding_labors.min(), min(results.get('discounted_exp_compute', [coding_labors.min()])))
-            y_max = max(coding_labors.max(), max(results.get('discounted_exp_compute', [coding_labors.max()])))
+            y_min = min(serial_coding_labors.min(), min(results.get('discounted_exp_compute', [serial_coding_labors.min()])))
+            y_max = max(serial_coding_labors.max(), max(results.get('discounted_exp_compute', [serial_coding_labors.max()])))
             fig.add_trace(
                 go.Scatter(x=[sc_time, sc_time], 
                           y=[y_min, y_max],
@@ -943,6 +943,66 @@ def plot_ai_vs_aggregate_research_taste(fig, ai_research_taste, aggregate_resear
         row=row, col=col
     )
 
+def plot_exp_cap_mult_with_infinite_compute(fig, times, exp_cap_mult_with_infinite_compute, row, col):
+    """Plot experiment capacity multiplier with infinite compute"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=exp_cap_mult_with_infinite_compute.tolist(),
+                  name='Exp Cap Mult (Infinite Compute)',
+                  line=dict(color='#7f7f7f', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[exp_cap_mult_with_infinite_compute.min(), exp_cap_mult_with_infinite_compute.max()],
+                          name='ACD-AI Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
+def plot_exp_cap_mult_with_infinite_labor(fig, times, exp_cap_mult_with_infinite_labor, row, col):
+    """Plot experiment capacity multiplier with infinite labor"""
+    fig.add_trace(
+        go.Scatter(x=times.tolist(), y=exp_cap_mult_with_infinite_labor.tolist(),
+                  name='Exp Cap Mult (Infinite Labor)',
+                  line=dict(color='#c7c7c7', width=3),
+                  mode='lines+markers', marker=dict(size=4),
+                  customdata=[format_decimal_year_to_month_year(t) for t in times],
+                  hovertemplate='Year: %{customdata}<br>%{fullData.name}: %{y}<extra></extra>'),
+        row=row, col=col
+    )
+    # Add horizontal reference line at y=1
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", opacity=0.5, row=row, col=col)
+    
+    # Add vertical line for SC time if available
+    results = session_data.get('results')
+    if results and results.get('sc_time') is not None:
+        sc_time = results['sc_time']
+        sc_progress = results.get('sc_progress_level')
+        if sc_time >= times.min() and sc_time <= times.max():
+            fig.add_trace(
+                go.Scatter(x=[sc_time, sc_time], 
+                          y=[exp_cap_mult_with_infinite_labor.min(), exp_cap_mult_with_infinite_labor.max()],
+                          name='ACD-AI Time',
+                          line=dict(color='#d62728', width=2, dash='dash'),
+                          mode='lines',
+                          hovertemplate=f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<br>ACD-AI Progress: {sc_progress:.3f}<extra></extra>' if sc_progress else f'ACD-AI Time: {format_decimal_year_to_month_year(sc_time)}<extra></extra>'),
+                row=row, col=col
+            )
+
 def format_time_duration(minutes):
     """Convert minutes to appropriate time unit string"""
     if minutes < 1:
@@ -1480,6 +1540,8 @@ def get_tab_configurations():
         'plot_all_ai_multipliers': lambda fig, data, r, c: plot_all_ai_multipliers(fig, data['metrics']['times'], data['metrics']['ai_coding_labor_multipliers'], data['metrics']['ai_research_stock_multipliers'], data['metrics']['ai_software_progress_multipliers'], data['metrics']['ai_overall_progress_multipliers'], r, c),
         'plot_human_only_progress_rate': lambda fig, data, r, c: plot_human_only_progress_rate(fig, data['metrics']['times'], data['metrics']['human_only_progress_rates'], r, c),
         'plot_automation_multiplier': lambda fig, data, r, c: plot_automation_multiplier(fig, data['metrics']['times'], data['metrics']['automation_multipliers'], r, c),
+        'plot_exp_cap_mult_with_infinite_compute': lambda fig, data, r, c: plot_exp_cap_mult_with_infinite_compute(fig, data['metrics']['times'], data['metrics']['exp_cap_mult_with_infinite_compute'], r, c),
+        'plot_exp_cap_mult_with_infinite_labor': lambda fig, data, r, c: plot_exp_cap_mult_with_infinite_labor(fig, data['metrics']['times'], data['metrics']['exp_cap_mult_with_infinite_labor'], r, c),
     }
     
     # Generate tab configurations from centralized config

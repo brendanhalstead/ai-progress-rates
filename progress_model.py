@@ -3338,6 +3338,11 @@ class ProgressModel:
                 exp_capacity = current_research_effort / aggregate_research_taste if aggregate_research_taste > 0 else 0.0
                 experiment_capacity.append(exp_capacity if np.isfinite(exp_capacity) else 0.0)
 
+                exp_cap_with_infinite_compute = (1-self.params.alpha_experiment_capacity) ** (1/self.params.rho_experiment_capacity) * serial_coding_labor
+                exp_cap_with_infinite_labor = self.params.alpha_experiment_capacity ** (1/self.params.rho_experiment_capacity) * discounted_exp_compute_val
+                exp_cap_mult_with_infinite_labor.append(exp_cap_with_infinite_labor / exp_capacity if exp_capacity > 0 else 0.0)
+                exp_cap_mult_with_infinite_compute.append(exp_cap_with_infinite_compute / exp_capacity if exp_capacity > 0 else 0.0)
+                
                 # RESEARCH EFFORT
                 research_effort_present_resources = compute_research_effort(
                     present_day_experiment_compute, serial_coding_labor_with_present_resources, 
@@ -3674,6 +3679,8 @@ class ProgressModel:
             'top_taste_num_sds': top_taste_num_sds,  # Number of SDs the top percentile represents
             'f_multiplier_per_sd': f_multiplier_per_sd,  # Multiplier per standard deviation
             'slope_times_log_f': slope_times_log_f,  # s * log10(f), where s is SDs per effective OOM
+            'exp_cap_mult_with_infinite_labor': exp_cap_mult_with_infinite_labor,
+            'exp_cap_mult_with_infinite_compute': exp_cap_mult_with_infinite_compute,
         }
         self.results['milestones'] = self.compute_milestones()
         # logger.info(f"Computed trajectory from {time_range[0]} to {time_range[1]}")
@@ -3770,7 +3777,7 @@ class ProgressModel:
             next_RS = milestones_list[i+1][1]['research_stock']
             if self.results['takeoff_progress_multipliers']:
                 milestones[milestones_list[i][0]]['human_only_years_to_next_milestone'] = (next_RS - this_RS) / self.human_only_results['takeoff_start_stats']['research_effort']
-        print(milestones_list)
+        # print(milestones_list)
         return milestones
     
     def evaluate_anchor_constraint(self, constraint: AnchorConstraint) -> float:

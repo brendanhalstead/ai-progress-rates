@@ -469,6 +469,18 @@ PLOT_METADATA = {
         'x_axis': {'title': 'Time', 'type': 'linear'},
         'y_axis': {'title': 'Automation Multiplier', 'type': 'linear'},
         'data_keys': ['times', 'automation_multipliers']
+    },
+    'plot_exp_cap_mult_with_infinite_compute': {
+        'title': 'Experiment Capacity Multiplier (Infinite Compute)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'exp_cap_mult_with_infinite_compute']
+    },
+    'plot_exp_cap_mult_with_infinite_labor': {
+        'title': 'Experiment Capacity Multiplier (Infinite Labor)',
+        'x_axis': {'title': 'Time', 'type': 'linear'},
+        'y_axis': {'title': 'Multiplier (log scale)', 'type': 'log'},
+        'data_keys': ['times', 'exp_cap_mult_with_infinite_labor']
     }
 }
 
@@ -647,12 +659,13 @@ This is meant to be a clean measure of AI R&D capabilities, and depends on three
     'other_metrics': {
         'id': 'other-metrics',
         'name': 'Other Metrics / Debug',
-        'rows': 2, 'cols': 2,
+        'rows': 3, 'cols': 2,
         'plots': [
             {'function': 'plot_ai_coding_labor_multiplier', 'position': (1, 1)},
             {'function': 'plot_human_only_progress_rate', 'position': (1, 2)},
             {'function': 'plot_horizon_lengths_vs_progress', 'position': (2, 1)},
-            
+            {'function': 'plot_exp_cap_mult_with_infinite_compute', 'position': (2, 2)},
+            {'function': 'plot_exp_cap_mult_with_infinite_labor', 'position': (3, 1)},
         ],
         'explanation': """
 ## Additional Metrics and Multipliers
