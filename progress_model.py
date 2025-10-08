@@ -3180,6 +3180,22 @@ class ProgressModel:
             except Exception as e:
                 logger.warning(f"Failed to convert taste slope for progress-year mode: {e}")
 
+        # Convert coding automation efficiency slope to OOMs/progress-unit
+        # This conversion is always applied (OOMs/progress-year → OOMs/OOM)
+        self._original_automation_efficiency_slope = self.params.coding_automation_efficiency_slope
+        try:
+            anchor_progress_rate = self.human_only_results['anchor_stats']['progress_rate']
+            if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate) and anchor_progress_rate > 0:
+                # Convert from OOMs/progress-year to OOMs/progress-unit by dividing by anchor_progress_rate
+                original_eff_slope = self.params.coding_automation_efficiency_slope
+                converted_eff_slope = original_eff_slope / anchor_progress_rate
+                logger.info(f"Converting automation efficiency slope from {original_eff_slope:.6f} OOMs/progress-year to {converted_eff_slope:.6f} OOMs/progress-unit (anchor rate: {anchor_progress_rate:.6f})")
+                self.params.coding_automation_efficiency_slope = converted_eff_slope
+            else:
+                logger.warning(f"Invalid anchor_progress_rate for automation efficiency slope conversion: {anchor_progress_rate}")
+        except Exception as e:
+            logger.warning(f"Failed to convert automation efficiency slope: {e}")
+
         # compute automation fraction at anchor time by solving for lower anchor via AutomationModel
         _t_anchor_solver_start = time.perf_counter()
         anchor_aut_frac = solve_lower_anchor_via_automation_model(
@@ -3599,7 +3615,19 @@ class ProgressModel:
                     ai_taste_slope_per_anchor_progress_year = float(self.params.ai_research_taste_slope) * float(anchor_progress_rate)
         except Exception as e:
             logger.warning(f"Failed computing taste slope conversions: {e}")
-        
+
+        # Compute automation efficiency slope in OOMs per anchor-progress-year (OOMs/year at anchor)
+        automation_efficiency_slope_per_anchor_progress_year = None
+        automation_efficiency_slope_per_effective_oom = None
+        try:
+            if anchor_progress_rate is not None and np.isfinite(anchor_progress_rate):
+                # Always show original input (which is in OOMs/progress-year)
+                automation_efficiency_slope_per_anchor_progress_year = float(self._original_automation_efficiency_slope)
+                # And the converted value (in OOMs/OOM)
+                automation_efficiency_slope_per_effective_oom = float(self.params.coding_automation_efficiency_slope)
+        except Exception as e:
+            logger.warning(f"Failed computing automation efficiency slope conversions: {e}")
+
         # Compute top taste percentile metrics for display
         top_taste_percentile = self.params.top_percentile
         top_taste_value = None
@@ -3670,6 +3698,8 @@ class ProgressModel:
             'instantaneous_anchor_doubling_time_years': instantaneous_anchor_doubling_time_years,  # Instantaneous doubling time of horizon at anchor (years)
             'ai_research_taste_slope_per_anchor_progress_year': ai_taste_slope_per_anchor_progress_year,  # SD per anchor-progress-year
             'ai_research_taste_slope_per_effective_oom': ai_taste_slope_per_effective_oom,  # SD per effective OOM
+            'automation_efficiency_slope_per_anchor_progress_year': automation_efficiency_slope_per_anchor_progress_year,  # OOMs per anchor-progress-year
+            'automation_efficiency_slope_per_effective_oom': automation_efficiency_slope_per_effective_oom,  # OOMs per effective OOM
             'input_time_series': {
                 'time': self.data.time,
                 'L_HUMAN': self.data.L_HUMAN,

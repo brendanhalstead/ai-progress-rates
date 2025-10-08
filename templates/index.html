@@ -375,12 +375,12 @@
                   </div>
                 </div>
 
-                <!-- Coding Automation Anchors -->
+                <!-- Coding Automation -->
                 <div class="param-group">
                   <div
                     class="d-flex justify-content-between align-items-center mb-2"
                   >
-                    <h6 class="text-muted mb-0">Coding Automation Anchors</h6>
+                    <h6 class="text-muted mb-0">Coding Automation</h6>
                     <button
                       class="btn btn-sm btn-outline-secondary"
                       type="button"
@@ -459,7 +459,7 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label" for="coding_automation_efficiency_slope">
-                        Automation Efficiency Slope: <span id="coding_automation_efficiency_slope_val">Loading...</span>
+                        Automation Efficiency Slope: <span id="coding_automation_efficiency_slope_val">Loading...</span> OOMs/progress-year
                       </label>
                       <input
                         type="range"
@@ -467,17 +467,17 @@
                         id="coding_automation_efficiency_slope"
                         step="0.01"
                       />
-                      <small class="text-muted">Number of OOMs of automation efficiency gained with each additional OOM of effective compute.</small>
+                      <small class="text-muted" id="coding_automation_efficiency_slope_info">Number of OOMs of automation efficiency gained per progress-year (at anchor point).</small>
                     </div>
                   </div>
                 </div>
-                <!-- Parallel Coding Labor Parameters -->
+                <!-- Parallel Coding Labor CES -->
                 <div class="param-group">
                   <div
                     class="d-flex justify-content-between align-items-center mb-2"
                   >
                     <h6 class="text-muted mb-0">
-                      Parallel Coding Labor CES Parameters
+                      Parallel Coding Labor CES
                     </h6>
                     <button
                       class="btn btn-sm btn-outline-secondary"
@@ -536,7 +536,7 @@
                     class="d-flex justify-content-between align-items-center mb-2"
                   >
                     <h6 class="text-muted mb-0">
-                      Experiment Capacity CES Parameters
+                      Experiment Capacity CES
                     </h6>
                     <button
                       class="btn btn-sm btn-outline-secondary"
@@ -719,12 +719,12 @@
                   </div>
                 </div>
 
-                <!-- AI Research Taste Anchors -->
+                <!-- AI Research Taste -->
                 <div class="param-group">
                   <div
                     class="d-flex justify-content-between align-items-center mb-2"
                   >
-                    <h6 class="text-muted mb-0">AI Research Taste Anchors</h6>
+                    <h6 class="text-muted mb-0">AI Research Taste</h6>
                     <button
                       class="btn btn-sm btn-outline-secondary"
                       type="button"
@@ -756,29 +756,7 @@
                     </div>
 
                     <div class="row">
-                      <div class="col-6" id="sc_taste_fraction_group">
-                        <label class="param-label"
-                          >ACD-AI Research Taste:
-                          <span id="ai_research_taste_at_coding_automation_anchor_val"
-                            >Loading...</span
-                          ></label
-                        >
-                        <input
-                          type="range"
-                          class="range-input form-range"
-                          id="ai_research_taste_at_coding_automation_anchor"
-                          step="0.01"
-                        />
-                        <small class="text-muted"
-                          >Research Taste at ACD-AI (units: multiplier on research
-                          effort)</small
-                        >
-                      </div>
-                      <div
-                        class="col-6"
-                        id="sc_taste_sd_group"
-                        style="display: none"
-                      >
+                      <div class="col-12" id="sc_taste_sd_group">
                         <label class="param-label"
                           >ACD-AI Research Taste (SD):
                           <span
@@ -872,7 +850,7 @@
                     class="d-flex justify-content-between align-items-center mb-2"
                   >
                     <h6 class="text-muted mb-0">
-                      Effective Compute Parameters
+                      Effective Compute
                     </h6>
                     <button
                       class="btn btn-sm btn-outline-secondary"
@@ -1129,7 +1107,7 @@
                 </button>
 
                 <div class="param-group">
-                  <h6 class="text-muted">Parameters to Optimize</h6>
+                  <h6 class="text-muted">To Optimize</h6>
                   <p>
                     <small
                       >Uncheck a parameter to hold it fixed at its current value
@@ -1572,30 +1550,8 @@
 
       function updateTasteUnitsVisibility() {
         const typeSelect = document.getElementById("taste_schedule_type");
-        const scTasteFractionGroup = document.getElementById(
-          "sc_taste_fraction_group"
-        );
-        const scTasteSdGroup = document.getElementById("sc_taste_sd_group");
-        if (!typeSelect || !scTasteFractionGroup || !scTasteSdGroup) return;
+        if (!typeSelect) return;
         const selected = typeSelect.value;
-        const useSD =
-          selected === "SDs per effective OOM" ||
-          selected === "SDs per progress-year";
-        scTasteSdGroup.style.display = useSD ? "" : "none";
-        scTasteFractionGroup.style.display = useSD ? "none" : "";
-
-        // Adjust column widths to prevent squashing
-        if (useSD) {
-          scTasteSdGroup.classList.remove("col-6");
-          scTasteSdGroup.classList.add("col-12");
-          scTasteFractionGroup.classList.remove("col-6");
-          scTasteFractionGroup.classList.add("col-12");
-        } else {
-          scTasteSdGroup.classList.remove("col-12");
-          scTasteSdGroup.classList.add("col-6");
-          scTasteFractionGroup.classList.remove("col-12");
-          scTasteFractionGroup.classList.add("col-6");
-        }
 
         const slopeInfoEl = document.getElementById(
           "ai_research_taste_slope_info"
@@ -3892,6 +3848,24 @@
               )} ${units}`;
             } else {
               slopeInfoEl.textContent = "Steepness of research taste curve";
+            }
+          }
+
+          // Update Automation Efficiency Slope info text under the slider
+          const effSlopeInfoEl = document.getElementById(
+            "coding_automation_efficiency_slope_info"
+          );
+          if (effSlopeInfoEl) {
+            // Always show the converted OOMs/OOM value (since input is always OOMs/progress-year)
+            const effSlopePerOOM = summary.automation_efficiency_slope_per_effective_oom;
+
+            if (effSlopePerOOM !== undefined && effSlopePerOOM !== null && isFinite(effSlopePerOOM)) {
+              effSlopeInfoEl.textContent = `Slope at present: ${fmt(
+                effSlopePerOOM,
+                2
+              )} OOMs/effective-OOM`;
+            } else {
+              effSlopeInfoEl.textContent = "Number of OOMs of automation efficiency gained per progress-year (at anchor point).";
             }
           }
 

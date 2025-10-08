@@ -2044,6 +2044,10 @@ def compute_model():
         summary['ai_research_taste_slope_per_anchor_progress_year'] = float(model.results['ai_research_taste_slope_per_anchor_progress_year'])
     if model.results.get('ai_research_taste_slope_per_effective_oom') is not None:
         summary['ai_research_taste_slope_per_effective_oom'] = float(model.results['ai_research_taste_slope_per_effective_oom'])
+    if model.results.get('automation_efficiency_slope_per_anchor_progress_year') is not None:
+        summary['automation_efficiency_slope_per_anchor_progress_year'] = float(model.results['automation_efficiency_slope_per_anchor_progress_year'])
+    if model.results.get('automation_efficiency_slope_per_effective_oom') is not None:
+        summary['automation_efficiency_slope_per_effective_oom'] = float(model.results['automation_efficiency_slope_per_effective_oom'])
 
     # Add anchor progress rate if available
     if model.results.get('anchor_progress_rate') is not None:
@@ -2166,8 +2170,8 @@ def get_parameter_config():
                 },
                 'coding_automation_efficiency_slope': {
                     'name': 'Automation Efficiency Slope',
-                    'description': 'Slope of automation multiplier above threshold (η ∝ E^θ)',
-                    'units': 'dimensionless'
+                    'description': 'OOMs of automation efficiency per progress-year (converted to per-progress-unit using anchor rate)',
+                    'units': 'OOMs/progress-year'
                 },
                 'optimal_ces_eta_init': {
                     'name': 'Optimal CES η_init',
