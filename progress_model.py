@@ -3202,8 +3202,8 @@ class ProgressModel:
         
         # SOS MODE
         takeoff_start_human_only_stats = None
-        if self.params.sos_mode and progress_values[-1] > self.params.progress_at_sc:
-            full_automation_time = np.interp(self.params.progress_at_sc, progress_values, times)
+        if self.params.sos_mode and progress_values[-1] > self.params.progress_at_aa:
+            full_automation_time = np.interp(self.params.progress_at_aa, progress_values, times)
             takeoff_start_human_only_stats = {
                 'time': full_automation_time,
                 'human_labor': _log_interp(full_automation_time, self.data.time, self.data.L_HUMAN),
@@ -3705,31 +3705,31 @@ class ProgressModel:
                 'target': (cfg.SERIAL_LABOR_MULT_EXTRA_FOR_AI2027_SC * 30) ** (1 / self.params.parallel_penalty) * 30,
                 'interpolation_type': 'exponential',
             },
-            '5x-AIR': {
+            'AIR-5x': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 5,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 5,
             },
-            '25x-AIR': {
+            'AIR-25x': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 25,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 25
             },
-            '250x-AIR': {
+            'AIR-250x': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 250,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 250
             },
-            '2000x-AIR': {
+            'AIR-2000x': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 2000,
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 2000
             },
-            '10000x-AIR': {
+            'AIR-10000x': {
                 'metric': 'ai_sw_progress_mult_ref_present_day',
                 'target': 10000,
                 'interpolation_type': 'exponential',

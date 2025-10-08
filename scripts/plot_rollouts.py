@@ -1277,12 +1277,12 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     # Milestone time histograms
     milestones = [
         "ACD-AI",
-        "5x-AIR",
+        "AIR-5x",
         "AI2027-SC",
         "(Expensive, threshold only considers taste) SAR",
-        "25x-AIR",
+        "AIR-25x",
         "(Expensive, threshold only considers taste) SIAR",
-        "250x-AIR"
+        "AIR-250x"
     ]
 
     for milestone in milestones:
@@ -1307,7 +1307,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:25x-AIR,25x-AIR:250x-AIR"
+    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:AIR-25x,AIR-25x:AIR-250x"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
@@ -1341,8 +1341,8 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     overlay_milestones = [
         "ACD-AI",
         "AI2027-SC",
-        "25x-AIR",
-        "250x-AIR"
+        "AIR-25x",
+        "AIR-250x"
     ]
     out_path = output_dir / "milestone_pdfs_overlay.png"
     plot_milestone_pdfs_overlay(
@@ -1373,10 +1373,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ymax-years", type=float, default=None, help="Maximum y-axis (years, log scale) for transition boxplot")
     parser.add_argument("--exclude-inf-from-stats", action="store_true", help="Exclude 'not achieved' (treated as +inf) from the stats panel and the plot")
     parser.add_argument("--inf-years", type=float, default=100.0, help="Where to plot 'not achieved' as points on the y-axis (years)")
-    parser.add_argument("--filter-milestone", type=str, default=None, help="Only include rollouts where this milestone was achieved by --filter-by-year (e.g., '5x-AIR')")
+    parser.add_argument("--filter-milestone", type=str, default=None, help="Only include rollouts where this milestone was achieved by --filter-by-year (e.g., 'AIR-5x')")
     parser.add_argument("--filter-by-year", type=float, default=None, help="Decimal year cutoff for --filter-milestone (e.g., 2029.5)")
     # Milestone scatter/heatmap options
-    parser.add_argument("--scatter-pair", type=str, default=None, help="Pair for scatter/heatmap FROM:TO (e.g., '5x-AIR:2000x-AIR')")
+    parser.add_argument("--scatter-pair", type=str, default=None, help="Pair for scatter/heatmap FROM:TO (e.g., 'AIR-5x:AIR-2000x')")
     parser.add_argument("--scatter-kind", type=str, choices=["hex", "hist2d", "scatter"], default="hex", help="Density visualization type")
     parser.add_argument("--gridsize", type=int, default=50, help="Grid size for hex/hist2d density")
     parser.add_argument("--point-size", type=float, default=8.0, help="Point size for scatter overlay")
@@ -1529,7 +1529,7 @@ def main() -> None:
 
     if args.mode == "milestone_scatter":
         if not args.scatter_pair:
-            raise ValueError("--scatter-pair is required for milestone_scatter mode (e.g., '5x-AIR:2000x-AIR')")
+            raise ValueError("--scatter-pair is required for milestone_scatter mode (e.g., 'AIR-5x:AIR-2000x')")
         if ":" not in args.scatter_pair:
             raise ValueError("--scatter-pair must be formatted as FROM:TO")
         from_name, to_name = [s.strip() for s in args.scatter_pair.split(":", 1)]
