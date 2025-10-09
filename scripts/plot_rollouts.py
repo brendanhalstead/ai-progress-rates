@@ -1614,8 +1614,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         plot_x_years_in_1_year_histogram(
             x_values,
             out_path,
-            bins=50,
-            title="Maximum 'X Years in 1 Year' Distribution"
+            bins=50
         )
         # Print statistics
         arr = np.asarray(x_values, dtype=float)
