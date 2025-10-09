@@ -529,12 +529,13 @@ def _read_milestone_transition_durations(
     pairs: List[Tuple[str, str]],
     filter_milestone: Optional[str] = None,
     filter_by_year: Optional[float] = None,
-) -> Tuple[List[str], List[List[float]], List[int], List[int], List[int], Optional[float]]:
+) -> Tuple[List[str], List[List[float]], List[List[float]], List[int], List[int], List[int], Optional[float]]:
     """For each pair (A,B), compute finite durations B.time - A.time.
 
     Returns:
         labels: ["A to B", ...]
         durations_per_pair: list of finite durations arrays (years, only where both achieved in order)
+        durations_with_censored_per_pair: list of durations including censored (B not achieved uses sim_end)
         num_b_not_achieved_per_pair: count where A achieved but B not achieved
         num_b_before_a_per_pair: count where both achieved but B came before A
         total_a_achieved_per_pair: number of rollouts where A was achieved for each pair
@@ -542,6 +543,7 @@ def _read_milestone_transition_durations(
     """
     labels: List[str] = [f"{a} to {b}" for a, b in pairs]
     durations_per_pair: List[List[float]] = [[] for _ in pairs]
+    durations_with_censored_per_pair: List[List[float]] = [[] for _ in pairs]
     num_b_not_achieved: List[int] = [0 for _ in pairs]
     num_b_before_a: List[int] = [0 for _ in pairs]
     total_a_achieved: List[int] = [0 for _ in pairs]
@@ -620,12 +622,20 @@ def _read_milestone_transition_durations(
                 if tb is None:
                     # Second milestone not achieved
                     num_b_not_achieved[idx] += 1
+                    # For censored data, use simulation end time
+                    if simulation_end is not None and simulation_end > ta:
+                        censored_dur = float(simulation_end - ta)
+                        durations_with_censored_per_pair[idx].append(censored_dur)
                     continue
 
                 dur = float(tb - ta)
                 if not np.isfinite(dur):
                     # Treat non-finite as B not achieved
                     num_b_not_achieved[idx] += 1
+                    # For censored data, use simulation end time
+                    if simulation_end is not None and simulation_end > ta:
+                        censored_dur = float(simulation_end - ta)
+                        durations_with_censored_per_pair[idx].append(censored_dur)
                     continue
 
                 if dur <= 0.0:
@@ -634,9 +644,10 @@ def _read_milestone_transition_durations(
                     continue
 
                 durations_per_pair[idx].append(dur)
+                durations_with_censored_per_pair[idx].append(dur)
 
     typical_max_duration = float(np.median(max_durations)) if max_durations else None
-    return labels, durations_per_pair, num_b_not_achieved, num_b_before_a, total_a_achieved, typical_max_duration
+    return labels, durations_per_pair, durations_with_censored_per_pair, num_b_not_achieved, num_b_before_a, total_a_achieved, typical_max_duration
 
 
 def _compute_x_years_in_1_year(
@@ -935,6 +946,7 @@ def _get_year_tick_values_and_labels(ymin: float, ymax: float) -> Tuple[List[flo
 def plot_milestone_transition_boxplot(
     labels: List[str],
     durations_per_pair: List[List[float]],
+    durations_with_censored_per_pair: List[List[float]],
     num_b_not_achieved_per_pair: List[int],
     num_b_before_a_per_pair: List[int],
     total_per_pair: List[int],
@@ -953,11 +965,14 @@ def plot_milestone_transition_boxplot(
         raise ValueError("Mismatched inputs for boxplot")
 
     # Prepare data groups. Finite groups are the true finite durations.
-    # Boxes only show achieved durations, issues shown as separate scatter points.
+    # Censored groups include both achieved and censored (not achieved -> sim_end)
     finite_groups: List[np.ndarray] = []
+    censored_groups: List[np.ndarray] = []
     global_min = np.inf
     global_max = 0.0
-    for arr in durations_per_pair:
+
+    for arr, arr_censored in zip(durations_per_pair, durations_with_censored_per_pair):
+        # Finite only
         a = np.asarray(arr, dtype=float)
         if a.size:
             a = a[np.isfinite(a) & (a > 0)]
@@ -965,6 +980,15 @@ def plot_milestone_transition_boxplot(
         if a.size:
             global_min = min(global_min, float(a.min()))
             global_max = max(global_max, float(a.max()))
+
+        # Including censored
+        ac = np.asarray(arr_censored, dtype=float)
+        if ac.size:
+            ac = ac[np.isfinite(ac) & (ac > 0)]
+        censored_groups.append(ac)
+        if ac.size:
+            global_min = min(global_min, float(ac.min()))
+            global_max = max(global_max, float(ac.max()))
 
     if not np.isfinite(global_min):
         raise ValueError("No finite durations found to plot")
@@ -982,22 +1006,59 @@ def plot_milestone_transition_boxplot(
     # Adjust plot area to leave room for stats panel on right
     plt.subplots_adjust(right=0.68)
 
-    # Boxplot - only show achieved durations in the boxes
+    # Interleave the two sets of boxes: achieved only and including censored
+    # For each pair, we'll have two boxes side by side
+    all_groups = []
+    all_positions = []
+    all_labels = []
+    colors = []
+
+    for i, (label, fg, cg) in enumerate(zip(labels, finite_groups, censored_groups)):
+        # Position boxes with spacing: pairs at 3*i and 3*i+1, with gap to next pair
+        pos_achieved = 3 * i + 0.6
+        pos_censored = 3 * i + 1.4
+
+        all_groups.append(fg)
+        all_positions.append(pos_achieved)
+        colors.append((0.5, 0.8, 0.5, 0.7))  # Green for achieved only
+
+        all_groups.append(cg)
+        all_positions.append(pos_censored)
+        colors.append((0.5, 0.5, 0.8, 0.7))  # Blue for including censored
+
+        # Label in the middle of the two boxes
+        all_labels.append(label if i == 0 else "")
+        all_labels.append("")
+
+    # Create boxplot with custom positions
     bp = plt.boxplot(
-        finite_groups,
-        labels=labels,
+        all_groups,
+        positions=all_positions,
         showfliers=True,
         patch_artist=True,
-        widths=0.6,
+        widths=0.7,
         whis=1.5,
     )
 
-    # Styling
-    for patch in bp['boxes']:
-        patch.set(facecolor=(0.5, 0.8, 0.5, 0.7), edgecolor='black')
+    # Styling with different colors
+    for patch, color in zip(bp['boxes'], colors):
+        patch.set(facecolor=color, edgecolor='black')
     for element in ['whiskers', 'caps', 'medians', 'fliers']:
         for line in bp[element]:
             line.set(color='black', linewidth=1.2)
+
+    # Set custom x-tick labels at the center of each pair
+    tick_positions = [3 * i + 1.0 for i in range(len(labels))]
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(labels)
+
+    # Add legend
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=(0.5, 0.8, 0.5, 0.7), edgecolor='black', label='Both achieved'),
+        Patch(facecolor=(0.5, 0.5, 0.8, 0.7), edgecolor='black', label='Including censored')
+    ]
+    ax.legend(handles=legend_elements, loc='upper left')
 
     plt.yscale('log')
     ticks, tick_labels = _get_year_tick_values_and_labels(ymin, ymax)
@@ -1017,23 +1078,30 @@ def plot_milestone_transition_boxplot(
         panel_lines.append(f"Condition: {condition_text}")
         panel_lines.append("")
 
-    for lbl, arr, n_not_achieved, n_before, total_a in zip(labels, finite_groups, num_b_not_achieved_per_pair, num_b_before_a_per_pair, total_per_pair):
+    for lbl, arr, arr_c, n_not_achieved, n_before, total_a in zip(labels, finite_groups, censored_groups, num_b_not_achieved_per_pair, num_b_before_a_per_pair, total_per_pair):
         panel_lines.append(lbl)
-        # Only use achieved data for stats
+
+        # Stats for achieved only
+        panel_lines.append("  Both achieved:")
         if arr.size == 0:
-            panel_lines.append("  (none achieved in order)")
-            panel_lines.append("")
-            continue
+            panel_lines.append("    (none)")
+        else:
+            q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+            panel_lines.append(f"    10/50/90: {_format_years_value(float(q10))}/{_format_years_value(float(q50))}/{_format_years_value(float(q90))}")
+            pct_achieved = 100.0 * arr.size / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"    ({pct_achieved:.1f}% of runs)")
 
-        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+        # Stats for including censored
+        panel_lines.append("  Including censored:")
+        if arr_c.size == 0:
+            panel_lines.append("    (none)")
+        else:
+            q10_c, q50_c, q90_c = np.quantile(arr_c, [0.1, 0.5, 0.9])
+            panel_lines.append(f"    10/50/90: {_format_years_value(float(q10_c))}/{_format_years_value(float(q50_c))}/{_format_years_value(float(q90_c))}")
+            pct_total = 100.0 * arr_c.size / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"    ({pct_total:.1f}% of runs)")
 
-        panel_lines.append(f"  10th: {_format_years_value(float(q10))}")
-        panel_lines.append(f"  50th: {_format_years_value(float(q50))}")
-        panel_lines.append(f"  90th: {_format_years_value(float(q90))}")
-
-        # Show issue counts as percentages
-        pct_achieved = 100.0 * arr.size / total_a if total_a > 0 else 0.0
-        panel_lines.append(f"  ({pct_achieved:.1f}% achieved in order)")
+        # Show issue counts
         if n_not_achieved > 0:
             milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
             pct_not_achieved = 100.0 * n_not_achieved / total_a if total_a > 0 else 0.0
@@ -1537,7 +1605,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
-    labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
+    labels, durations, durations_censored, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
         rollouts_file,
         pairs,
         filter_milestone=None,
@@ -1548,6 +1616,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         plot_milestone_transition_boxplot(
             labels,
             durations,
+            durations_censored,
             num_b_not_achieved,
             num_b_before_a,
             total_per_pair,
@@ -1583,29 +1652,41 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     try:
         import sys
         sys.path.insert(0, str(rollouts_file.parent.parent / "scripts"))
-        from sensitivity_analysis import analyze
+        from sensitivity_analysis import analyze_milestone_transitions
 
         # Sensitivity analysis: ACD-AI to AIR-25x
-        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x...")
-        analyze(
+        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x (both achieved only)...")
+        analyze_milestone_transitions(
             rollouts_file,
-            out_json=output_dir / "sensitivity_ACD_AI_to_AIR_25x.json",
-            make_plots=True,
+            output_dir,
             transition_pair=("ACD-AI", "AIR-25x"),
-            upper_dummy_year=2200.0
+            include_censored=False
         )
-        print(f"Saved sensitivity analysis for ACD-AI to AIR-25x")
+
+        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x (including censored)...")
+        analyze_milestone_transitions(
+            rollouts_file,
+            output_dir,
+            transition_pair=("ACD-AI", "AIR-25x"),
+            include_censored=True
+        )
 
         # Sensitivity analysis: AIR-25x to AIR-250x
-        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x...")
-        analyze(
+        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x (both achieved only)...")
+        analyze_milestone_transitions(
             rollouts_file,
-            out_json=output_dir / "sensitivity_AIR_25x_to_AIR_250x.json",
-            make_plots=True,
+            output_dir,
             transition_pair=("AIR-25x", "AIR-250x"),
-            upper_dummy_year=2200.0
+            include_censored=False
         )
-        print(f"Saved sensitivity analysis for AIR-25x to AIR-250x")
+
+        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x (including censored)...")
+        analyze_milestone_transitions(
+            rollouts_file,
+            output_dir,
+            transition_pair=("AIR-25x", "AIR-250x"),
+            include_censored=True
+        )
 
     except Exception as e:
         print(f"Warning: Could not run parameter sensitivity analysis: {e}")
@@ -1766,7 +1847,7 @@ def main() -> None:
         pairs = _parse_milestone_pairs(args.pairs)
         if not pairs:
             raise ValueError("--pairs is required for milestone_transition_box mode (use --list-milestones to inspect names)")
-        labels, durations, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
+        labels, durations, durations_censored, num_b_not_achieved, num_b_before_a, total_per_pair, typical_max = _read_milestone_transition_durations(
             rollouts_path,
             pairs,
             filter_milestone=(args.filter_milestone if args.filter_milestone else None),
@@ -1787,6 +1868,7 @@ def main() -> None:
         plot_milestone_transition_boxplot(
             labels,
             durations,
+            durations_censored,
             num_b_not_achieved,
             num_b_before_a,
             total_per_pair,

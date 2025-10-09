@@ -317,7 +317,68 @@ def _permutation_importance(
     return summary
 
 
-def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False, transition_pair: Optional[Tuple[str, str]] = None, upper_dummy_year: float = 2200.0, target_statistic: str = "aa_time") -> Dict[str, Any]:
+def analyze_milestone_transitions(
+    rollouts_path: Path,
+    output_dir: Path,
+    transition_pair: Tuple[str, str],
+    include_censored: bool = False,
+) -> None:
+    """Run sensitivity analysis for milestone transitions.
+
+    Args:
+        rollouts_path: Path to rollouts.jsonl
+        output_dir: Directory to save outputs
+        transition_pair: (from_milestone, to_milestone)
+        include_censored: If True, treat "not achieved" as achieved at sim end;
+                         if False, only include rollouts where both milestones achieved
+    """
+    from_name, to_name = transition_pair
+    suffix = "censored" if include_censored else "both_achieved"
+    safe_from = "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in from_name])
+    safe_to = "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in to_name])
+
+    out_json = output_dir / f"sensitivity_{safe_from}_to_{safe_to}_{suffix}.json"
+
+    # Determine upper_dummy_year based on include_censored
+    # If include_censored, we need to compute sim_end from the data
+    if include_censored:
+        # Read sim end times from rollouts
+        sim_ends = []
+        with rollouts_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    results = rec.get("results")
+                    if isinstance(results, dict):
+                        times = results.get("times")
+                        if times and len(times) > 0:
+                            sim_ends.append(float(times[-1]))
+                except Exception:
+                    continue
+
+        # Use median sim end as dummy year
+        upper_dummy_year = float(np.median(sim_ends)) if sim_ends else 2200.0
+    else:
+        # For both achieved, use a very large dummy year to effectively exclude missing milestones
+        upper_dummy_year = 1e10
+
+    result = analyze(
+        rollouts_path,
+        out_json=out_json,
+        make_plots=True,
+        transition_pair=transition_pair,
+        upper_dummy_year=upper_dummy_year,
+        target_statistic="transition_duration",
+        censored_suffix=suffix
+    )
+
+    print(f"Saved sensitivity analysis: {from_name} -> {to_name} ({suffix})")
+
+
+def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False, transition_pair: Optional[Tuple[str, str]] = None, upper_dummy_year: float = 2200.0, target_statistic: str = "aa_time", censored_suffix: Optional[str] = None) -> Dict[str, Any]:
     records = _read_rollouts_ndjson(rollouts_path)
     total_records = len(records)
 
@@ -408,7 +469,14 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
             def _safe_name(s: str) -> str:
                 return "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in s])
 
-            suffix = "_aa_time" if transition_pair is None else f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
+            if transition_pair is None:
+                suffix = "_aa_time"
+            else:
+                base_suffix = f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
+                if censored_suffix:
+                    suffix = f"{base_suffix}_{censored_suffix}"
+                else:
+                    suffix = base_suffix
 
             # Spearman correlation for numeric parameters (+ special-case include_gap)
             spearman_names = list(numeric_names)
@@ -426,9 +494,14 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names, fontsize=9)
                 plt.xlabel(f'Spearman rho with {target_label}')
-                # Create a shorter title
+                # Create a shorter title - extract censored/both achieved info from suffix if present
                 if transition_pair is not None:
-                    short_title = f"Parameter sensitivity: {transition_pair[0]} → {transition_pair[1]}"
+                    title_suffix_text = ""
+                    if "both-achieved" in suffix or "both_achieved" in suffix:
+                        title_suffix_text = " (both achieved)"
+                    elif "censored" in suffix:
+                        title_suffix_text = " (incl. censored)"
+                    short_title = f"Parameter sensitivity: {transition_pair[0]} → {transition_pair[1]}{title_suffix_text}"
                 else:
                     short_title = "Parameter sensitivity for ACD-AI time"
                 plt.title(short_title, pad=15, fontsize=11)
