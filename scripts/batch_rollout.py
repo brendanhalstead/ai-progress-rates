@@ -175,168 +175,21 @@ def _suppress_noise():
 
 
 def _sample_from_dist(dist_spec: Dict[str, Any], rng: np.random.Generator, param_name: Optional[str] = None) -> Any:
-    kind = dist_spec.get("dist", "fixed")
-
-    if kind == "fixed":
-        return dist_spec.get("value")
-
-    if kind == "uniform":
-        a = float(dist_spec["min"])  # inclusive
-        b = float(dist_spec["max"])  # inclusive-ish
-        return rng.uniform(a, b)
-
-    if kind == "normal":
-        # Support parameterization by mean/sd (or sigma) OR by 80% CI (q10,q90)
-        # If 80% CI is provided (ci80_low/high or ci80: [low, high]), it takes precedence
-        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
-        has_array = "ci80" in dist_spec
-        if has_array or has_pair:
-            # Warn once per parameter if both CI and mean/sd are provided
-            if (
-                ("mean" in dist_spec or "sd" in dist_spec or "sigma" in dist_spec)
-                and param_name is not None and param_name not in _ci_first_warned_params
-            ):
-                import warnings as _warnings
-                _warnings.warn(
-                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mean/sd provided; "
-                    f"using 80% CI and ignoring mean/sd.",
-                )
-                _ci_first_warned_params.add(param_name)
-            if has_array:
-                ci = dist_spec["ci80"]
-                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
-                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
-                q10 = float(ci[0])  # 10th percentile
-                q90 = float(ci[1])  # 90th percentile
-            else:
-                q10 = float(dist_spec["ci80_low"])  # 10th percentile
-                q90 = float(dist_spec["ci80_high"]) # 90th percentile
-            if not np.isfinite(q10) or not np.isfinite(q90):
-                raise ValueError("ci80_low/ci80_high for normal must be finite numbers")
-            # Ensure ordering
-            if q10 > q90:
-                q10, q90 = q90, q10
-            # z-scores for 10% and 90% quantiles (symmetric)
-            z = 1.2815515655446004
-            mu = 0.5 * (q10 + q90)
-            sigma = (q90 - q10) / (2.0 * z)
-        else:
-            mu = float(dist_spec["mean"])  # real line
-            sigma = float(dist_spec["sd"]) if "sd" in dist_spec else float(dist_spec.get("sigma", 1.0))
-
-        x = rng.normal(mu, sigma)
-        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
-            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
-        return x
-
-    if kind == "lognormal":
-        # Support parameterization by mu/sigma in log-space OR by 80% CI in original space
-        # If 80% CI is provided (ci80_low/high or ci80: [low, high]), it takes precedence
-        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
-        has_array = "ci80" in dist_spec
-        if has_array or has_pair:
-            # Warn once per parameter if both CI and mu/sigma are provided
-            if (
-                ("mu" in dist_spec or "sigma" in dist_spec)
-                and param_name is not None and param_name not in _ci_first_warned_params
-            ):
-                import warnings as _warnings
-                _warnings.warn(
-                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
-                    f"using 80% CI and ignoring mu/sigma.",
-                )
-                _ci_first_warned_params.add(param_name)
-            if has_array:
-                ci = dist_spec["ci80"]
-                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
-                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
-                q10 = float(ci[0])  # 10th percentile in original units
-                q90 = float(ci[1])  # 90th percentile in original units
-            else:
-                q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units
-                q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units
-            if not np.isfinite(q10) or not np.isfinite(q90) or q10 <= 0 or q90 <= 0:
-                raise ValueError("ci80_low/ci80_high for lognormal must be positive finite numbers")
-            if q10 > q90:
-                q10, q90 = q90, q10
-            # Convert to log-space and solve for mu, sigma using the symmetric quantiles
-            z = 1.2815515655446004
-            ln_q10 = float(np.log(q10))
-            ln_q90 = float(np.log(q90))
-            mu = 0.5 * (ln_q10 + ln_q90)
-            sigma = (ln_q90 - ln_q10) / (2.0 * z)
-        else:
-            # parameterization using mu, sigma in log-space
-            mu = float(dist_spec["mu"])  # log-space mean
-            sigma = float(dist_spec["sigma"])  # log-space sd
-
-        x = rng.lognormal(mean=mu, sigma=sigma)
-        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
-            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
-        return x
-
-    if kind == "shifted_lognormal":
-        # Shifted lognormal: x = shift + LogNormal(mu, sigma)
-        # The ci80 (or ci80_low/ci80_high) refers to the lognormal part ONLY (pre-shift).
-        has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
-        has_array = "ci80" in dist_spec
-        if has_array or has_pair:
-            # Warn once per parameter if both CI and mu/sigma are provided
-            if (
-                ("mu" in dist_spec or "sigma" in dist_spec)
-                and param_name is not None and param_name not in _ci_first_warned_params
-            ):
-                import warnings as _warnings
-                _warnings.warn(
-                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
-                    f"using 80% CI and ignoring mu/sigma.",
-                )
-                _ci_first_warned_params.add(param_name)
-            if has_array:
-                ci = dist_spec["ci80"]
-                if not (isinstance(ci, (list, tuple)) and len(ci) == 2):
-                    raise ValueError("ci80 must be a 2-element list/tuple: [low, high]")
-                q10 = float(ci[0])  # 10th percentile in original units (pre-shift)
-                q90 = float(ci[1])  # 90th percentile in original units (pre-shift)
-            else:
-                q10 = float(dist_spec["ci80_low"])  # 10th percentile in original units (pre-shift)
-                q90 = float(dist_spec["ci80_high"]) # 90th percentile in original units (pre-shift)
-            if not np.isfinite(q10) or not np.isfinite(q90) or q10 <= 0 or q90 <= 0:
-                raise ValueError("ci80_low/ci80_high for shifted_lognormal must be positive finite numbers (pre-shift)")
-            if q10 > q90:
-                q10, q90 = q90, q10
-            # Convert to log-space and solve for mu, sigma using the symmetric quantiles
-            z = 1.2815515655446004
-            ln_q10 = float(np.log(q10))
-            ln_q90 = float(np.log(q90))
-            mu = 0.5 * (ln_q10 + ln_q90)
-            sigma = (ln_q90 - ln_q10) / (2.0 * z)
-        else:
-            # parameterization using mu, sigma in log-space (pre-shift)
-            mu = float(dist_spec["mu"])  # log-space mean
-            sigma = float(dist_spec["sigma"])  # log-space sd
-
-        x_core = rng.lognormal(mean=mu, sigma=sigma)
-        shift = float(dist_spec.get("shift", 0.0))
-        x = float(shift + x_core)
-        if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
-            x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
-        return x
-
-    if kind == "beta":
-        a = float(dist_spec["alpha"])  # shape alpha
-        b = float(dist_spec["beta"])   # shape beta
-        lo = float(dist_spec.get("min", 0.0))
-        hi = float(dist_spec.get("max", 1.0))
-        x01 = rng.beta(a, b)
-        return lo + (hi - lo) * x01
-
-    if kind == "choice":
-        values = dist_spec["values"]
-        p = dist_spec.get("p")
-        return rng.choice(values, p=p)
-
-    raise ValueError(f"Unknown distribution kind: {kind}")
+    """Sample from a distribution using random sampling.
+    
+    This is a wrapper around _sample_from_dist_with_quantile that generates a random quantile.
+    
+    Args:
+        dist_spec: Distribution specification
+        rng: Random number generator
+        param_name: Parameter name for error messages and warnings
+        
+    Returns:
+        Sampled value
+    """
+    # Generate a random quantile and use the quantile-based sampling function
+    quantile = rng.uniform(0.0, 1.0)
+    return _sample_from_dist_with_quantile(dist_spec, quantile, param_name)
 
 
 def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, param_name: Optional[str] = None) -> Any:
@@ -354,6 +207,10 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
 
     if kind == "fixed":
         return dist_spec.get("value")
+    elif kind == "choice":
+        pass
+    elif (dist_spec.get("min") is None or dist_spec.get("max") is None) and dist_spec.get("clip_to_bounds", True):
+        raise ValueError(f"min and max are required for {kind} distribution for parameter {param_name}")
 
     if kind == "uniform":
         a = float(dist_spec["min"])
@@ -365,6 +222,17 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
         has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
         has_array = "ci80" in dist_spec
         if has_array or has_pair:
+            # Warn once per parameter if both CI and mean/sd are provided
+            if (
+                ("mean" in dist_spec or "sd" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mean/sd provided; "
+                    f"using 80% CI and ignoring mean/sd.",
+                )
+                _ci_first_warned_params.add(param_name)
             if has_array:
                 ci = dist_spec["ci80"]
                 q10 = float(ci[0])
@@ -392,6 +260,17 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
         has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
         has_array = "ci80" in dist_spec
         if has_array or has_pair:
+            # Warn once per parameter if both CI and mu/sigma are provided
+            if (
+                ("mu" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
+                    f"using 80% CI and ignoring mu/sigma.",
+                )
+                _ci_first_warned_params.add(param_name)
             if has_array:
                 ci = dist_spec["ci80"]
                 q10 = float(ci[0])
@@ -421,6 +300,17 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
         has_pair = "ci80_low" in dist_spec and "ci80_high" in dist_spec
         has_array = "ci80" in dist_spec
         if has_array or has_pair:
+            # Warn once per parameter if both CI and mu/sigma are provided
+            if (
+                ("mu" in dist_spec or "sigma" in dist_spec)
+                and param_name is not None and param_name not in _ci_first_warned_params
+            ):
+                import warnings as _warnings
+                _warnings.warn(
+                    f"Parameter '{param_name}': 80% CI (ci80_low/ci80_high) and mu/sigma provided; "
+                    f"using 80% CI and ignoring mu/sigma.",
+                )
+                _ci_first_warned_params.add(param_name)
             if has_array:
                 ci = dist_spec["ci80"]
                 q10 = float(ci[0])
@@ -441,7 +331,10 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
 
         # Use inverse shifted lognormal CDF
         x_core = np.exp(mu + sigma * np.sqrt(2) * scipy.special.erfinv(2 * quantile - 1))
-        shift = float(dist_spec.get("shift", 0.0))
+        shift = dist_spec.get("shift")
+        if shift is None:
+            raise ValueError(f"shift for shifted_lognormal is not set for parameter {param_name}")
+        shift = float(shift)
         x = float(shift + x_core)
         if dist_spec.get("clip_to_bounds") and "min" in dist_spec and "max" in dist_spec:
             x = float(np.clip(x, float(dist_spec["min"]), float(dist_spec["max"])))
@@ -476,13 +369,12 @@ def _sample_from_dist_with_quantile(dist_spec: Dict[str, Any], quantile: float, 
 
 def _clip_to_param_bounds(param_name: str, value: Any) -> Any:
     bounds = cfg.PARAMETER_BOUNDS.get(param_name)
+    if value is None:
+        assert False, f"value is None for parameter {param_name}"
     if bounds is None:
         return value
     lo, hi = bounds
-    try:
-        return float(np.clip(float(value), float(lo), float(hi)))
-    except Exception:
-        return value
+    return float(np.clip(float(value), float(lo), float(hi)))
 
 
 # =======================
@@ -566,6 +458,8 @@ def _solve_latent_rho_for_pair(
 
 def _nearest_correlation_matrix(A: np.ndarray, tol: float = 1e-8, max_iters: int = 100) -> np.ndarray:
     # Higham's nearest correlation matrix algorithm (simplified)
+    np.linalg.cholesky(A)
+    return A
     Y = A.copy()
     np.fill_diagonal(Y, 1.0)
     delta_S = np.zeros_like(Y)
@@ -606,7 +500,7 @@ def _calibrate_gaussian_copula_latent_corr(
     correlated_params: List[str],
     target_corr: np.ndarray,
     rng: np.random.Generator,
-    interpretation: str = "pearson",
+    interpretation: str = "spearman",
     calibration_samples: int = 20000,
     tol: float = 1e-2,
 ) -> np.ndarray:
@@ -677,6 +571,7 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
             # Prefer a pre-calibrated latent correlation matrix if provided
             latent_corr = correlation_matrix.get("latent_correlation_matrix")
             corr_array = np.array(latent_corr if latent_corr is not None else corr_matrix, dtype=float)
+            assert latent_corr is not None
             if not np.allclose(corr_array, corr_array.T):
                 raise ValueError("Correlation matrix must be symmetric")
             if not np.allclose(np.diag(corr_array), 1.0):
@@ -791,7 +686,8 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dic
 
         params_obj = _Params(**sampled_params)
         model = _PM(params_obj, data)
-        model.compute_progress_trajectory(time_range, initial_progress)
+        with _suppress_noise():
+            model.compute_progress_trajectory(time_range, initial_progress)
         conn.send({"ok": True, "results": _to_jsonable(model.results)})
     except Exception as e:  # pragma: no cover
         import traceback
@@ -799,7 +695,8 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dic
     finally:
         try:
             conn.close()
-        except Exception:
+        except Exception as e2:
+            print(f"Error closing connection: {e2}")
             pass
 
 
@@ -831,7 +728,8 @@ def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: D
         # Ensure the child is fully reaped (avoid zombies)
         try:
             proc.join(timeout=1)
-        except Exception:
+        except Exception as e:
+            print(f"Error joining process: {e}")
             pass
         if not isinstance(result, dict) or not result.get("ok"):
             err = None if not isinstance(result, dict) else result.get("error")
@@ -844,16 +742,19 @@ def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: D
     finally:
         try:
             parent_conn.close()
-        except Exception:
+        except Exception as e:
+            print(f"Error closing parent connection: {e}")
             pass
         try:
             if proc.is_alive():
                 try:
                     proc.terminate()
-                except Exception:
+                except Exception as e:
+                    print(f"Error terminating process: {e}")
                     pass
             proc.join(timeout=1)
-        except Exception:
+        except Exception as e:
+            print(f"Error joining process: {e}")
             pass
 
 def _run_with_timeout(seconds: Optional[float], func, *args, **kwargs):
@@ -982,7 +883,7 @@ def main() -> None:
             target_corr = correlation_matrix.get("correlation_matrix")
             if correlated_params and target_corr is not None:
                 # Allow specifying interpretation of provided correlations: 'pearson' (default) or 'spearman'
-                interpretation = str(correlation_matrix.get("correlation_type", correlation_matrix.get("interpretation", "pearson")))
+                interpretation = str(correlation_matrix.get("correlation_type", correlation_matrix.get("interpretation", "spearman")))
                 calib_samples = int(correlation_matrix.get("calibration_samples", 20000))
                 # Use a derived RNG for calibration to keep overall reproducibility
                 calib_rng = np.random.default_rng(rng.integers(0, 2**32 - 1))
@@ -1065,6 +966,8 @@ def main() -> None:
             except Exception as e:
                 import traceback
                 # Persist failure info to keep alignment between files
+                print(f"Rollout failed: {e}")
+                print(traceback.format_exc())
                 f_samples.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "error": str(e), "traceback": traceback.format_exc()}) + "\n")
                 f_samples.flush()
                 f_rollouts.write(json.dumps({"sample_id": i, "parameters": None, "time_series_parameters": None, "results": None, "error": str(e), "traceback": traceback.format_exc()}) + "\n")
