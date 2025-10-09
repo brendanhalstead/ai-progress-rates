@@ -1460,8 +1460,12 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
             color = colors[idx % len(colors)]
             plt.plot(xs, pdf_values, linewidth=2.5, label=milestone_name, color=color)
 
+            # Find mode (peak of KDE)
+            mode_idx = np.argmax(pdf_values)
+            mode = xs[mode_idx]
+
             # Store stats for display
-            stats_lines.append(f"{milestone_name}: P10={q10:.1f}, P50={q50:.1f}")
+            stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}")
         except Exception as e:
             print(f"Warning: Could not create KDE for {milestone_name}: {e}")
             continue
@@ -1475,7 +1479,7 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
     # Add statistics text in top right
     stats_text = "\n".join(stats_lines)
     plt.text(0.98, 0.98, stats_text,
-             transform=plt.gca().transAxes, fontsize=10,
+             transform=plt.gca().transAxes, fontsize=12,
              verticalalignment='top', horizontalalignment='right',
              bbox=dict(facecolor='white', alpha=0.9, edgecolor='gray'),
              family='monospace')
@@ -1529,7 +1533,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AI2027-SC,AI2027-SC:AIR-25x,AIR-25x:AIR-250x"
+    pairs_str = "ACD-AI:AIR-25x,AIR-25x:AIR-250x"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
