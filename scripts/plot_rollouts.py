@@ -639,6 +639,126 @@ def _read_milestone_transition_durations(
     return labels, durations_per_pair, num_b_not_achieved, num_b_before_a, total_a_achieved, typical_max_duration
 
 
+def _compute_x_years_in_1_year(
+    times: np.ndarray,
+    progress: np.ndarray,
+    current_time_idx: int = 0,
+) -> float:
+    """Compute maximum 'X years in 1 year' metric for a trajectory.
+
+    Finds the 1-year window with the maximum OOMs crossed and compares it to
+    the OOMs crossed in the present year (starting at current_time_idx).
+
+    The metric answers: "If the max year had X times more progress than the
+    present year, what is X?" Result should always be >= 1.
+
+    Args:
+        times: array of time points (decimal years)
+        progress: array of progress values (in OOMs or log10 scale)
+        current_time_idx: index representing the "present" time
+
+    Returns:
+        X value such that "X years in 1 year" happened (ratio of max to present)
+    """
+    if len(times) < 2 or len(progress) < 2:
+        return np.nan
+
+    # Find OOMs crossed in each rolling 1-year window (looking forward from each point)
+    max_ooms_per_year = 0.0
+
+    for i in range(len(times)):
+        # Find the point approximately 1 year after times[i]
+        target_time = times[i] + 1.0
+
+        # Find the index closest to target_time
+        end_idx = None
+        for j in range(i + 1, len(times)):
+            if times[j] >= target_time:
+                end_idx = j
+                break
+
+        if end_idx is None:
+            # Use the last point if we don't reach 1 year ahead
+            if i < len(times) - 1:
+                end_idx = len(times) - 1
+            else:
+                continue
+
+        # Calculate OOMs crossed in this window
+        ooms_in_window = progress[end_idx] - progress[i]
+        max_ooms_per_year = max(max_ooms_per_year, float(ooms_in_window))
+
+    # Get current year OOMs (1 year window starting from current_time_idx)
+    if current_time_idx >= len(times) - 1:
+        return np.nan
+
+    target_time = times[current_time_idx] + 1.0
+    current_end_idx = None
+    for j in range(current_time_idx + 1, len(times)):
+        if times[j] >= target_time:
+            current_end_idx = j
+            break
+
+    if current_end_idx is None:
+        current_end_idx = len(times) - 1
+
+    current_ooms = progress[current_end_idx] - progress[current_time_idx]
+
+    if current_ooms <= 0:
+        return np.nan
+
+    # This ratio should always be >= 1 since max includes current as a candidate
+    return float(max_ooms_per_year / current_ooms)
+
+
+def _read_x_years_in_1_year(rollouts_file: Path) -> List[float]:
+    """Read progress trajectories and compute 'X years in 1 year' metric for each rollout.
+
+    Returns:
+        List of X values (one per rollout that has valid progress data)
+    """
+    x_values: List[float] = []
+
+    with rollouts_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            results = rec.get("results")
+            if not isinstance(results, dict):
+                continue
+
+            times = results.get("times")
+            progress = results.get("progress")
+
+            if times is None or progress is None:
+                continue
+
+            try:
+                times_arr = np.asarray(times, dtype=float)
+                progress_arr = np.asarray(progress, dtype=float)
+            except Exception:
+                continue
+
+            if times_arr.ndim != 1 or progress_arr.ndim != 1 or times_arr.size != progress_arr.size:
+                continue
+
+            if times_arr.size < 2:
+                continue
+
+            # Assume index 0 is the "present" time
+            x_val = _compute_x_years_in_1_year(times_arr, progress_arr, current_time_idx=0)
+
+            if np.isfinite(x_val) and x_val > 0:
+                x_values.append(x_val)
+
+    return x_values
+
+
 def _read_milestone_scatter_data(
     rollouts_file: Path,
     from_name: str,
@@ -1198,6 +1318,96 @@ def plot_aa_time_histogram(aa_times: List[float], num_no_sc: int, out_path: Path
     plt.close()
 
 
+def plot_x_years_in_1_year_histogram(x_values: List[float], out_path: Path, bins: int = 50, title: Optional[str] = None) -> None:
+    """Plot histogram of 'X years in 1 year' values.
+
+    Args:
+        x_values: list of X values (ratio of max OOMs/year to current OOMs/year)
+        out_path: output file path
+        bins: number of histogram bins
+        title: optional plot title
+    """
+    if len(x_values) == 0:
+        raise ValueError("No X values found to plot")
+
+    data = np.asarray(x_values, dtype=float)
+
+    # Separate values ≤50 and >50
+    data_in_range = data[data <= 50]
+    num_above_50 = int(np.sum(data > 50))
+
+    plt.figure(figsize=(10, 6))
+    ax = plt.gca()
+
+    # Create log-spaced bins from min to 50
+    xmin = max(data_in_range[data_in_range > 0].min(), 1.0) if len(data_in_range) > 0 else 1.0
+    xmax = 50.0
+    bin_edges = np.logspace(np.log10(xmin), np.log10(xmax), int(bins))
+
+    # Create histogram for data ≤50 with log-spaced bins
+    counts, bin_edges, _ = ax.hist(
+        data_in_range,
+        bins=bin_edges,
+        edgecolor="black",
+        alpha=0.6,
+        label="Histogram",
+    )
+
+    # Add a special bar for >50 values
+    if num_above_50 > 0:
+        # Position the >50 bar at x=70 (visually separated from the 50 mark)
+        bar_x = 70.0
+        bar_width = 20.0  # Make it visually distinct
+        ax.bar(bar_x, num_above_50, width=bar_width, edgecolor="black",
+               alpha=0.6, color="tab:red", label=f">50 ({num_above_50})")
+
+    # Set x-axis to log scale
+    plt.xscale("log")
+
+    # Add KDE if we have enough data (only for data ≤50)
+    if len(data_in_range) >= 2:
+        xs = np.linspace(data_in_range.min(), data_in_range.max(), 512)
+        try:
+            kde = gaussian_kde(data_in_range)
+            bin_width = float(bin_edges[1] - bin_edges[0]) if len(bin_edges) > 1 else 1.0
+            kde_counts = kde(xs) * len(data_in_range) * bin_width
+            plt.plot(xs, kde_counts, color="tab:orange", linewidth=2.25, label="Gaussian KDE")
+        except Exception:
+            pass
+
+    # Percentiles and annotations (using original uncapped data)
+    q10, q50, q90 = np.quantile(data, [0.1, 0.5, 0.9])
+    ymax = float(np.max(counts) if counts.size else 1.0)
+    y_annot = ymax * 0.95
+
+    # Only show percentile lines if they're <= 50
+    if q10 <= 50:
+        plt.axvline(q10, color="tab:gray", linestyle="--", linewidth=1.5, label="P10")
+        plt.text(q10, y_annot, f"P10: {q10:.1f}x", rotation=90, va="top", ha="right",
+                 color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+
+    if q50 <= 50:
+        plt.axvline(q50, color="tab:green", linestyle="-", linewidth=1.75, label="Median")
+        plt.text(q50, y_annot, f"Median: {q50:.1f}x", rotation=90, va="top", ha="right",
+                 color="tab:green", fontsize=9, backgroundcolor=(1,1,1,0.6))
+
+    if q90 <= 50:
+        plt.axvline(q90, color="tab:gray", linestyle="--", linewidth=1.5, label="P90")
+        plt.text(q90, y_annot, f"P90: {q90:.1f}x", rotation=90, va="top", ha="right",
+                 color="tab:gray", fontsize=9, backgroundcolor=(1,1,1,0.6))
+
+    plt.xlabel("Speedup factor (ratio of annual progress between fastest and current year)")
+    plt.ylabel("Count")
+    plt.title(title or "Distribution of Maximum 'X Years in 1 Year'")
+    plt.grid(True, axis="y", alpha=0.25)
+    plt.legend(loc="upper right")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
 def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str], out_path: Path, title: Optional[str] = None) -> None:
     """Plot overlaid PDFs for multiple milestones."""
     plt.figure(figsize=(12, 7))
@@ -1352,6 +1562,69 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         title="Milestone Arrival Time Distributions"
     )
     print(f"Saved {out_path}")
+
+    # Sensitivity analysis: ACD-AI to AIR-25x
+    out_path = output_dir / "sensitivity_ACD_AI_to_AIR_25x.png"
+    xs, ys = _read_milestone_scatter_data(
+        rollouts_file,
+        "ACD-AI",
+        "AIR-25x",
+        include_inf=True,
+        inf_years_cap=100.0,
+    )
+    if xs.size > 0:
+        plot_milestone_scatter(
+            xs,
+            ys,
+            out_path,
+            title="Sensitivity Analysis: ACD-AI to AIR-25x",
+            kind="hex",
+            gridsize=50,
+            point_size=8.0,
+            scatter_overlay=True,
+        )
+        print(f"Saved {out_path}")
+
+    # Sensitivity analysis: AIR-25x to AIR-250x
+    out_path = output_dir / "sensitivity_AIR_25x_to_AIR_250x.png"
+    xs, ys = _read_milestone_scatter_data(
+        rollouts_file,
+        "AIR-25x",
+        "AIR-250x",
+        include_inf=True,
+        inf_years_cap=100.0,
+    )
+    if xs.size > 0:
+        plot_milestone_scatter(
+            xs,
+            ys,
+            out_path,
+            title="Sensitivity Analysis: AIR-25x to AIR-250x",
+            kind="hex",
+            gridsize=50,
+            point_size=8.0,
+            scatter_overlay=True,
+        )
+        print(f"Saved {out_path}")
+
+    # X years in 1 year distribution
+    out_path = output_dir / "x_years_in_1_year_hist.png"
+    x_values = _read_x_years_in_1_year(rollouts_file)
+
+    if len(x_values) > 0:
+        plot_x_years_in_1_year_histogram(
+            x_values,
+            out_path,
+            bins=50,
+            title="Maximum 'X Years in 1 Year' Distribution"
+        )
+        # Print statistics
+        arr = np.asarray(x_values, dtype=float)
+        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+        print(f"Saved {out_path}")
+        print(f"  X years in 1 year - P10/Median/P90: {q10:.1f}x / {q50:.1f}x / {q90:.1f}x")
+    else:
+        print(f"Warning: No valid X values found, skipping X years in 1 year plot")
 
 
 def parse_args() -> argparse.Namespace:
