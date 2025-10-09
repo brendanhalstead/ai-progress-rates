@@ -437,6 +437,38 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150, bbox_inches='tight')
                 plt.close()
+
+            # Scatter plots: each numeric parameter vs target_statistic
+            scatter_dir = rollouts_path.parent / 'scatter_plots'
+            scatter_dir.mkdir(parents=True, exist_ok=True)
+
+            for name in numeric_names:
+                x_vals = np.array(param_values_raw[name], dtype=float)
+                mask = np.isfinite(x_vals) & np.isfinite(y)
+                if mask.sum() < 2:
+                    continue
+                plt.figure(figsize=(6.5, 4.5))
+                plt.scatter(x_vals[mask], y[mask], s=12, alpha=0.6, edgecolors='none')
+                plt.xlabel(name)
+                plt.ylabel(target_label)
+                plt.title(f"{name} vs {target_label}", fontsize=11, pad=12)
+                plt.tight_layout()
+                scatter_path = scatter_dir / f"scatter_{_safe_name(name)}{suffix}.png"
+                plt.savefig(scatter_path, dpi=150, bbox_inches='tight')
+                plt.close()
+
+                # Rank-based scatter (Spearman visualization): average ranks for ties
+                x_rank = stats.rankdata(x_vals[mask], method='average')
+                y_rank = stats.rankdata(y[mask], method='average')
+                plt.figure(figsize=(6.5, 4.5))
+                plt.scatter(x_rank, y_rank, s=12, alpha=0.6, edgecolors='none')
+                plt.xlabel(f"rank({name})")
+                plt.ylabel(f"rank({target_label})")
+                plt.title(f"Ranks: {name} vs {target_label}", fontsize=11, pad=12)
+                plt.tight_layout()
+                scatter_rank_path = scatter_dir / f"scatter_rank_{_safe_name(name)}{suffix}.png"
+                plt.savefig(scatter_rank_path, dpi=150, bbox_inches='tight')
+                plt.close()
         except Exception as e:
             print(f"Error making plots: {e}")
 
