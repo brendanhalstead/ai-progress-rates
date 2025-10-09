@@ -655,8 +655,7 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
         correlation_matrix: Optional correlation specification with format:
             {
                 "parameters": ["param1", "param2", ...],  # List of parameter names
-                "correlation_matrix": [[1.0, 0.5, ...], [0.5, 1.0, ...], ...],  # Correlation matrix
-                "method": "gaussian_copula"  # Sampling method (only gaussian_copula supported)
+                "correlation_matrix": [[1.0, 0.5, ...], [0.5, 1.0, ...], ...]  # Correlation matrix
             }
     """
     sampled: Dict[str, Any] = {}
@@ -665,8 +664,6 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
     if correlation_matrix is not None:
         correlated_params = correlation_matrix.get("parameters", [])
         corr_matrix = correlation_matrix.get("correlation_matrix")
-        method = correlation_matrix.get("method", "gaussian_copula")
-        
         if correlated_params and corr_matrix is not None:
             # Validate correlation matrix
             n_params = len(correlated_params)
@@ -691,52 +688,27 @@ def _sample_parameter_dict(param_dists: Dict[str, Any], rng: np.random.Generator
             except np.linalg.LinAlgError:
                 raise ValueError("Correlation matrix must be positive semi-definite")
             
-            # Sample correlated parameters using Gaussian copula
-            if method == "gaussian_copula":
-                # Generate multivariate normal samples
-                mv_samples = rng.multivariate_normal(np.zeros(n_params), corr_array)
+            # Sample correlated parameters via Gaussian copula
+            # Generate multivariate normal samples
+            mv_samples = rng.multivariate_normal(np.zeros(n_params), corr_array)
+            
+            # Convert to uniform marginals using normal CDF
+            uniform_samples = np.array([0.5 * (1 + scipy.special.erf(x / np.sqrt(2))) for x in mv_samples])
+            
+            # Sample each correlated parameter using its distribution with the uniform quantile
+            for i, param_name in enumerate(correlated_params):
+                if param_name not in param_dists:
+                    raise ValueError(f"Correlated parameter '{param_name}' not found in parameter distributions")
                 
-                # Convert to uniform marginals using normal CDF
-                uniform_samples = np.array([0.5 * (1 + scipy.special.erf(x / np.sqrt(2))) for x in mv_samples])
+                spec = param_dists[param_name]
+                val = _sample_from_dist_with_quantile(spec, uniform_samples[i], param_name)
                 
-                # Sample each correlated parameter using its distribution
-                for i, param_name in enumerate(correlated_params):
-                    if param_name not in param_dists:
-                        raise ValueError(f"Correlated parameter '{param_name}' not found in parameter distributions")
-                    
-                    spec = param_dists[param_name]
-                    val = _sample_from_dist_with_quantile(spec, uniform_samples[i], param_name)
-                    
-                    # Clip to bounds unless explicitly disabled
-                    clip_requested = spec.get("clip_to_bounds", True)
-                    if clip_requested:
-                        val = _clip_to_param_bounds(param_name, val)
-                    
-                    sampled[param_name] = val
-            elif method == "rank_correlation":
-                # Use rank correlation to preserve correlations across different distribution types
-                # Generate multivariate normal samples
-                mv_samples = rng.multivariate_normal(np.zeros(n_params), corr_array)
+                # Clip to bounds unless explicitly disabled
+                clip_requested = spec.get("clip_to_bounds", True)
+                if clip_requested:
+                    val = _clip_to_param_bounds(param_name, val)
                 
-                # Convert to uniform marginals using normal CDF
-                uniform_samples = np.array([0.5 * (1 + scipy.special.erf(x / np.sqrt(2))) for x in mv_samples])
-                
-                # Sample each correlated parameter using its distribution with the uniform quantile
-                for i, param_name in enumerate(correlated_params):
-                    if param_name not in param_dists:
-                        raise ValueError(f"Correlated parameter '{param_name}' not found in parameter distributions")
-                    
-                    spec = param_dists[param_name]
-                    val = _sample_from_dist_with_quantile(spec, uniform_samples[i], param_name)
-                    
-                    # Clip to bounds unless explicitly disabled
-                    clip_requested = spec.get("clip_to_bounds", True)
-                    if clip_requested:
-                        val = _clip_to_param_bounds(param_name, val)
-                    
-                    sampled[param_name] = val
-            else:
-                raise ValueError(f"Unsupported correlation method: {method}")
+                sampled[param_name] = val
     
     # Sample remaining independent parameters
     for name, spec in param_dists.items():

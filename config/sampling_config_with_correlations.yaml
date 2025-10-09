@@ -125,7 +125,6 @@ correlation_matrix:
     - [1.0, 0.6, 0.3]    # ai_research_taste_at_coding_automation_anchor_sd
     - [0.6, 1.0, 0.4]    # ai_research_taste_slope  
     - [0.3, 0.4, 1.0]    # median_to_top_taste_multiplier
-  method: "rank_correlation"
 
 # Input time series uncertainty
 # These parameters control the generation of time series data with uncertainty
