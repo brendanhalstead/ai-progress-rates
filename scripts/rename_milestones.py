@@ -3,7 +3,7 @@
 Script to rename milestones in all rollouts.jsonl files.
 
 Renames:
-- "(Expensive, threshold only considers taste) SAR" -> "Top-human-experiment-selection-skill"
+- "(Expensive, threshold only considers taste) SAR" -> "SAR-level-experiment-selection-skill"
 - "(Expensive, threshold only considers taste) SIAR" -> "SIAR-level-experiment-selection-skill"
 """
 
@@ -14,8 +14,9 @@ from typing import Any, Dict
 
 # Milestone rename mappings
 MILESTONE_RENAMES = {
-    "(Expensive, threshold only considers taste) SAR": "Top-human-experiment-selection-skill",
+    "(Expensive, threshold only considers taste) SAR": "SAR-level-experiment-selection-skill",
     "(Expensive, threshold only considers taste) SIAR": "SIAR-level-experiment-selection-skill",
+    "Top-human-experiment-selection-skill": "SAR-level-experiment-selection-skill",
 }
 
 
