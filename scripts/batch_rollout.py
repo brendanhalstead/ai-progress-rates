@@ -900,19 +900,32 @@ def main() -> None:
             # If calibration fails, fall back to user-provided matrix; sampling will validate PSD
             print(f"WARNING: correlation calibration failed; using provided correlation_matrix. Error: {e}")
 
+    # Merge parameter distributions to enable cross-group correlations
+    # All parameters are sampled together, then split back into their respective groups
+    all_param_dists = {}
+    all_param_dists.update(param_dists)
+    all_param_dists.update(ts_param_dists)
+    
+    # Track which parameters belong to which group for later splitting
+    model_param_names = set(param_dists.keys())
+    ts_param_names = set(ts_param_dists.keys())
+
     # Sampling and rollouts
     with samples_out_path.open("w", encoding="utf-8") as f_samples, rollouts_out_path.open("w", encoding="utf-8") as f_rollouts:
         iterable = range(int(num_samples))
         progress_iter = _tqdm(iterable, desc="Rollouts", unit="run") if _tqdm is not None else iterable
         for i in progress_iter:
             try:
-                sampled_params = _sample_parameter_dict(param_dists, rng, correlation_matrix)
+                # Sample all parameters together (enables correlations across parameter groups)
+                all_sampled = _sample_parameter_dict(all_param_dists, rng, correlation_matrix)
+                
+                # Split sampled parameters back into model and time series groups
+                sampled_params = {k: v for k, v in all_sampled.items() if k in model_param_names}
+                sampled_ts_params = {k: v for k, v in all_sampled.items() if k in ts_param_names}
+                
                 # Make sure categorical defaults exist if user omitted
                 sampled_params.setdefault("horizon_extrapolation_type", cfg.DEFAULT_HORIZON_EXTRAPOLATION_TYPE)
                 sampled_params.setdefault("taste_schedule_type", cfg.DEFAULT_TASTE_SCHEDULE_TYPE)
-
-                # Sample time series parameters if present
-                sampled_ts_params = _sample_parameter_dict(ts_param_dists, rng) if ts_param_dists else {}
 
                 # Generate time series with uncertainty if time series parameters are present
                 if sampled_ts_params:
