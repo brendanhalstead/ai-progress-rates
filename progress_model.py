@@ -2665,7 +2665,8 @@ class ProgressModel:
                                         return np.full_like(t_vals, np.log(1e12))
                                     
                                     return np.log(result)
-                                except:
+                                except Exception as e:
+                                    logger.warning(f"Error in shifted_func: {e}")
                                     return np.full_like(t_vals, np.log(1e12))
                             
                             predicted = shifted_func(progress_values)
@@ -2726,7 +2727,8 @@ class ProgressModel:
                                         return np.full_like(t_vals, np.log(1e12))
                                     
                                     return np.log(result)
-                                except:
+                                except Exception as e:
+                                    logger.warning(f"Error in shifted_func: {e}")
                                     return np.full_like(t_vals, np.log(1e12))
                             
                             predicted = shifted_func(progress_values)
