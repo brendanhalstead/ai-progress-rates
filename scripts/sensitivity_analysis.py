@@ -489,7 +489,7 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
             if spearman_items:
                 names, vals = zip(*spearman_items[:30])
-                plt.figure(figsize=(11, max(4, len(names) * 0.35)))
+                plt.figure(figsize=(13, max(4, len(names) * 0.35)))
                 y_pos = np.arange(len(names))
                 plt.barh(y_pos, vals, align='center')
                 plt.yticks(y_pos, names, fontsize=9)
@@ -500,11 +500,11 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                     if "both-achieved" in suffix or "both_achieved" in suffix:
                         title_suffix_text = " (both achieved)"
                     elif "censored" in suffix:
-                        title_suffix_text = " (incl. censored)"
+                        title_suffix_text = " (assuming achieved at simulation cutoff)"
                     short_title = f"Parameter sensitivity: {transition_pair[0]} → {transition_pair[1]}{title_suffix_text}"
                 else:
                     short_title = "Parameter sensitivity for ACD-AI time"
-                plt.title(short_title, pad=15, fontsize=11)
+                plt.title(short_title, pad=15, fontsize=10)
                 plt.gca().invert_yaxis()
                 plot_path = rollouts_path.parent / f'sensitivity_spearman_top{suffix}.png'
                 plt.tight_layout()

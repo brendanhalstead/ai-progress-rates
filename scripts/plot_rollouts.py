@@ -1722,6 +1722,23 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
             include_censored=True
         )
 
+        # Sensitivity analysis: ACD-AI to SIAR-level
+        print("Running parameter sensitivity analysis for ACD-AI to SIAR-level-experiment-selection-skill (both achieved only)...")
+        analyze_milestone_transitions(
+            rollouts_file,
+            output_dir,
+            transition_pair=("ACD-AI", "SIAR-level-experiment-selection-skill"),
+            include_censored=False
+        )
+
+        print("Running parameter sensitivity analysis for ACD-AI to SIAR-level-experiment-selection-skill (including censored)...")
+        analyze_milestone_transitions(
+            rollouts_file,
+            output_dir,
+            transition_pair=("ACD-AI", "SIAR-level-experiment-selection-skill"),
+            include_censored=True
+        )
+
     except Exception as e:
         print(f"Warning: Could not run parameter sensitivity analysis: {e}")
 
