@@ -404,29 +404,6 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
             suffix = "_aa_time" if transition_pair is None else f"_{_safe_name(transition_pair[0])}-to-{_safe_name(transition_pair[1])}"
 
-            # Pearson correlation for numeric parameters (+ special-case include_gap)
-            pearson_names = list(numeric_names)
-            if "include_gap" not in pearson_names and "include_gap" in correlations:
-                pearson_names.append("include_gap")
-            pearson_items = [
-                (name, correlations[name]["pearson_r"]) for name in pearson_names if np.isfinite(correlations[name].get("pearson_r", float("nan")))  # type: ignore[index]
-            ]
-            pearson_items.sort(key=lambda x: abs(x[1]), reverse=True)
-
-            if pearson_items:
-                names, vals = zip(*pearson_items[:30])
-                plt.figure(figsize=(10, max(3, len(names) * 0.3)))
-                y_pos = np.arange(len(names))
-                plt.barh(y_pos, vals, align='center')
-                plt.yticks(y_pos, names)
-                plt.xlabel('Pearson r with aa_time')
-                plt.title(f"Top numeric parameters by Pearson correlation (target: {target_label})")
-                plt.gca().invert_yaxis()
-                plot_path = rollouts_path.parent / f'sensitivity_pearson_top{suffix}.png'
-                plt.tight_layout()
-                plt.savefig(plot_path, dpi=150)
-                plt.close()
-
             # Spearman correlation for numeric parameters (+ special-case include_gap)
             spearman_names = list(numeric_names)
             if "include_gap" not in spearman_names and "include_gap" in correlations:
@@ -438,34 +415,21 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
             if spearman_items:
                 names, vals = zip(*spearman_items[:30])
-                plt.figure(figsize=(10, max(3, len(names) * 0.3)))
+                plt.figure(figsize=(11, max(4, len(names) * 0.35)))
                 y_pos = np.arange(len(names))
                 plt.barh(y_pos, vals, align='center')
-                plt.yticks(y_pos, names)
-                plt.xlabel('Spearman rho with aa_time')
-                plt.title(f"Top numeric parameters by Spearman correlation (target: {target_label})")
+                plt.yticks(y_pos, names, fontsize=9)
+                plt.xlabel(f'Spearman rho with {target_label}')
+                # Create a shorter title
+                if transition_pair is not None:
+                    short_title = f"Parameter sensitivity: {transition_pair[0]} → {transition_pair[1]}"
+                else:
+                    short_title = "Parameter sensitivity for ACD-AI time"
+                plt.title(short_title, pad=15, fontsize=11)
                 plt.gca().invert_yaxis()
                 plot_path = rollouts_path.parent / f'sensitivity_spearman_top{suffix}.png'
                 plt.tight_layout()
-                plt.savefig(plot_path, dpi=150)
-                plt.close()
-
-
-            # Permutation importance
-            perm_items = [(k, v[0]) for k, v in permutation_summary.items() if np.isfinite(v[0])]
-            perm_items.sort(key=lambda x: x[1], reverse=True)
-            if perm_items:
-                names, vals = zip(*perm_items[:30])
-                plt.figure(figsize=(10, max(3, len(names) * 0.3)))
-                y_pos = np.arange(len(names))
-                plt.barh(y_pos, vals, align='center')
-                plt.yticks(y_pos, names)
-                plt.xlabel('Mean drop in R^2 when permuted')
-                plt.title(f"Top parameters by permutation importance (linear model) (target: {target_label})")
-                plt.gca().invert_yaxis()
-                plot_path = rollouts_path.parent / f'sensitivity_permutation_top{suffix}.png'
-                plt.tight_layout()
-                plt.savefig(plot_path, dpi=150)
+                plt.savefig(plot_path, dpi=150, bbox_inches='tight')
                 plt.close()
         except Exception:
             # Plotting is optional; ignore failures
