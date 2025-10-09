@@ -1563,49 +1563,36 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     )
     print(f"Saved {out_path}")
 
-    # Sensitivity analysis: ACD-AI to AIR-25x
-    out_path = output_dir / "sensitivity_ACD_AI_to_AIR_25x.png"
-    xs, ys = _read_milestone_scatter_data(
-        rollouts_file,
-        "ACD-AI",
-        "AIR-25x",
-        include_inf=True,
-        inf_years_cap=100.0,
-    )
-    if xs.size > 0:
-        plot_milestone_scatter(
-            xs,
-            ys,
-            out_path,
-            title="Sensitivity Analysis: ACD-AI to AIR-25x",
-            kind="hex",
-            gridsize=50,
-            point_size=8.0,
-            scatter_overlay=True,
-        )
-        print(f"Saved {out_path}")
+    # Parameter sensitivity analysis for milestone transitions
+    try:
+        import sys
+        sys.path.insert(0, str(rollouts_file.parent.parent / "scripts"))
+        from sensitivity_analysis import analyze
 
-    # Sensitivity analysis: AIR-25x to AIR-250x
-    out_path = output_dir / "sensitivity_AIR_25x_to_AIR_250x.png"
-    xs, ys = _read_milestone_scatter_data(
-        rollouts_file,
-        "AIR-25x",
-        "AIR-250x",
-        include_inf=True,
-        inf_years_cap=100.0,
-    )
-    if xs.size > 0:
-        plot_milestone_scatter(
-            xs,
-            ys,
-            out_path,
-            title="Sensitivity Analysis: AIR-25x to AIR-250x",
-            kind="hex",
-            gridsize=50,
-            point_size=8.0,
-            scatter_overlay=True,
+        # Sensitivity analysis: ACD-AI to AIR-25x
+        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x...")
+        analyze(
+            rollouts_file,
+            out_json=output_dir / "sensitivity_ACD_AI_to_AIR_25x.json",
+            make_plots=True,
+            transition_pair=("ACD-AI", "AIR-25x"),
+            upper_dummy_year=2200.0
         )
-        print(f"Saved {out_path}")
+        print(f"Saved sensitivity analysis for ACD-AI to AIR-25x")
+
+        # Sensitivity analysis: AIR-25x to AIR-250x
+        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x...")
+        analyze(
+            rollouts_file,
+            out_json=output_dir / "sensitivity_AIR_25x_to_AIR_250x.json",
+            make_plots=True,
+            transition_pair=("AIR-25x", "AIR-250x"),
+            upper_dummy_year=2200.0
+        )
+        print(f"Saved sensitivity analysis for AIR-25x to AIR-250x")
+
+    except Exception as e:
+        print(f"Warning: Could not run parameter sensitivity analysis: {e}")
 
     # X years in 1 year distribution
     out_path = output_dir / "x_years_in_1_year_hist.png"
