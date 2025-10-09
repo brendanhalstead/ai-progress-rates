@@ -1543,8 +1543,8 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
             # Store stats for display
             pct_achieved = prob_achieved * 100
 
-            # For ACD-AI and AI2027-SC, also show stats for achieved-only runs
-            if milestone_name in ["ACD-AI", "AI2027-SC"] and num_not_achieved > 0:
+            # For ACD-AI, AI2027-SC, AIR-25x, and AIR-250x, also show stats for achieved-only runs
+            if milestone_name in ["ACD-AI", "AI2027-SC", "AIR-25x", "AIR-250x"] and num_not_achieved > 0:
                 # Calculate percentiles using only achieved runs
                 q10_achieved, q50_achieved = np.quantile(data, [0.1, 0.5])
                 stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}, {pct_achieved:.0f}% achieved")
@@ -1590,9 +1590,9 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         "ACD-AI",
         "AIR-5x",
         "AI2027-SC",
-        "(Expensive, threshold only considers taste) SAR",
+        "Top-human-experiment-selection-skill",
         "AIR-25x",
-        "(Expensive, threshold only considers taste) SIAR",
+        "SIAR-level-experiment-selection-skill",
         "AIR-250x"
     ]
 
@@ -1653,7 +1653,9 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     overlay_milestones = [
         "ACD-AI",
         "AI2027-SC",
+        "Top-human-experiment-selection-skill",
         "AIR-25x",
+        "SIAR-level-experiment-selection-skill",
         "AIR-250x"
     ]
     out_path = output_dir / "milestone_pdfs_overlay.png"
