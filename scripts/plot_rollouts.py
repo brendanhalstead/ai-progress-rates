@@ -1543,12 +1543,12 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
             # Store stats for display
             pct_achieved = prob_achieved * 100
 
-            # For ACD-AI, AI2027-SC, AIR-25x, and AIR-250x, also show stats for achieved-only runs
-            if milestone_name in ["ACD-AI", "AI2027-SC", "AIR-25x", "AIR-250x"] and num_not_achieved > 0:
+            # For ACD-AI, AI2027-SC, SAR-level, and SIAR-level, also show stats for achieved-only runs
+            if milestone_name in ["ACD-AI", "AI2027-SC", "SAR-level-experiment-selection-skill", "SIAR-level-experiment-selection-skill"] and num_not_achieved > 0:
                 # Calculate percentiles using only achieved runs
                 q10_achieved, q50_achieved = np.quantile(data, [0.1, 0.5])
                 stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}, {pct_achieved:.0f}% achieved")
-                stats_lines.append(f"  (if achieved: P10={q10_achieved:.1f}, P50={q50_achieved:.1f})")
+                stats_lines.append(f"  (filtering for achieved: P10={q10_achieved:.1f}, P50={q50_achieved:.1f})")
             else:
                 stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}, {pct_achieved:.0f}% achieved")
         except Exception as e:
@@ -1590,7 +1590,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         "ACD-AI",
         "AIR-5x",
         "AI2027-SC",
-        "Top-human-experiment-selection-skill",
+        "SAR-level-experiment-selection-skill",
         "AIR-25x",
         "SIAR-level-experiment-selection-skill",
         "AIR-250x"
@@ -1618,7 +1618,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AI2027-SC,ACD-AI:AIR-25x,AIR-25x:AIR-250x"
+    pairs_str = "ACD-AI:AI2027-SC,ACD-AI:SAR-level-experiment-selection-skill,SAR-level-experiment-selection-skill:SIAR-level-experiment-selection-skill"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
@@ -1653,10 +1653,8 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     overlay_milestones = [
         "ACD-AI",
         "AI2027-SC",
-        "Top-human-experiment-selection-skill",
-        "AIR-25x",
-        "SIAR-level-experiment-selection-skill",
-        "AIR-250x"
+        "SAR-level-experiment-selection-skill",
+        "SIAR-level-experiment-selection-skill"
     ]
     out_path = output_dir / "milestone_pdfs_overlay.png"
     plot_milestone_pdfs_overlay(
@@ -1673,37 +1671,37 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         sys.path.insert(0, str(rollouts_file.parent.parent / "scripts"))
         from sensitivity_analysis import analyze_milestone_transitions
 
-        # Sensitivity analysis: ACD-AI to AIR-25x
-        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x (both achieved only)...")
+        # Sensitivity analysis: ACD-AI to SAR-level
+        print("Running parameter sensitivity analysis for ACD-AI to SAR-level-experiment-selection-skill (both achieved only)...")
         analyze_milestone_transitions(
             rollouts_file,
             output_dir,
-            transition_pair=("ACD-AI", "AIR-25x"),
+            transition_pair=("ACD-AI", "SAR-level-experiment-selection-skill"),
             include_censored=False
         )
 
-        print("Running parameter sensitivity analysis for ACD-AI to AIR-25x (including censored)...")
+        print("Running parameter sensitivity analysis for ACD-AI to SAR-level-experiment-selection-skill (including censored)...")
         analyze_milestone_transitions(
             rollouts_file,
             output_dir,
-            transition_pair=("ACD-AI", "AIR-25x"),
+            transition_pair=("ACD-AI", "SAR-level-experiment-selection-skill"),
             include_censored=True
         )
 
-        # Sensitivity analysis: AIR-25x to AIR-250x
-        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x (both achieved only)...")
+        # Sensitivity analysis: SAR-level to SIAR-level
+        print("Running parameter sensitivity analysis for SAR-level-experiment-selection-skill to SIAR-level-experiment-selection-skill (both achieved only)...")
         analyze_milestone_transitions(
             rollouts_file,
             output_dir,
-            transition_pair=("AIR-25x", "AIR-250x"),
+            transition_pair=("SAR-level-experiment-selection-skill", "SIAR-level-experiment-selection-skill"),
             include_censored=False
         )
 
-        print("Running parameter sensitivity analysis for AIR-25x to AIR-250x (including censored)...")
+        print("Running parameter sensitivity analysis for SAR-level-experiment-selection-skill to SIAR-level-experiment-selection-skill (including censored)...")
         analyze_milestone_transitions(
             rollouts_file,
             output_dir,
-            transition_pair=("AIR-25x", "AIR-250x"),
+            transition_pair=("SAR-level-experiment-selection-skill", "SIAR-level-experiment-selection-skill"),
             include_censored=True
         )
 

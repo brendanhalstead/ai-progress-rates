@@ -3776,7 +3776,7 @@ class ProgressModel:
                 'interpolation_type': 'exponential',
                 'progress_multiplier': 10000
             },
-            'Top-human-experiment-selection-skill': {
+            'SAR-level-experiment-selection-skill': {
                 'metric': 'ai_research_taste',
                 'target': cfg.MEDIAN_TO_TOP_TASTE_MULTIPLIER,
                 'interpolation_type': 'exponential'
