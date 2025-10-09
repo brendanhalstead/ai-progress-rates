@@ -714,8 +714,10 @@ def _compute_x_years_in_1_year(
 def _read_x_years_in_1_year(rollouts_file: Path) -> List[float]:
     """Read progress trajectories and compute 'X years in 1 year' metric for each rollout.
 
+    Only includes rollouts where ACD-AI (aa_time) is achieved.
+
     Returns:
-        List of X values (one per rollout that has valid progress data)
+        List of X values (one per rollout that has valid progress data and achieved ACD-AI)
     """
     x_values: List[float] = []
 
@@ -730,6 +732,16 @@ def _read_x_years_in_1_year(rollouts_file: Path) -> List[float]:
                 continue
             results = rec.get("results")
             if not isinstance(results, dict):
+                continue
+
+            # Check if ACD-AI was achieved
+            aa_time = results.get("aa_time")
+            try:
+                aa_t = float(aa_time) if aa_time is not None else np.nan
+            except (TypeError, ValueError):
+                aa_t = np.nan
+            if not np.isfinite(aa_t):
+                # Skip rollouts where ACD-AI was not achieved
                 continue
 
             times = results.get("times")
@@ -1398,7 +1410,7 @@ def plot_x_years_in_1_year_histogram(x_values: List[float], out_path: Path, bins
 
     plt.xlabel("Speedup factor (ratio of annual progress between fastest and current year)")
     plt.ylabel("Count")
-    plt.title(title or "Distribution of Maximum 'X Years in 1 Year'")
+    plt.title(title or "Distribution of Maximum 'X Years in 1 Year'\n(Only simulations reaching ACD-AI)")
     plt.grid(True, axis="y", alpha=0.25)
     plt.legend(loc="upper right")
 
