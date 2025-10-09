@@ -80,12 +80,13 @@ def _collect_dataset(
     records: List[Dict[str, Any]],
     transition_pair: Optional[Tuple[str, str]] = None,
     upper_dummy_year: float = 2200.0,
+    target_statistic: str = "aa_time",
 ) -> Tuple[List[str], List[str], np.ndarray, Dict[str, List[Any]]]:
     """
     From rollout records, build:
     - numeric_param_names: list of parameter names treated as numeric
     - categorical_param_names: list of parameter names treated as categorical
-    - y: np.ndarray of target values (aa_time or transition duration)
+    - y: np.ndarray of target values (target_statistic or transition duration)
     - param_values_raw: dict param_name -> list of raw values (for correlation/ANOVA)
     """
     # Filter to usable records
@@ -101,14 +102,22 @@ def _collect_dataset(
         all_params = {**params, **ts_params} if params or ts_params else None
         if not all_params:
             continue
+        if rec.get("error") is not None:
+            continue
+        
+        assert isinstance(results, dict), f"results must be a dict, instead got {type(results)}"
+
         # Determine target y: either aa_time or milestone transition
         y_val: Optional[float] = None
         if transition_pair is None:
-            aa_time = results.get("aa_time") if isinstance(results, dict) else None
-            if aa_time is not None and isinstance(aa_time, (int, float)) and np.isfinite(aa_time):
-                y_val = float(aa_time)
+            assert target_statistic in results, f"results does not have key {target_statistic}"
+            target_statistic_val = results[target_statistic]
+            if target_statistic_val is None:
+                target_statistic_val = float(upper_dummy_year)
+            if target_statistic_val is not None and isinstance(target_statistic_val, (int, float)) and np.isfinite(target_statistic_val):
+                y_val = float(target_statistic_val)
         else:
-            milestones = results.get("milestones") if isinstance(results, dict) else None
+            milestones = results.get("milestones")
             if isinstance(milestones, dict):
                 from_name, to_name = transition_pair
                 try:
@@ -308,11 +317,11 @@ def _permutation_importance(
     return summary
 
 
-def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False, transition_pair: Optional[Tuple[str, str]] = None, upper_dummy_year: float = 2200.0) -> Dict[str, Any]:
+def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bool = False, transition_pair: Optional[Tuple[str, str]] = None, upper_dummy_year: float = 2200.0, target_statistic: str = "aa_time") -> Dict[str, Any]:
     records = _read_rollouts_ndjson(rollouts_path)
     total_records = len(records)
 
-    numeric_names, categorical_names, y, param_values_raw = _collect_dataset(records, transition_pair=transition_pair, upper_dummy_year=float(upper_dummy_year))
+    numeric_names, categorical_names, y, param_values_raw = _collect_dataset(records, transition_pair=transition_pair, upper_dummy_year=float(upper_dummy_year), target_statistic=target_statistic)
 
     used_n = y.shape[0]
     dropped = total_records - used_n
@@ -330,17 +339,14 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
     # Special-case: treat include_gap as binary for Spearman and Pearson
     if "include_gap" in categorical_names:
-        try:
-            mapped = _map_include_gap_to_binary(param_values_raw["include_gap"])  # type: ignore[index]
-            sp = _compute_numeric_correlations(mapped, y)
-            correlations.setdefault("include_gap", {})
-            # Record Spearman and Pearson so it can be plotted/printed alongside numeric params
-            correlations["include_gap"]["spearman_rho"] = float(sp.get("spearman_rho", float("nan")))
-            correlations["include_gap"]["spearman_p"] = float(sp.get("spearman_p", float("nan")))
-            correlations["include_gap"]["pearson_r"] = float(sp.get("pearson_r", float("nan")))
-            correlations["include_gap"]["pearson_p"] = float(sp.get("pearson_p", float("nan")))
-        except Exception:
-            pass
+        mapped = _map_include_gap_to_binary(param_values_raw["include_gap"])  # type: ignore[index]
+        sp = _compute_numeric_correlations(mapped, y)
+        correlations.setdefault("include_gap", {})
+        # Record Spearman and Pearson so it can be plotted/printed alongside numeric params
+        correlations["include_gap"]["spearman_rho"] = float(sp.get("spearman_rho", float("nan")))
+        correlations["include_gap"]["spearman_p"] = float(sp.get("spearman_p", float("nan")))
+        correlations["include_gap"]["pearson_r"] = float(sp.get("pearson_r", float("nan")))
+        correlations["include_gap"]["pearson_p"] = float(sp.get("pearson_p", float("nan")))
 
     # Build feature matrix for permutation importance
     # Numeric features
@@ -467,9 +473,8 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
                 plt.tight_layout()
                 plt.savefig(plot_path, dpi=150)
                 plt.close()
-        except Exception:
-            # Plotting is optional; ignore failures
-            pass
+        except Exception as e:
+            print(f"Error making plots: {e}")
 
     return result
 
@@ -483,6 +488,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--plot", action="store_true", help="Save summary plots alongside outputs")
     parser.add_argument("--transition-pair", type=str, default=None, help="Analyze duration for milestone pair FROM:TO instead of aa_time")
     parser.add_argument("--upper-dummy-year", type=float, default=2200.0, help="If upper milestone missing, substitute this year for duration calculation")
+    parser.add_argument("--target-statistic", type=str, default="aa_time", help="What are we analyzing the sensitivity of? (default: aa_time)")
     return parser.parse_args()
 
 
@@ -509,7 +515,7 @@ def main() -> None:
             raise ValueError("--transition-pair requires both FROM and TO names")
         tp = (left, right)
 
-    result = analyze(rollouts_path, out_json=out_json, make_plots=args.plot, transition_pair=tp, upper_dummy_year=float(args.upper_dummy_year))
+    result = analyze(rollouts_path, out_json=out_json, make_plots=args.plot, transition_pair=tp, upper_dummy_year=float(args.upper_dummy_year), target_statistic=args.target_statistic)
 
     # Print concise top-10 summary to stdout
     print(f"Target: {result.get('target', 'aa_time')}")
