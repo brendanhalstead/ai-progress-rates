@@ -25,7 +25,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, rankdata, spearmanr
 from datetime import datetime, timedelta
 import yaml
 
@@ -1592,6 +1592,290 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
     plt.close()
 
 
+def _load_correlation_config(run_dir: Path) -> Tuple[Optional[np.ndarray], Optional[List[str]], Optional[str], Optional[Dict[str, str]]]:
+    """Load correlation matrix configuration from run directory.
+
+    Returns:
+        corr_matrix: correlation matrix as numpy array, or None if not found
+        param_names: list of parameter names, or None if not found
+        corr_type: correlation type (e.g., 'spearman'), or None if not found
+        param_dists: dict mapping parameter name to distribution type, or None if not found
+    """
+    config_path = run_dir / "input_distributions.yaml"
+    if not config_path.exists():
+        return None, None, None, None
+
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        print(f"Warning: Could not load {config_path}: {e}")
+        return None, None, None, None
+
+    corr_config = config.get("correlation_matrix")
+    if not isinstance(corr_config, dict):
+        return None, None, None, None
+
+    corr_matrix_list = corr_config.get("correlation_matrix")
+    param_names = corr_config.get("parameters")
+    corr_type = corr_config.get("correlation_type", "pearson")
+
+    if not corr_matrix_list or not param_names:
+        return None, None, None, None
+
+    try:
+        corr_matrix = np.array(corr_matrix_list, dtype=float)
+    except Exception as e:
+        print(f"Warning: Could not parse correlation matrix: {e}")
+        return None, None, None, None
+
+    # Extract distribution types for parameters
+    param_dists: Dict[str, str] = {}
+    
+    # Check both 'parameters' and 'time_series_parameters' sections
+    params_config = config.get("parameters", {})
+    ts_params_config = config.get("time_series_parameters", {})
+    
+    for param_name in param_names:
+        # Look in both sections
+        param_info = params_config.get(param_name) or ts_params_config.get(param_name)
+        if isinstance(param_info, dict) and "dist" in param_info:
+            param_dists[param_name] = param_info["dist"]
+
+    return corr_matrix, param_names, corr_type, param_dists
+
+
+def _load_all_samples(samples_file: Path) -> Dict[str, np.ndarray]:
+    """Load all sampled parameter values from samples.jsonl.
+
+    Returns:
+        param_values: dictionary mapping parameter name to array of sampled values
+    """
+    param_values: Dict[str, List[float]] = {}
+
+    with samples_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            # Merge parameters and time_series_parameters
+            all_params = {}
+            if "parameters" in rec and isinstance(rec["parameters"], dict):
+                all_params.update(rec["parameters"])
+            if "time_series_parameters" in rec and isinstance(rec["time_series_parameters"], dict):
+                all_params.update(rec["time_series_parameters"])
+
+            # Store numeric values only
+            for key, value in all_params.items():
+                if isinstance(value, (int, float)) and np.isfinite(value):
+                    if key not in param_values:
+                        param_values[key] = []
+                    param_values[key].append(float(value))
+
+    # Convert lists to numpy arrays
+    param_arrays = {k: np.array(v, dtype=float) for k, v in param_values.items()}
+    return param_arrays
+
+
+def plot_correlation_scatter(
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    out_path: Path,
+    param_x: str,
+    param_y: str,
+    target_corr: float,
+    use_ranks: bool = False,
+    corr_type: str = "pearson",
+    show_actual_corr: bool = True,
+    x_dist: Optional[str] = None,
+    y_dist: Optional[str] = None,
+) -> None:
+    """Create scatter plot for two correlated parameters.
+
+    Args:
+        x_values: array of x parameter values
+        y_values: array of y parameter values
+        out_path: output file path
+        param_x: name of x parameter
+        param_y: name of y parameter
+        target_corr: target correlation coefficient
+        use_ranks: if True, plot ranks instead of values
+        corr_type: correlation type from config (e.g., 'spearman')
+        show_actual_corr: if True, display actual correlation in text box
+        x_dist: distribution type for x parameter (for determining log scale)
+        y_dist: distribution type for y parameter (for determining log scale)
+    """
+    if len(x_values) == 0 or len(y_values) == 0:
+        raise ValueError("No data to plot")
+
+    if len(x_values) != len(y_values):
+        raise ValueError("x_values and y_values must have same length")
+
+    plt.figure(figsize=(10, 8))
+    ax = plt.gca()
+
+    if use_ranks:
+        # Convert to ranks for Spearman-style visualization
+        x_plot = rankdata(x_values)
+        y_plot = rankdata(y_values)
+        xlabel = f"{param_x} (rank)"
+        ylabel = f"{param_y} (rank)"
+        title_suffix = "Ranks"
+    else:
+        x_plot = x_values
+        y_plot = y_values
+        xlabel = param_x
+        ylabel = param_y
+        title_suffix = "Values"
+
+    # Create scatter plot with some transparency
+    ax.scatter(x_plot, y_plot, alpha=0.5, s=20, color='tab:blue')
+
+    # Calculate actual correlation (only if needed for display)
+    if show_actual_corr:
+        if use_ranks:
+            actual_corr, _ = spearmanr(x_values, y_values)
+        else:
+            actual_corr = float(np.corrcoef(x_values, y_values)[0, 1])
+
+        # Add text box with correlation info
+        textstr = f'Target {corr_type} correlation: {target_corr:.2f}\nActual correlation: {actual_corr:.3f}'
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=12,
+                verticalalignment='top', bbox=props, family='monospace')
+    else:
+        # Just show target correlation
+        textstr = f'Target {corr_type} correlation: {target_corr:.2f}'
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=12,
+                verticalalignment='top', bbox=props, family='monospace')
+
+    # Set log scale for lognormal parameters
+    if not use_ranks:
+        if x_dist in ['lognormal', 'shifted_lognormal'] and np.all(x_plot > 0):
+            ax.set_xscale('log')
+        if y_dist in ['lognormal', 'shifted_lognormal'] and np.all(y_plot > 0):
+            ax.set_yscale('log')
+
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(f"{param_x} vs {param_y}\n({title_suffix})", fontsize=14)
+    ax.grid(True, alpha=0.3)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=100)
+    plt.close()
+
+
+def plot_all_correlations(run_dir: Path) -> None:
+    """Generate scatter plots for all correlated parameter pairs.
+
+    Reads the correlation matrix from input_distributions.yaml and creates
+    scatter plots for all parameter pairs with non-zero correlation.
+    Creates both value-based and rank-based plots.
+
+    Args:
+        run_dir: path to run directory containing input_distributions.yaml and samples.jsonl
+    """
+    print(f"Loading correlation configuration from {run_dir}")
+
+    # Load correlation matrix
+    corr_matrix, param_names, corr_type, param_dists = _load_correlation_config(run_dir)
+    if corr_matrix is None or param_names is None:
+        print("Warning: Could not load correlation configuration")
+        return
+
+    print(f"Found {len(param_names)} parameters with {corr_type} correlations")
+    if param_dists:
+        print(f"Loaded distribution types for {len(param_dists)} parameters")
+
+    # Load samples
+    samples_file = run_dir / "samples.jsonl"
+    if not samples_file.exists():
+        print(f"Warning: samples.jsonl not found in {run_dir}")
+        return
+
+    print("Loading samples...")
+    param_values = _load_all_samples(samples_file)
+    print(f"Loaded samples for {len(param_values)} parameters")
+
+    # Create output directory
+    output_dir = run_dir / "correlation_plots"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Saving plots to {output_dir}")
+
+    # Find all non-zero correlations
+    num_plots = 0
+    for i in range(len(param_names)):
+        for j in range(i + 1, len(param_names)):
+            corr = corr_matrix[i, j]
+
+            # Skip zero or near-zero correlations
+            if abs(corr) < 0.01:
+                continue
+
+            param_i = param_names[i]
+            param_j = param_names[j]
+
+            # Check if we have data for both parameters
+            if param_i not in param_values or param_j not in param_values:
+                print(f"Warning: Missing data for {param_i} or {param_j}, skipping")
+                continue
+
+            x_vals = param_values[param_i]
+            y_vals = param_values[param_j]
+
+            # Check if arrays have same length
+            if len(x_vals) != len(y_vals):
+                print(f"Warning: Mismatched lengths for {param_i} ({len(x_vals)}) and {param_j} ({len(y_vals)}), skipping")
+                continue
+
+            print(f"  Creating plots for {param_i} vs {param_j} (target {corr_type} corr: {corr:.2f})")
+
+            # Get distribution types
+            x_dist = param_dists.get(param_i) if param_dists else None
+            y_dist = param_dists.get(param_j) if param_dists else None
+
+            # Create safe filenames
+            safe_i = param_i.replace("/", "_").replace(" ", "_")
+            safe_j = param_j.replace("/", "_").replace(" ", "_")
+
+            # Plot actual values (without actual correlation)
+            try:
+                out_path_values = output_dir / f"corr_{safe_i}_vs_{safe_j}_values.png"
+                plot_correlation_scatter(
+                    x_vals, y_vals, out_path_values,
+                    param_i, param_j, corr,
+                    use_ranks=False, corr_type=corr_type,
+                    show_actual_corr=False,
+                    x_dist=x_dist, y_dist=y_dist
+                )
+                num_plots += 1
+            except Exception as e:
+                print(f"    Warning: Could not create values plot: {e}")
+
+            # Plot ranks (with actual correlation)
+            try:
+                out_path_ranks = output_dir / f"corr_{safe_i}_vs_{safe_j}_ranks.png"
+                plot_correlation_scatter(
+                    x_vals, y_vals, out_path_ranks,
+                    param_i, param_j, corr,
+                    use_ranks=True, corr_type=corr_type,
+                    show_actual_corr=True
+                )
+                num_plots += 1
+            except Exception as e:
+                print(f"    Warning: Could not create ranks plot: {e}")
+
+    print(f"\nGenerated {num_plots} correlation plots in {output_dir}")
+
+
 def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     """Generate all standard plots for a batch rollout.
 
@@ -1767,8 +2051,9 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--run-dir", type=str, default=None, help="Path to a single rollout run directory containing rollouts.jsonl")
     g.add_argument("--rollouts", type=str, default=None, help="Path directly to a rollouts.jsonl file")
     parser.add_argument("--out", type=str, default=None, help="Output image path (PNG). Defaults vary by --mode")
-    parser.add_argument("--mode", type=str, choices=["sc_hist", "horizon_trajectories", "horizon_at_sc_hist", "milestone_time_hist", "milestone_transition_box", "milestone_scatter"], default="sc_hist", help="Which plot to generate")
+    parser.add_argument("--mode", type=str, choices=["sc_hist", "horizon_trajectories", "horizon_at_sc_hist", "milestone_time_hist", "milestone_transition_box", "milestone_scatter", "correlations"], default="sc_hist", help="Which plot to generate")
     parser.add_argument("--batch-all", action="store_true", help="Generate all standard plots (ignores --mode and --out)")
+    parser.add_argument("--plot-correlations", action="store_true", help="Generate correlation scatter plots for all parameter pairs with non-zero correlation")
     # Histogram options
     parser.add_argument("--bins", type=int, default=50, help="Number of histogram bins for sc_hist mode")
     # Milestone options
@@ -1799,6 +2084,19 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    
+    # Handle correlations mode or flag (doesn't need rollouts_path)
+    if args.mode == "correlations" or args.plot_correlations:
+        if args.run_dir:
+            run_dir = Path(args.run_dir)
+        else:
+            # If --rollouts was provided, use its parent directory
+            rollouts_path = Path(args.rollouts)
+            run_dir = rollouts_path.parent
+        
+        plot_all_correlations(run_dir)
+        return
+    
     rollouts_path = _resolve_rollouts_path(args.run_dir, args.rollouts)
 
     default_dir = rollouts_path.parent

@@ -31,6 +31,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from scipy import stats
 
+# Use a non-interactive backend in case this runs on a headless server
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+# Use monospace font for all text elements (consistent with plot_rollouts.py)
+matplotlib.rcParams["font.family"] = "monospace"
+
 
 def _read_rollouts_ndjson(path: Path) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
@@ -464,8 +472,6 @@ def analyze(rollouts_path: Path, out_json: Optional[Path] = None, make_plots: bo
 
     if make_plots:
         try:
-            import matplotlib.pyplot as plt
-
             def _safe_name(s: str) -> str:
                 return "".join([c if c.isalnum() or c in ("_", "-") else "-" for c in s])
 
