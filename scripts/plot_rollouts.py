@@ -1000,11 +1000,11 @@ def plot_milestone_transition_boxplot(
     ymax_candidate = max(ymax_candidate, float(inf_years_display))
     ymax = max(ymax_candidate, ymin * 10.0)
 
-    plt.figure(figsize=(16, 8))
+    plt.figure(figsize=(18, 8))
     ax = plt.gca()
 
     # Adjust plot area to leave room for stats panel on right
-    plt.subplots_adjust(right=0.68)
+    plt.subplots_adjust(right=0.64)
 
     # Interleave the two sets of boxes: achieved only and including censored
     # For each pair, we'll have two boxes side by side
@@ -1056,7 +1056,7 @@ def plot_milestone_transition_boxplot(
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor=(0.5, 0.8, 0.5, 0.7), edgecolor='black', label='Both achieved'),
-        Patch(facecolor=(0.5, 0.5, 0.8, 0.7), edgecolor='black', label='Including censored')
+        Patch(facecolor=(0.5, 0.5, 0.8, 0.7), edgecolor='black', label='Assuming achieved at cutoff')
     ]
     ax.legend(handles=legend_elements, loc='upper left')
 
@@ -1088,24 +1088,23 @@ def plot_milestone_transition_boxplot(
         else:
             q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
             panel_lines.append(f"    10/50/90: {_format_years_value(float(q10))}/{_format_years_value(float(q50))}/{_format_years_value(float(q90))}")
-            pct_achieved = 100.0 * arr.size / total_a if total_a > 0 else 0.0
-            panel_lines.append(f"    ({pct_achieved:.1f}% of runs)")
+
+        # Show not achieved count before "Assuming..." section
+        if n_not_achieved > 0:
+            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+            pct_not_achieved = 100.0 * n_not_achieved / total_a if total_a > 0 else 0.0
+            panel_lines.append(f"  ({pct_not_achieved:.1f}% {milestone_b} not achieved)")
 
         # Stats for including censored
-        panel_lines.append("  Including censored:")
+        milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
+        panel_lines.append(f"  Assuming {milestone_b} achieved at simulation cutoff:")
         if arr_c.size == 0:
             panel_lines.append("    (none)")
         else:
             q10_c, q50_c, q90_c = np.quantile(arr_c, [0.1, 0.5, 0.9])
             panel_lines.append(f"    10/50/90: {_format_years_value(float(q10_c))}/{_format_years_value(float(q50_c))}/{_format_years_value(float(q90_c))}")
-            pct_total = 100.0 * arr_c.size / total_a if total_a > 0 else 0.0
-            panel_lines.append(f"    ({pct_total:.1f}% of runs)")
 
-        # Show issue counts
-        if n_not_achieved > 0:
-            milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
-            pct_not_achieved = 100.0 * n_not_achieved / total_a if total_a > 0 else 0.0
-            panel_lines.append(f"  ({pct_not_achieved:.1f}% {milestone_b} not achieved)")
+        # Show out of order count at the end
         if n_before > 0:
             milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
             milestone_a = lbl.split(" to ")[0] if " to " in lbl else "first"
@@ -1114,7 +1113,7 @@ def plot_milestone_transition_boxplot(
         panel_lines.append("")
 
     txt = "\n".join(panel_lines)
-    ax_inset = plt.gcf().add_axes([0.72, 0.12, 0.26, 0.76])
+    ax_inset = plt.gcf().add_axes([0.66, 0.12, 0.32, 0.76])
     ax_inset.axis('off')
     ax_inset.text(0.0, 1.0, txt, va='top', ha='left', fontsize=12, family='monospace', bbox=dict(facecolor=(1,1,1,0.7), edgecolor='0.7'))
 
@@ -1496,6 +1495,7 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
 
     global_min = np.inf
     global_max = -np.inf
+    global_sim_end = None
 
     stats_lines = []
 
@@ -1510,6 +1510,10 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
         global_min = min(global_min, float(data.min()))
         global_max = max(global_max, float(data.max()))
 
+        # Track simulation end for "not achieved" marker
+        if sim_end is not None:
+            global_sim_end = sim_end if global_sim_end is None else max(global_sim_end, sim_end)
+
         # Calculate percentiles (including not achieved as sim_end)
         if num_not_achieved > 0 and sim_end is not None:
             combined_data = np.concatenate([data, np.full(num_not_achieved, sim_end)])
@@ -1518,12 +1522,16 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
 
         q10, q50 = np.quantile(combined_data, [0.1, 0.5])
 
+        # Calculate achievement probability
+        total_runs = len(times) + num_not_achieved
+        prob_achieved = len(times) / total_runs if total_runs > 0 else 0.0
+
         # Create KDE
         try:
             kde = gaussian_kde(data)
             xs = np.linspace(data.min(), data.max(), 512)
-            # Normalize to get PDF (divide by total count to get density that integrates to 1)
-            pdf_values = kde(xs)
+            # Scale PDF by probability of achievement
+            pdf_values = kde(xs) * prob_achieved
 
             color = colors[idx % len(colors)]
             plt.plot(xs, pdf_values, linewidth=2.5, label=milestone_name, color=color)
@@ -1533,7 +1541,16 @@ def plot_milestone_pdfs_overlay(rollouts_file: Path, milestone_names: List[str],
             mode = xs[mode_idx]
 
             # Store stats for display
-            stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}")
+            pct_achieved = prob_achieved * 100
+
+            # For ACD-AI and AI2027-SC, also show stats for achieved-only runs
+            if milestone_name in ["ACD-AI", "AI2027-SC"] and num_not_achieved > 0:
+                # Calculate percentiles using only achieved runs
+                q10_achieved, q50_achieved = np.quantile(data, [0.1, 0.5])
+                stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}, {pct_achieved:.0f}% achieved")
+                stats_lines.append(f"  (if achieved: P10={q10_achieved:.1f}, P50={q50_achieved:.1f})")
+            else:
+                stats_lines.append(f"{milestone_name}: Mode={mode:.1f}, P10={q10:.1f}, P50={q50:.1f}, {pct_achieved:.0f}% achieved")
         except Exception as e:
             print(f"Warning: Could not create KDE for {milestone_name}: {e}")
             continue
@@ -1601,7 +1618,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AIR-25x,AIR-25x:AIR-250x"
+    pairs_str = "ACD-AI:AI2027-SC,ACD-AI:AIR-25x,AIR-25x:AIR-250x"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
