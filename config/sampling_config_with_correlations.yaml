@@ -7,7 +7,6 @@
 #   python scripts/batch_rollout.py --config config/sampling_config_with_correlations.yaml \
 #     --num-samples 2000 --input-data input_data.csv --time-range 2015 2035 --seed 123
 
-seed: 32432432
 initial_progress: 0.0
 time_range: [2012.0, 2050.0]
 
@@ -136,13 +135,29 @@ parameters:
 # This creates correlations between related parameters
 correlation_matrix:
   parameters:
+    - "present_doubling_time"
+    - "doubling_difficulty_growth_factor"
+    - "ai_research_taste_slope"          
     - "ai_research_taste_at_coding_automation_anchor_sd"
-    - "ai_research_taste_slope"
-    - "median_to_top_taste_multiplier"
+    - "gap_years"
+    - "pre_gap_aa_time_horizon"
+    - "slowdown_year"
+    - "aa_time_horizon_minutes"
+    - "coding_automation_efficiency_slope"
+    - "inv_compute_anchor_exp_cap"
+    - "inf_compute_asymptote"
   correlation_matrix:
-    - [1.0, 0.6, 0.3]    # ai_research_taste_at_coding_automation_anchor_sd
-    - [0.6, 1.0, 0.4]    # ai_research_taste_slope  
-    - [0.3, 0.4, 1.0]    # median_to_top_taste_multiplier
+    - [ 1.00,  0.60, -0.30,  0.00,  0.00,  0.00, -0.30,  0.00, -0.15,  0.00,  0.00] # present_doubling_time
+    - [ 0.60,  1.00, -0.30,  0.00,  0.30,  0.00,  0.00,  0.00, -0.10,  0.00,  0.00] # doubling_difficulty_growth_factor
+    - [-0.30, -0.30,  1.00,  0.30,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00] # ai_research_taste_slope
+    - [ 0.00,  0.00,  0.30,  1.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00] # ai_research_taste_at_coding_automation_anchor_sd
+    - [ 0.00,  0.30,  0.00,  0.00,  1.00, -0.70, -0.30,  0.00,  0.00,  0.00,  0.00] # gap_years
+    - [ 0.00,  0.00,  0.00,  0.00, -0.70,  1.00,  0.00,  0.00,  0.00,  0.00,  0.00] # pre_gap_aa_time_horizon
+    - [-0.30,  0.00,  0.00,  0.00, -0.30,  0.00,  1.00, -0.30,  0.00,  0.00,  0.00] # slowdown_year
+    - [ 0.00,  0.00,  0.00,  0.00,  0.00,  0.00, -0.30,  1.00,  0.00,  0.00,  0.00] # aa_time_horizon_minutes
+    - [-0.15, -0.10,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  1.00,  0.00,  0.00] # coding_automation_efficiency_slope
+    - [ 0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  1.00,  0.50] # inv_compute_anchor_exp_cap (marginal behavior)
+    - [ 0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00,  0.50,  1.00] # inf_compute_asymptote (C_inf)
   correlation_type: "spearman"
 # Input time series uncertainty
 # These parameters control the generation of time series data with uncertainty
