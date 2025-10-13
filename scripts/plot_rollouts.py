@@ -25,7 +25,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde, rankdata, spearmanr
+from scipy.stats import gaussian_kde, rankdata, spearmanr, norm
 from datetime import datetime, timedelta
 import yaml
 
@@ -1893,6 +1893,172 @@ def plot_all_correlations(run_dir: Path) -> None:
     print(f"\nGenerated {num_plots} correlation plots in {output_dir}")
 
 
+def _read_m_over_beta_values(rollouts_file: Path) -> Tuple[List[float], int]:
+    """
+    Read m/beta values from rollouts file.
+
+    Formula:
+    m = (ai_research_taste_slope / present_year_OOMs) * (log10(median_to_top_taste_multiplier) ^ (1/norm.ppf(top_percentile)))
+    beta = 1/r_software
+    m/beta = m * r_software
+
+    Where present_year_OOMs is the human-only progress rate at present_day (in OOMs/year)
+
+    Returns:
+        Tuple of (list of m/beta values, number of rollouts skipped due to missing data)
+    """
+    m_over_beta_values: List[float] = []
+    num_skipped = 0
+
+    with rollouts_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            params = rec.get("parameters")
+            results = rec.get("results")
+            if not isinstance(params, dict) or not isinstance(results, dict):
+                num_skipped += 1
+                continue
+
+            # Extract required parameters
+            ai_research_taste_slope = params.get("ai_research_taste_slope")
+            median_to_top_taste_multiplier = params.get("median_to_top_taste_multiplier")
+            top_percentile = params.get("top_percentile", 0.999)  # Default from model_config
+            r_software = params.get("r_software")
+            present_day = params.get("present_day", 2025.6)  # Default from model_config
+
+            # Extract results arrays
+            times = results.get("times")
+            human_only_progress_rates = results.get("human_only_progress_rates")
+
+            # Skip if any required parameter is missing
+            if (ai_research_taste_slope is None or
+                median_to_top_taste_multiplier is None or
+                r_software is None or
+                times is None or
+                human_only_progress_rates is None):
+                num_skipped += 1
+                continue
+
+            try:
+                # Get present_year_OOMs by interpolating human_only_progress_rates at present_day
+                times_arr = np.asarray(times)
+                rates_arr = np.asarray(human_only_progress_rates)
+                present_year_OOMs = float(np.interp(present_day, times_arr, rates_arr))
+
+                if present_year_OOMs <= 0:
+                    num_skipped += 1
+                    continue
+
+                # Compute m/beta
+                # m = (ai_research_taste_slope / present_year_OOMs) * log10(median_to_top_taste_multiplier^(1/z_p))
+                # Which equals: (ai_research_taste_slope / present_year_OOMs) * (1/z_p) * log10(median_to_top_taste_multiplier)
+                z_p = norm.ppf(float(top_percentile))
+                if z_p <= 0 or median_to_top_taste_multiplier <= 0:
+                    num_skipped += 1
+                    continue
+
+                log10_mult = np.log10(float(median_to_top_taste_multiplier))
+                m = (float(ai_research_taste_slope) / present_year_OOMs) * (1.0 / z_p) * log10_mult
+
+                # beta = 1/r_software, so m/beta = m * r_software
+                m_over_beta = m * float(r_software)
+
+                if np.isfinite(m_over_beta):
+                    m_over_beta_values.append(m_over_beta)
+                else:
+                    num_skipped += 1
+            except (TypeError, ValueError, ZeroDivisionError):
+                num_skipped += 1
+                continue
+
+    return m_over_beta_values, num_skipped
+
+
+def plot_m_over_beta_histogram(m_over_beta_values: List[float], num_skipped: int, out_path: Path, bins: int = 50, title: Optional[str] = None) -> None:
+    """
+    Plot histogram of m/beta values with logarithmic bins.
+
+    Args:
+        m_over_beta_values: List of m/beta values
+        num_skipped: Number of rollouts skipped due to missing data
+        out_path: Output path for the plot
+        bins: Number of histogram bins
+        title: Optional title for the plot
+    """
+    if not m_over_beta_values:
+        print("Warning: No m/beta values to plot")
+        return
+
+    arr = np.asarray(m_over_beta_values, dtype=float)
+
+    # Calculate percentage > 1
+    pct_above_one = 100.0 * np.sum(arr > 1) / len(arr)
+
+    # Calculate statistics
+    q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+    mean_val = np.mean(arr)
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Create logarithmic bins
+    min_val = np.min(arr)
+    max_val = np.max(arr)
+    # Ensure positive values for log scale
+    if min_val <= 0:
+        min_val = np.min(arr[arr > 0]) if np.any(arr > 0) else 1e-10
+    log_bins = np.logspace(np.log10(min_val), np.log10(max_val), bins + 1)
+
+    # Plot histogram with log bins
+    n, bins_out, patches = ax.hist(arr, bins=log_bins, color="steelblue", alpha=0.7, edgecolor="black")
+
+    # Add vertical line at m/beta = 1
+    ax.axvline(x=1.0, color="red", linestyle="--", linewidth=2, label="m/β = 1")
+
+    # Add median line
+    ax.axvline(x=q50, color="green", linestyle="--", linewidth=1.5, alpha=0.7, label=f"Median = {q50:.2f}")
+
+    # Set log scale for x-axis
+    ax.set_xscale('log')
+
+    # Labels and title
+    ax.set_xlabel("m/β (log scale)", fontsize=12)
+    ax.set_ylabel("Count", fontsize=12)
+    if title is None:
+        title = "Distribution of m/β"
+    ax.set_title(title, fontsize=14)
+
+    # Add text box with statistics
+    stats_text = (
+        f"Percentage m/β > 1: {pct_above_one:.1f}%\n"
+        f"Mean: {mean_val:.2f}\n"
+        f"P10/P50/P90: {q10:.2f} / {q50:.2f} / {q90:.2f}\n"
+        f"N = {len(arr)}"
+    )
+    if num_skipped > 0:
+        stats_text += f"\nSkipped (missing r_software): {num_skipped}"
+
+    ax.text(0.98, 0.97, stats_text, transform=ax.transAxes,
+            verticalalignment="top", horizontalalignment="right",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+            fontsize=10, family="monospace")
+
+    ax.legend(loc="upper left")
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(str(out_path), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved m/β histogram to {out_path}")
+
+
 def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     """Generate all standard plots for a batch rollout.
 
@@ -2061,6 +2227,31 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
     else:
         print(f"Warning: No valid X values found, skipping X years in 1 year plot")
 
+    # m/beta distribution
+    out_path = output_dir / "m_over_beta_hist.png"
+    m_over_beta_values, num_skipped = _read_m_over_beta_values(rollouts_file)
+
+    if len(m_over_beta_values) > 0:
+        plot_m_over_beta_histogram(
+            m_over_beta_values,
+            num_skipped,
+            out_path,
+            bins=50,
+            title="Distribution of m/β"
+        )
+        # Print statistics
+        arr = np.asarray(m_over_beta_values, dtype=float)
+        pct_above_one = 100.0 * np.sum(arr > 1) / len(arr)
+        q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+        print(f"Saved {out_path}")
+        print(f"  m/β - Percentage > 1: {pct_above_one:.1f}% | P10/Median/P90: {q10:.2f} / {q50:.2f} / {q90:.2f}")
+        if num_skipped > 0:
+            print(f"  Note: {num_skipped} rollouts skipped due to missing r_software")
+    else:
+        print(f"Warning: No valid m/β values found, skipping m/β plot")
+        if num_skipped > 0:
+            print(f"  (All {num_skipped} rollouts were missing r_software - run a new Monte Carlo with updated code)")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plot tools for batch rollout results")
@@ -2068,7 +2259,7 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--run-dir", type=str, default=None, help="Path to a single rollout run directory containing rollouts.jsonl")
     g.add_argument("--rollouts", type=str, default=None, help="Path directly to a rollouts.jsonl file")
     parser.add_argument("--out", type=str, default=None, help="Output image path (PNG). Defaults vary by --mode")
-    parser.add_argument("--mode", type=str, choices=["sc_hist", "horizon_trajectories", "horizon_at_sc_hist", "milestone_time_hist", "milestone_transition_box", "milestone_scatter", "correlations"], default="sc_hist", help="Which plot to generate")
+    parser.add_argument("--mode", type=str, choices=["sc_hist", "horizon_trajectories", "horizon_at_sc_hist", "milestone_time_hist", "milestone_transition_box", "milestone_scatter", "correlations", "m_over_beta"], default="sc_hist", help="Which plot to generate")
     parser.add_argument("--batch-all", action="store_true", help="Generate all standard plots (ignores --mode and --out)")
     parser.add_argument("--plot-correlations", action="store_true", help="Generate correlation scatter plots for all parameter pairs with non-zero correlation")
     # Histogram options
@@ -2138,6 +2329,8 @@ def main() -> None:
             out_path = default_dir / f"milestone_{safe}_hist.png"
         elif args.mode == "milestone_scatter":
             out_path = default_dir / "milestone_scatter.png"
+        elif args.mode == "m_over_beta":
+            out_path = default_dir / "m_over_beta_hist.png"
         else:
             if args.mode == "milestone_transition_box":
                 out_path = default_dir / "milestone_transition_box.png"
@@ -2277,6 +2470,31 @@ def main() -> None:
             condition_text=None,
         )
         print(f"Saved milestone scatter to: {out_path}")
+        return
+
+    if args.mode == "m_over_beta":
+        m_over_beta_values, num_skipped = _read_m_over_beta_values(rollouts_path)
+        if len(m_over_beta_values) > 0:
+            plot_m_over_beta_histogram(
+                m_over_beta_values,
+                num_skipped,
+                out_path,
+                bins=args.bins,
+                title="Distribution of m/β"
+            )
+            # Print statistics
+            arr = np.asarray(m_over_beta_values, dtype=float)
+            pct_above_one = 100.0 * np.sum(arr > 1) / len(arr)
+            q10, q50, q90 = np.quantile(arr, [0.1, 0.5, 0.9])
+            print(f"Saved m/β histogram to: {out_path}")
+            print(f"  Percentage m/β > 1: {pct_above_one:.1f}%")
+            print(f"  P10/Median/P90: {q10:.2f} / {q50:.2f} / {q90:.2f}")
+            if num_skipped > 0:
+                print(f"  Note: {num_skipped} rollouts skipped due to missing data")
+        else:
+            print(f"Warning: No valid m/β values found")
+            if num_skipped > 0:
+                print(f"  (All {num_skipped} rollouts were missing required data)")
         return
 
     # horizon_trajectories mode
