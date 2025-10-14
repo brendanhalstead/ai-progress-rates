@@ -524,6 +524,15 @@ def _parse_milestone_pairs(pairs_arg: Optional[str]) -> List[Tuple[str, str]]:
     return pairs
 
 
+def _simplify_milestone_name(name: str) -> str:
+    """Simplify milestone names for display."""
+    simplifications = {
+        "SAR-level-experiment-selection-skill": "SAR-experiment-selection",
+        "SIAR-level-experiment-selection-skill": "SIAR-experiment-selection",
+    }
+    return simplifications.get(name, name)
+
+
 def _read_milestone_transition_durations(
     rollouts_file: Path,
     pairs: List[Tuple[str, str]],
@@ -541,7 +550,7 @@ def _read_milestone_transition_durations(
         total_a_achieved_per_pair: number of rollouts where A was achieved for each pair
         typical_max_duration: typical maximum possible duration (sim_end - earliest A time)
     """
-    labels: List[str] = [f"{a} to {b}" for a, b in pairs]
+    labels: List[str] = [f"{_simplify_milestone_name(a)} to {_simplify_milestone_name(b)}" for a, b in pairs]
     durations_per_pair: List[List[float]] = [[] for _ in pairs]
     durations_with_censored_per_pair: List[List[float]] = [[] for _ in pairs]
     num_b_not_achieved: List[int] = [0 for _ in pairs]
@@ -1058,7 +1067,7 @@ def plot_milestone_transition_boxplot(
         wrapped = label.replace(" to ", "\nto\n")
         wrapped_labels.append(wrapped)
 
-    ax.set_xticklabels(wrapped_labels, rotation=0, ha='center', fontsize=10)
+    ax.set_xticklabels(wrapped_labels, rotation=0, ha='center', fontsize=20)
 
     # Add legend
     from matplotlib.patches import Patch
@@ -1066,21 +1075,21 @@ def plot_milestone_transition_boxplot(
         Patch(facecolor=(0.5, 0.8, 0.5, 0.7), edgecolor='black', label='Both achieved'),
         Patch(facecolor=(0.5, 0.5, 0.8, 0.7), edgecolor='black', label='Assuming achieved at cutoff')
     ]
-    ax.legend(handles=legend_elements, loc='upper left')
+    ax.legend(handles=legend_elements, loc='upper left', fontsize=16)
 
     plt.yscale('log')
     ticks, tick_labels = _get_year_tick_values_and_labels(ymin, ymax)
-    plt.yticks(ticks, tick_labels)
+    plt.yticks(ticks, tick_labels, fontsize=18)
     plt.ylim(ymin, ymax)
 
     # Set x-axis limits to show all boxes with padding
     ax.set_xlim(-0.5, 3 * len(labels) - 0.5)
 
-    plt.xlabel("Milestone Transition")
-    plt.ylabel("Calendar Years (log scale)")
+    plt.xlabel("Milestone Transition", fontsize=20)
+    plt.ylabel("Calendar Years (log scale)", fontsize=20)
     plt.grid(True, which="both", axis="y", alpha=0.25)
 
-    plt.title(title or "Time Spent in Each Milestone Transition (calendar years)")
+    plt.title(title or "Time Spent in Each Milestone Transition (calendar years)", fontsize=22)
 
     # Stats panel
     x_text = 1.03
@@ -1091,7 +1100,13 @@ def plot_milestone_transition_boxplot(
         panel_lines.append("")
 
     for lbl, arr, arr_c, n_not_achieved, n_before, total_a in zip(labels, finite_groups, censored_groups, num_b_not_achieved_per_pair, num_b_before_a_per_pair, total_per_pair):
-        panel_lines.append(lbl)
+        # Wrap long milestone transition labels
+        if len(lbl) > 40 and " to " in lbl:
+            parts = lbl.split(" to ")
+            panel_lines.append(f"{parts[0]} to")
+            panel_lines.append(f"  {parts[1]}")
+        else:
+            panel_lines.append(lbl)
 
         # Stats for achieved only
         panel_lines.append("  Both achieved:")
@@ -1109,12 +1124,13 @@ def plot_milestone_transition_boxplot(
 
         # Stats for including censored
         milestone_b = lbl.split(" to ")[1] if " to " in lbl else "second"
-        # Wrap long milestone names to prevent cutoff
-        if len(milestone_b) > 25:
+        # Wrap if the full line would be too long
+        full_line = f"  Assuming {milestone_b} achieved at simulation cutoff:"
+        if len(full_line) > 50:
             panel_lines.append(f"  Assuming {milestone_b}")
             panel_lines.append(f"    achieved at simulation cutoff:")
         else:
-            panel_lines.append(f"  Assuming {milestone_b} achieved at simulation cutoff:")
+            panel_lines.append(full_line)
         if arr_c.size == 0:
             panel_lines.append("    (none)")
         else:
@@ -1132,7 +1148,7 @@ def plot_milestone_transition_boxplot(
     txt = "\n".join(panel_lines)
     ax_inset = plt.gcf().add_axes([0.70, 0.12, 0.28, 0.76])
     ax_inset.axis('off')
-    ax_inset.text(0.0, 1.0, txt, va='top', ha='left', fontsize=11, family='monospace', bbox=dict(facecolor=(1,1,1,0.7), edgecolor='0.7'))
+    ax_inset.text(0.0, 1.0, txt, va='top', ha='left', fontsize=16, family='monospace', bbox=dict(facecolor=(1,1,1,0.7), edgecolor='0.7'))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out_path)
@@ -1454,8 +1470,9 @@ def plot_x_years_in_1_year_histogram(x_values: List[float], out_path: Path, bins
         # Position the >50 bar at x=70 (visually separated from the 50 mark)
         bar_x = 70.0
         bar_width = 20.0  # Make it visually distinct
+        pct_above_50 = 100.0 * num_above_50 / len(data)
         ax.bar(bar_x, num_above_50, width=bar_width, edgecolor="black",
-               alpha=0.6, color="tab:red", label=f">50 ({num_above_50})")
+               alpha=0.6, color="tab:red", label=f">50 ({pct_above_50:.1f}%)")
 
     # Set x-axis to log scale
     plt.xscale("log")
@@ -1919,7 +1936,7 @@ def batch_plot_all(rollouts_file: Path, output_dir: Path) -> None:
         print(f"Saved {out_path}")
 
     # Milestone transition boxplot
-    pairs_str = "ACD-AI:AI2027-SC,ACD-AI:SAR-level-experiment-selection-skill,SAR-level-experiment-selection-skill:SIAR-level-experiment-selection-skill"
+    pairs_str = "ACD-AI:SAR-level-experiment-selection-skill,SAR-level-experiment-selection-skill:SIAR-level-experiment-selection-skill"
     pairs = _parse_milestone_pairs(pairs_str)
     out_path = output_dir / "milestone_transition_box.png"
 
