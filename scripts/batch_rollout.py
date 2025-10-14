@@ -688,7 +688,8 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dic
         model = _PM(params_obj, data)
         with _suppress_noise():
             model.compute_progress_trajectory(time_range, initial_progress)
-        conn.send({"ok": True, "results": _to_jsonable(model.results)})
+        # Include computed r_software in results
+        conn.send({"ok": True, "results": _to_jsonable(model.results), "r_software": float(model.params.r_software)})
     except Exception as e:  # pragma: no cover
         import traceback
         conn.send({"ok": False, "error": str(e), "traceback": traceback.format_exc()})
@@ -703,7 +704,7 @@ def _rollout_worker(conn, sampled_params: Dict[str, Any], sampled_ts_params: Dic
 def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: Dict[str, Any], input_data_path: str, time_range: List[float], initial_progress: float, timeout_s: Optional[float]) -> Dict[str, Any]:
     """Run one rollout in a child process; enforce timeout by termination.
 
-    Returns results dict on success. Raises TimeoutError on timeout. Raises Exception on failure.
+    Returns dict with 'results' and 'r_software' on success. Raises TimeoutError on timeout. Raises Exception on failure.
     """
     ctx = mp.get_context("spawn")
     parent_conn, child_conn = ctx.Pipe(duplex=False)
@@ -738,7 +739,8 @@ def _run_rollout_subprocess(sampled_params: Dict[str, Any], sampled_ts_params: D
             if traceback:
                 error_msg += f"\nSubprocess traceback:\n{traceback}"
             raise RuntimeError(error_msg)
-        return result["results"]
+        # Return both results and r_software
+        return {"results": result["results"], "r_software": result.get("r_software")}
     finally:
         try:
             parent_conn.close()
@@ -941,11 +943,20 @@ def main() -> None:
                 # with _suppress_noise():
                 if per_sample_timeout is not None and per_sample_timeout > 0:
                     # Use subprocess isolation when timeout is requested to avoid internal catches
-                    results = _run_rollout_subprocess(sampled_params, sampled_ts_params, str(Path(input_data_path).resolve()), time_range, initial_progress, per_sample_timeout)
+                    subprocess_result = _run_rollout_subprocess(sampled_params, sampled_ts_params, str(Path(input_data_path).resolve()), time_range, initial_progress, per_sample_timeout)
+                    # Extract r_software if available from subprocess
+                    if isinstance(subprocess_result, dict) and "r_software" in subprocess_result:
+                        sampled_params["r_software"] = subprocess_result["r_software"]
+                        rollout_results = subprocess_result.get("results")
+                    else:
+                        rollout_results = subprocess_result
                     model = None  # no in-process model
                 else:
                     model = ProgressModel(params_obj, rollout_data)
                     times, progress_values, research_stock_values = model.compute_progress_trajectory(time_range, initial_progress)
+                    # Add computed r_software to sampled_params for future analysis
+                    sampled_params["r_software"] = model.params.r_software
+                    rollout_results = _to_jsonable(model.results)
 
                 # Persist sample record (include both parameter types)
                 sample_record = {
@@ -957,10 +968,6 @@ def main() -> None:
                 f_samples.flush()
 
                 # Persist rollout record
-                if per_sample_timeout is not None and per_sample_timeout > 0:
-                    rollout_results = results
-                else:
-                    rollout_results = _to_jsonable(model.results)
                 rollout_record = {
                     "sample_id": i,
                     "parameters": _to_jsonable(sampled_params),
