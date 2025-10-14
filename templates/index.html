@@ -28,6 +28,53 @@
 
     <style>
       /* Using external stylesheet at /static/styles.css */
+      
+      /* Red theme override for blacksite mode */
+      body.blacksite-mode {
+        --primary-color: #dc3545;
+        --primary-hover: #c82333;
+        --primary-dark: #bd2130;
+      }
+      
+      body.blacksite-mode .navbar {
+        background: linear-gradient(135deg, #dc3545 0%, #bd2130 100%) !important;
+      }
+      
+      body.blacksite-mode .btn-primary {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+      }
+      
+      body.blacksite-mode .btn-primary:hover {
+        background-color: #c82333 !important;
+        border-color: #bd2130 !important;
+      }
+      
+      body.blacksite-mode .btn-outline-light:hover {
+        background-color: rgba(220, 53, 69, 0.1) !important;
+      }
+      
+      body.blacksite-mode .nav-link.active {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+      }
+      
+      body.blacksite-mode .form-check-input:checked {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+      }
+      
+      body.blacksite-mode .form-range::-webkit-slider-thumb {
+        background-color: #dc3545 !important;
+      }
+      
+      body.blacksite-mode .form-range::-moz-range-thumb {
+        background-color: #dc3545 !important;
+      }
+      
+      body.blacksite-mode .progress-bar.bg-success {
+        background-color: #dc3545 !important;
+      }
     </style>
   </head>
   <body>
@@ -1570,6 +1617,16 @@
           if (this.type === "range") {
             updateDisplayValue(this);
           }
+          
+          // Toggle theme when blacksite checkbox changes
+          if (this.id === "is_blacksite" && this.type === "checkbox") {
+            if (this.checked) {
+              document.body.classList.add("blacksite-mode");
+            } else {
+              document.body.classList.remove("blacksite-mode");
+            }
+          }
+          
           if ($("#autoUpdate").is(":checked")) {
             clearTimeout(window.updateTimer);
             window.updateTimer = setTimeout(computeModel, 300);
@@ -3260,6 +3317,10 @@
           const blacksiteToggle = document.getElementById("is_blacksite");
           if (blacksiteToggle && parameterConfig?.defaults?.is_blacksite !== undefined) {
             blacksiteToggle.checked = !!parameterConfig.defaults.is_blacksite;
+            // Apply theme based on initial state
+            if (blacksiteToggle.checked) {
+              document.body.classList.add("blacksite-mode");
+            }
           }
           
           // Initialize blacksite sliders
