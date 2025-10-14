@@ -907,6 +907,130 @@
                                 </div>
                             </div> -->
 
+                <!-- Plan A Settings -->
+                <div class="param-group" id="plan_a_settings_group" style="display: none;">
+                  <div
+                    class="d-flex justify-content-between align-items-center mb-2"
+                  >
+                    <h6 class="text-muted mb-0">Plan A Settings</h6>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#planAParams"
+                      aria-expanded="false"
+                      aria-controls="planAParams"
+                    >
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                  </div>
+                  <div class="collapse" id="planAParams">
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="is_blacksite"
+                        />
+                        <label class="form-check-label" for="is_blacksite">
+                          Black Site
+                        </label>
+                      </div>
+                      <small class="text-muted">Enable black site scenario.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Black Site SW Years Behind:
+                        <span id="blacksite_sw_years_behind_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_sw_years_behind"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >How many years behind the black site is in software efficiency</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Training Compute Penalty:
+                        <span id="blacksite_training_compute_penalty_ooms_val">Loading...</span> OOMs</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_training_compute_penalty_ooms"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Training compute penalty in OOMs</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Human Labor Penalty:
+                        <span id="blacksite_human_labor_penalty_ooms_val">Loading...</span> OOMs</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_human_labor_penalty_ooms"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Human labor penalty in OOMs</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Experiment Compute Penalty:
+                        <span id="blacksite_experiment_compute_penalty_ooms_val">Loading...</span> OOMs</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_experiment_compute_penalty_ooms"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Experiment compute penalty in OOMs</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Inference Compute Penalty:
+                        <span id="blacksite_inference_compute_penalty_ooms_val">Loading...</span> OOMs</label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_inference_compute_penalty_ooms"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Inference compute penalty in OOMs</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Human Taste Penalty:
+                        <span id="blacksite_human_taste_penalty_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_human_taste_penalty"
+                        step="0.01"
+                      />
+                      <small class="text-muted"
+                        >Human taste penalty factor</small
+                      >
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Simulation Settings -->
                 <div class="param-group">
                   <div
@@ -957,6 +1081,19 @@
                         </label>
                       </div>
                       <small class="text-muted">Freezes input time series once the automation anchor is reached.</small>
+                    </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="plan_a_mode"
+                        />
+                        <label class="form-check-label" for="plan_a_mode">
+                          Plan A Mode
+                        </label>
+                      </div>
+                      <small class="text-muted">Enables Plan A scenario configuration.</small>
                     </div>
                     <div class="row">
                       <div class="col-4">
@@ -1218,6 +1355,15 @@
         "doubling_difficulty_growth_factor",
         // Simulation settings
         "sos_mode",
+        "plan_a_mode",
+        // Plan A settings
+        "is_blacksite",
+        "blacksite_sw_years_behind",
+        "blacksite_training_compute_penalty_ooms",
+        "blacksite_human_labor_penalty_ooms",
+        "blacksite_experiment_compute_penalty_ooms",
+        "blacksite_inference_compute_penalty_ooms",
+        "blacksite_human_taste_penalty",
       ];
 
       // Load parameter configuration from server
@@ -1408,6 +1554,30 @@
           }
         });
 
+        // Add event listener for Plan A mode checkbox
+        $("#plan_a_mode").on("change", function () {
+          updatePlanASettingsVisibility();
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else {
+            computeModel();
+          }
+        });
+
+        // Add event listeners for Plan A Settings parameters
+        $("#is_blacksite, #blacksite_sw_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty").on("change input", function () {
+          if (this.type === "range") {
+            updateDisplayValue(this);
+          }
+          if ($("#autoUpdate").is(":checked")) {
+            clearTimeout(window.updateTimer);
+            window.updateTimer = setTimeout(computeModel, 300);
+          } else if (this.type === "checkbox") {
+            computeModel();
+          }
+        });
+
         // Wire include_gap toggle
         $("#include_gap").on("change", function () {
           updateBenchmarksAndGapsVisibility();
@@ -1427,6 +1597,8 @@
         updateBenchmarksAndGapsVisibility();
         // Initialize converted gap display
         updateGapConvertedDisplay();
+        // Initialize Plan A Settings visibility
+        updatePlanASettingsVisibility();
 
         // Initialize anchor time display text
         updateAnchorTimeDisplay();
@@ -1447,6 +1619,13 @@
         group.style.display = toggle.checked ? "" : "none";
         if (scGroup) scGroup.style.display = toggle.checked ? "none" : "";
         if (satGroup) satGroup.style.display = toggle.checked ? "" : "none";
+      }
+
+      function updatePlanASettingsVisibility() {
+        const toggle = document.getElementById("plan_a_mode");
+        const group = document.getElementById("plan_a_settings_group");
+        if (!toggle || !group) return;
+        group.style.display = toggle.checked ? "block" : "none";
       }
 
       function formatDecimalYearToDate(decimalYear) {
@@ -1789,7 +1968,7 @@
           id === "coding_labor_mode"
             ) {
               value = element.val(); // Keep as string
-            } else if (id === "sos_mode") {
+            } else if (id === "sos_mode" || id === "plan_a_mode" || id === "is_blacksite") {
               // Boolean checkbox
               value = element.is(":checked");
             } else {
@@ -1833,10 +2012,12 @@
             if (
               id !== "taste_schedule_type" &&
               id !== "horizon_extrapolation_type" &&
-          id !== "automation_interp_type" &&
+              id !== "automation_interp_type" &&
           id !== "coding_labor_mode" &&
               id !== "include_gap" &&
               id !== "sos_mode" &&
+              id !== "plan_a_mode" &&
+              id !== "is_blacksite" &&
               value !== null &&
               !isFinite(value)
             ) {
@@ -3062,6 +3243,44 @@
           }
         } catch (e) {
           console.warn("Failed to initialize SIE mode toggle", e);
+        }
+
+        // Initialize Plan A mode toggle state
+        try {
+          const planAToggle = document.getElementById("plan_a_mode");
+          if (planAToggle && parameterConfig?.defaults?.plan_a_mode !== undefined) {
+            planAToggle.checked = !!parameterConfig.defaults.plan_a_mode;
+          }
+        } catch (e) {
+          console.warn("Failed to initialize Plan A mode toggle", e);
+        }
+
+        // Initialize Plan A / blacksite parameters
+        try {
+          const blacksiteToggle = document.getElementById("is_blacksite");
+          if (blacksiteToggle && parameterConfig?.defaults?.is_blacksite !== undefined) {
+            blacksiteToggle.checked = !!parameterConfig.defaults.is_blacksite;
+          }
+          
+          // Initialize blacksite sliders
+          const blacksiteParams = [
+            'blacksite_sw_years_behind',
+            'blacksite_training_compute_penalty_ooms',
+            'blacksite_human_labor_penalty_ooms',
+            'blacksite_experiment_compute_penalty_ooms',
+            'blacksite_inference_compute_penalty_ooms',
+            'blacksite_human_taste_penalty'
+          ];
+          
+          blacksiteParams.forEach(paramId => {
+            const slider = document.getElementById(paramId);
+            if (slider && parameterConfig?.defaults?.[paramId] !== undefined) {
+              slider.value = parameterConfig.defaults[paramId];
+              updateDisplayValue(slider);
+            }
+          });
+        } catch (e) {
+          console.warn("Failed to initialize Plan A/blacksite parameters", e);
         }
 
         // Initialize Benchmarks & Gaps controls from defaults where appropriate
