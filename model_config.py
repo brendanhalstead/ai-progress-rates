@@ -157,6 +157,7 @@ PARAMETER_BOUNDS = {
     'coding_labor_mode': (0, 1),
     'blacksite_sw_years_behind': (0.0, 10.0),
     'blacksite_training_compute_penalty_ooms': (0.0, 10.0),
+    'blacksite_training_compute_growth_rate': (0.0, 5.0),
     'blacksite_human_labor_penalty_ooms': (0.0, 10.0),
     'blacksite_experiment_compute_penalty_ooms': (0.0, 10.0),
     'blacksite_inference_compute_penalty_ooms': (0.0, 10.0),
@@ -261,10 +262,13 @@ DEFAULT_PARAMETERS = {
     'is_blacksite': False,
     'blacksite_sw_years_behind': 0.0,
     'blacksite_training_compute_penalty_ooms': 1,
+    'blacksite_training_compute_growth_rate': 0,
     'blacksite_human_labor_penalty_ooms': 1,
     'blacksite_experiment_compute_penalty_ooms': 1,
     'blacksite_inference_compute_penalty_ooms': 1,
     'blacksite_human_taste_penalty': 1,
+    'blacksite_can_stack_training_compute': False,
+    'blacksite_can_stack_software_progress': True,
     'blacksite_start_time': 2028.0
 }
 

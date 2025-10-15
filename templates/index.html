@@ -1017,6 +1017,21 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
+                        >Training Compute Growth Rate:
+                        <span id="blacksite_training_compute_growth_rate_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_training_compute_growth_rate"
+                        step="0.01"
+                      />
+                      <small class="text-muted"
+                        >Blacksite training compute growth rate (OOMs per year)</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
                         >Human Labor Penalty:
                         <span id="blacksite_human_labor_penalty_ooms_val">Loading...</span> OOMs</label
                       >
@@ -1074,6 +1089,37 @@
                       <small class="text-muted"
                         >Human taste penalty factor</small
                       >
+                    </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="blacksite_can_stack_software_progress"
+                          checked
+                        />
+                        <label class="form-check-label" for="blacksite_can_stack_software_progress">
+                          Can Stack Software Progress
+                        </label>
+                      </div>
+                      <small class="text-muted">Allow blacksite to benefit from frontier software progress.</small>
+                      <div class="alert alert-warning mt-2" id="blacksite_software_progress_warning" style="display: none;">
+                        <small><strong>Warning:</strong> Disabling software progress stacking is currently unsupported and may produce incorrect results.</small>
+                      </div>
+                    </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="blacksite_can_stack_training_compute"
+                          checked
+                        />
+                        <label class="form-check-label" for="blacksite_can_stack_training_compute">
+                          Can Stack Training Compute
+                        </label>
+                      </div>
+                      <small class="text-muted">Allow blacksite to benefit from frontier training compute.</small>
                     </div>
                   </div>
                 </div>
@@ -1411,6 +1457,9 @@
         "blacksite_experiment_compute_penalty_ooms",
         "blacksite_inference_compute_penalty_ooms",
         "blacksite_human_taste_penalty",
+        "blacksite_training_compute_growth_rate",
+        "blacksite_can_stack_software_progress",
+        "blacksite_can_stack_training_compute",
       ];
 
       // Load parameter configuration from server
@@ -1613,7 +1662,7 @@
         });
 
         // Add event listeners for Plan A Settings parameters
-        $("#is_blacksite, #blacksite_sw_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty").on("change input", function () {
+        $("#is_blacksite, #blacksite_sw_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_training_compute_growth_rate, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty, #blacksite_can_stack_software_progress, #blacksite_can_stack_training_compute").on("change input", function () {
           if (this.type === "range") {
             updateDisplayValue(this);
           }
@@ -1624,6 +1673,14 @@
               document.body.classList.add("blacksite-mode");
             } else {
               document.body.classList.remove("blacksite-mode");
+            }
+          }
+          
+          // Show warning when software progress stacking is disabled
+          if (this.id === "blacksite_can_stack_software_progress" && this.type === "checkbox") {
+            const warning = document.getElementById("blacksite_software_progress_warning");
+            if (warning) {
+              warning.style.display = this.checked ? "none" : "block";
             }
           }
           
@@ -2025,7 +2082,7 @@
           id === "coding_labor_mode"
             ) {
               value = element.val(); // Keep as string
-            } else if (id === "sos_mode" || id === "plan_a_mode" || id === "is_blacksite") {
+            } else if (id === "sos_mode" || id === "plan_a_mode" || id === "is_blacksite" || id === "blacksite_can_stack_software_progress" || id === "blacksite_can_stack_training_compute") {
               // Boolean checkbox
               value = element.is(":checked");
             } else {
@@ -2075,6 +2132,8 @@
               id !== "sos_mode" &&
               id !== "plan_a_mode" &&
               id !== "is_blacksite" &&
+              id !== "blacksite_can_stack_software_progress" &&
+              id !== "blacksite_can_stack_training_compute" &&
               value !== null &&
               !isFinite(value)
             ) {
@@ -3327,6 +3386,7 @@
           const blacksiteParams = [
             'blacksite_sw_years_behind',
             'blacksite_training_compute_penalty_ooms',
+            'blacksite_training_compute_growth_rate',
             'blacksite_human_labor_penalty_ooms',
             'blacksite_experiment_compute_penalty_ooms',
             'blacksite_inference_compute_penalty_ooms',
@@ -3340,6 +3400,22 @@
               updateDisplayValue(slider);
             }
           });
+          
+          // Initialize blacksite stacking toggles
+          const stackSWToggle = document.getElementById("blacksite_can_stack_software_progress");
+          if (stackSWToggle && parameterConfig?.defaults?.blacksite_can_stack_software_progress !== undefined) {
+            stackSWToggle.checked = !!parameterConfig.defaults.blacksite_can_stack_software_progress;
+            // Show/hide warning based on initial state
+            const warning = document.getElementById("blacksite_software_progress_warning");
+            if (warning) {
+              warning.style.display = stackSWToggle.checked ? "none" : "block";
+            }
+          }
+          
+          const stackTCToggle = document.getElementById("blacksite_can_stack_training_compute");
+          if (stackTCToggle && parameterConfig?.defaults?.blacksite_can_stack_training_compute !== undefined) {
+            stackTCToggle.checked = !!parameterConfig.defaults.blacksite_can_stack_training_compute;
+          }
         } catch (e) {
           console.warn("Failed to initialize Plan A/blacksite parameters", e);
         }

@@ -593,10 +593,13 @@ class Parameters:
     is_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['is_blacksite'])
     blacksite_sw_years_behind: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_sw_years_behind'])
     blacksite_training_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_penalty_ooms'])
+    blacksite_training_compute_growth_rate: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_growth_rate'])
     blacksite_human_labor_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_human_labor_penalty_ooms'])
     blacksite_experiment_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_experiment_compute_penalty_ooms'])
     blacksite_inference_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_inference_compute_penalty_ooms'])
     blacksite_human_taste_penalty: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_human_taste_penalty'])
+    blacksite_can_stack_training_compute: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_can_stack_training_compute'])
+    blacksite_can_stack_software_progress: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_can_stack_software_progress'])
     blacksite_start_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_start_time'])
     
     def __post_init__(self):
@@ -4058,7 +4061,24 @@ class BlacksiteProgressModel(ProgressModel):
         L_HUMAN = data.L_HUMAN[start_time_idx:] / (10**self.params.blacksite_human_labor_penalty_ooms)
         inference_compute = data.inference_compute[start_time_idx:] / (10**self.params.blacksite_inference_compute_penalty_ooms)
         experiment_compute = data.experiment_compute[start_time_idx:] / (10**self.params.blacksite_experiment_compute_penalty_ooms)
+        
         training_compute_growth_rate = data.training_compute_growth_rate[start_time_idx:]
+        if self.params.blacksite_can_stack_training_compute:
+            for i in range(len(training_compute_growth_rate)):
+                training_compute_growth_rate[i] = self.params.blacksite_training_compute_growth_rate
+        else:
+            if self.params.blacksite_training_compute_growth_rate > 0:
+                time_until_training_compute_parity = self.params.blacksite_training_compute_penalty_ooms / self.params.blacksite_training_compute_growth_rate
+                training_compute_parity_idx = np.argmin(np.abs(time - (time_until_training_compute_parity + time[0])))
+                training_compute_growth_rate = data.training_compute_growth_rate[start_time_idx:]
+                for i in range(training_compute_parity_idx):
+                    training_compute_growth_rate[i] = 0
+                for i in range(training_compute_parity_idx, len(training_compute_growth_rate)):
+                    training_compute_growth_rate[i] = self.params.blacksite_training_compute_growth_rate
+            else:
+                for i in range(len(training_compute_growth_rate)):
+                    training_compute_growth_rate[i] = 0
+
         return TimeSeriesData(time, L_HUMAN, inference_compute, experiment_compute, training_compute_growth_rate)
 
     def compute_progress_trajectory(self, time_range: List[float]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -4246,6 +4266,7 @@ class BlacksiteProgressModel(ProgressModel):
                 if i == 0:
                     # Initialize training compute at 0
                     training_compute_val = self.initial_training_compute
+                    logger.info(f"BLACKSITE::: initial_training_compute: {self.initial_training_compute}")
                 else:
                     # Trapezoidal integration: add area of trapezoid from previous time step
                     dt = times[i] - times[i-1]
@@ -4472,11 +4493,7 @@ class BlacksiteProgressModel(ProgressModel):
         except Exception as e:
             logger.warning(f"Failed computing top taste metrics: {e}")
         
-        # RESCALE SOFTWARE EFFICIENCY TO REFLECT PRESENT-DAY BASELINE
-        software_efficiency = software_efficiency - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, software_efficiency)
-        training_compute = training_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, training_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
-        effective_compute = effective_compute - np.interp(cfg.TRAINING_COMPUTE_REFERENCE_YEAR, times, effective_compute) + cfg.TRAINING_COMPUTE_REFERENCE_OOMS
-
+        logger.info(f"BLACKSITE::: training_compute: {training_compute}")
         # Store comprehensive results
         self.results = {
             'times': times,
@@ -4504,7 +4521,7 @@ class BlacksiteProgressModel(ProgressModel):
             'discounted_exp_compute': discounted_exp_compute,
             'horizon_lengths': horizon_lengths,
             'effective_compute': effective_compute,
-            'training_compute': training_compute,
+            'training_compute': np.array(training_compute),
             'experiment_capacity': experiment_capacity,
             'aa_time': aa_time,  # Time when superhuman coder level is reached
             'sc_progress_level': self.params.progress_at_aa,  # Progress level for SC
