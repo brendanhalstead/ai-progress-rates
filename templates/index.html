@@ -101,25 +101,6 @@
                 >
                   Export Progress-Adjusted METR Data
                 </button>
-                <button
-                  class="btn btn-outline-light me-2"
-                  onclick="downloadSettings()"
-                >
-                  Save Settings
-                </button>
-                <button
-                  class="btn btn-outline-light"
-                  onclick="document.getElementById('settingsFileInput').click()"
-                >
-                  Load Settings
-                </button>
-                <input
-                  type="file"
-                  id="settingsFileInput"
-                  accept="application/json"
-                  style="display: none"
-                  onchange="handleSettingsFile(event)"
-                />
               </div>
             </div>
           </nav>
@@ -993,6 +974,21 @@
                   <div class="collapse" id="planAParams">
                     <div class="mb-3">
                       <label class="param-label"
+                        >Plan A Start Time:
+                        <span id="plan_a_start_time_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="plan_a_start_time"
+                        step="0.1"
+                      />
+                      <small class="text-muted"
+                        >Year when Plan A scenario begins</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
                         >Blacksite Start Time:
                         <span id="blacksite_start_time_val">Loading...</span></label
                       >
@@ -1004,6 +1000,36 @@
                       />
                       <small class="text-muted"
                         >Year when the blacksite project begins</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Main Project Training Compute Growth Rate:
+                        <span id="main_project_training_compute_growth_rate_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="main_project_training_compute_growth_rate"
+                        step="0.01"
+                      />
+                      <small class="text-muted"
+                        >How quickly training run compute grows (OOMs per year)</small
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="param-label"
+                        >Main Project Software Progress Rate:
+                        <span id="main_project_software_progress_rate_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="main_project_software_progress_rate"
+                        step="0.01"
+                      />
+                      <small class="text-muted"
+                        >Human-only software efficiency growth rate (OOMs/year)</small
                       >
                     </div>
                     <div class="mb-3">
@@ -1484,7 +1510,10 @@
         "sos_mode",
         "plan_a_mode",
         // Plan A settings
+        "plan_a_start_time",
         "show_blacksite",
+        "main_project_training_compute_growth_rate",
+        "main_project_software_progress_rate",
         "blacksite_start_time",
         "blacksite_initial_years_behind",
         "blacksite_training_compute_penalty_ooms",
@@ -1697,7 +1726,7 @@
         });
 
         // Add event listeners for Plan A Settings parameters
-        $("#show_blacksite, #blacksite_start_time, #blacksite_initial_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_training_compute_growth_rate, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty, #blacksite_can_stack_software_progress, #blacksite_can_stack_training_compute").on("change input", function () {
+        $("#plan_a_start_time, #show_blacksite, #blacksite_start_time, #main_project_training_compute_growth_rate, #main_project_software_progress_rate, #blacksite_initial_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_training_compute_growth_rate, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty, #blacksite_can_stack_software_progress, #blacksite_can_stack_training_compute").on("change input", function () {
           if (this.type === "range") {
             updateDisplayValue(this);
           }
@@ -3292,314 +3321,6 @@
         window.location.href = "/api/export-metr-data";
       }
 
-      function buildSettingsObject() {
-        try {
-          const parameters = collectParameters();
-          const useDirectCes = !!document.getElementById("directCesToggle")?.checked;
-
-          let startYear = parseInt($("#start_year").val());
-          let endYear = parseInt($("#end_year").val());
-          let initialProgress = parseFloat($("#initial_progress").val());
-          if (!isFinite(startYear) || startYear < 2000) startYear = 2012;
-          if (!isFinite(endYear) || endYear < startYear) endYear = Math.max(startYear + 1, 2050);
-          if (!isFinite(initialProgress)) initialProgress = 0.0;
-
-          const datasetEl = document.getElementById("datasetSelect");
-          const dataset = datasetEl ? datasetEl.value : null;
-          const enableParallelPenaltyToggle = document.getElementById("enable_parallel_penalty");
-          const enableParallelPenalty = enableParallelPenaltyToggle ? !!enableParallelPenaltyToggle.checked : undefined;
-
-          return {
-            schema_version: 1,
-            app: "ai-capabilities-model",
-            generated_at: new Date().toISOString(),
-            parameters: parameters,
-            time_range: [startYear, endYear],
-            initial_progress: initialProgress,
-            direct_input_exp_cap_ces_params: useDirectCes,
-            ui_state: {
-              precise_input_mode: !!usePreciseInputs,
-              auto_update: $("#autoUpdate").is(":checked"),
-              dataset: dataset,
-              enable_parallel_penalty: enableParallelPenalty,
-            },
-          };
-        } catch (e) {
-          showError("Failed to build settings: " + (e?.message || e));
-          throw e;
-        }
-      }
-
-      function downloadSettings() {
-        try {
-          const settings = buildSettingsObject();
-          const json = JSON.stringify(settings, null, 2);
-          const blob = new Blob([json], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          const ts = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
-          a.href = url;
-          a.download = `ai_capabilities_settings_${ts}.json`;
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }, 0);
-        } catch (e) {
-          showError("Failed to save settings: " + (e?.message || e));
-        }
-      }
-
-      function handleSettingsFile(event) {
-        try {
-          const file = event.target.files && event.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = function (e) {
-            try {
-              const text = e.target?.result;
-              const settings = JSON.parse(text);
-              applySettings(settings);
-            } catch (err) {
-              showError("Invalid settings file: " + (err?.message || err));
-            } finally {
-              // reset input so the same file can be chosen again later
-              event.target.value = "";
-            }
-          };
-          reader.onerror = function () {
-            showError("Failed to read settings file");
-          };
-          reader.readAsText(file);
-        } catch (e) {
-          showError("Failed to load settings: " + (e?.message || e));
-        }
-      }
-
-      function applySettings(settings) {
-        try {
-          if (!settings || typeof settings !== "object") {
-            throw new Error("Empty or invalid settings");
-          }
-
-          // Best-effort schema checks
-          if (
-            settings.parameters === undefined ||
-            settings.time_range === undefined ||
-            settings.initial_progress === undefined
-          ) {
-            console.warn("Settings missing expected fields; applying best-effort.");
-          }
-
-          // Apply dataset first (session-level on backend)
-          try {
-            const ds = settings.ui_state?.dataset;
-            const dsSelect = document.getElementById("datasetSelect");
-            if (ds && dsSelect && Array.from(dsSelect.options).some((o) => o.value === ds)) {
-              dsSelect.value = ds;
-              $.ajax({
-                url: "/api/select-data",
-                method: "POST",
-                contentType: "application/json",
-                data: JSON.stringify({ dataset: ds }),
-                success: function (response) {
-                  try {
-                    if (response && response.success) {
-                      $("#dataPreview").show();
-                      $("#dataSummary").html(
-                        `<div>Time range: ${response.data_summary.time_range[0]} - ${response.data_summary.time_range[1]}</div>` +
-                          `<div>Data points: ${response.data_summary.data_points}</div>`
-                      );
-                      $("#start_year").val(Math.floor(response.data_summary.time_range[0]));
-                      $("#end_year").val(Math.ceil(response.data_summary.time_range[1]));
-                    }
-                  } catch (_) {}
-                },
-              });
-            }
-          } catch (e) {
-            console.warn("Failed to apply dataset from settings", e);
-          }
-
-          // UI state toggles
-          try {
-            const precise = !!settings.ui_state?.precise_input_mode;
-            const preciseToggle = document.getElementById("preciseInputMode");
-            if (preciseToggle) {
-              preciseToggle.checked = precise;
-              setInputMode(precise);
-            }
-            const autoUpdateToggle = document.getElementById("autoUpdate");
-            if (autoUpdateToggle && settings.ui_state?.auto_update !== undefined) {
-              autoUpdateToggle.checked = !!settings.ui_state.auto_update;
-            }
-            const eppToggle = document.getElementById("enable_parallel_penalty");
-            if (eppToggle && settings.ui_state?.enable_parallel_penalty !== undefined) {
-              eppToggle.checked = !!settings.ui_state.enable_parallel_penalty;
-            }
-          } catch (e) {
-            console.warn("Failed to apply UI toggles from settings", e);
-          }
-
-          // Direct CES toggle
-          try {
-            if (typeof settings.direct_input_exp_cap_ces_params === "boolean") {
-              const directToggle = document.getElementById("directCesToggle");
-              if (directToggle) {
-                directToggle.checked = settings.direct_input_exp_cap_ces_params;
-                setCesInputMode(directToggle.checked, true);
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to apply CES input mode from settings", e);
-          }
-
-          // Apply select/string parameters first
-          try {
-            [
-              "taste_schedule_type",
-              "horizon_extrapolation_type",
-              "automation_interp_type",
-              "coding_labor_mode",
-            ].forEach((id) => {
-              const v = settings.parameters?.[id];
-              const el = document.getElementById(id);
-              if (el && v !== undefined && v !== null) {
-                el.value = v;
-              }
-            });
-          } catch (e) {
-            console.warn("Failed to apply select params from settings", e);
-          }
-
-          // Include gap special handling (string -> checkbox)
-          try {
-            if (settings.parameters && settings.parameters.include_gap !== undefined) {
-              const includeGapToggle = document.getElementById("include_gap");
-              if (includeGapToggle) {
-                includeGapToggle.checked = settings.parameters.include_gap === "gap";
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to apply include_gap from settings", e);
-          }
-
-          // Boolean toggles stored in parameters
-          try {
-            [
-              "sos_mode",
-              "plan_a_mode",
-              "show_blacksite",
-              "blacksite_can_stack_software_progress",
-              "blacksite_can_stack_training_compute",
-            ].forEach((id) => {
-              const v = settings.parameters?.[id];
-              const el = document.getElementById(id);
-              if (el && typeof v === "boolean") {
-                el.checked = v;
-              }
-            });
-            // Apply blacksite theme if needed
-            try {
-              const isBlacksite = !!settings.parameters?.show_blacksite;
-              if (isBlacksite) {
-                document.body.classList.add("blacksite-mode");
-              } else {
-                document.body.classList.remove("blacksite-mode");
-              }
-            } catch (_) {}
-          } catch (e) {
-            console.warn("Failed to apply boolean params from settings", e);
-          }
-
-          // Optional auto-fit params based on null values
-          try {
-            [
-              "present_horizon",
-              "present_doubling_time",
-              "doubling_difficulty_growth_factor",
-            ].forEach((id) => {
-              const v = settings.parameters?.[id];
-              const checkbox = document.getElementById("auto_fit_" + id);
-              const slider = document.getElementById(id);
-              if (checkbox && slider) {
-                if (v === null) {
-                  checkbox.checked = true;
-                  slider.disabled = true;
-                  const span = document.getElementById(id + "_val");
-                  if (span) span.textContent = "Auto-fit";
-                } else if (v !== undefined) {
-                  checkbox.checked = false;
-                  slider.disabled = false;
-                }
-              }
-            });
-          } catch (e) {
-            console.warn("Failed to apply auto-fit params from settings", e);
-          }
-
-          // Numeric parameters (range/number inputs)
-          try {
-            if (settings.parameters) {
-              Object.entries(settings.parameters).forEach(([key, value]) => {
-                if (value === null) return; // handled by auto-fit logic
-                if (typeof value === "string") return; // handled when string param
-                const el = document.getElementById(key);
-                if (!el) return;
-                const tag = el.tagName ? el.tagName.toLowerCase() : "";
-                if (tag === "select" || el.type === "checkbox") return; // already handled
-
-                if (el.type === "number") {
-                  el.value = isFinite(value) ? value : "";
-                } else if (el.type === "range") {
-                  let newValue = applyParameterBounds(key, value);
-                  el.value = newValue;
-                  updateDisplayValue(el);
-                }
-              });
-            }
-          } catch (e) {
-            console.warn("Failed to apply numeric params from settings", e);
-          }
-
-          // Update dependent UI visibility and labels
-          try {
-            updateHorizonExtrapolationVisibility();
-            updateTasteUnitsVisibility();
-            updateBenchmarksAndGapsVisibility();
-            updatePlanASettingsVisibility();
-            updateAnchorTimeDisplay();
-            updateMilestoneTableHeader();
-            updateGapConvertedDisplay();
-          } catch (e) {
-            console.warn("Failed updating UI after applying settings", e);
-          }
-
-          // Simulation settings
-          try {
-            if (Array.isArray(settings.time_range) && settings.time_range.length === 2) {
-              const [sy, ey] = settings.time_range;
-              const syEl = document.getElementById("start_year");
-              const eyEl = document.getElementById("end_year");
-              if (syEl && isFinite(sy)) syEl.value = Math.floor(sy);
-              if (eyEl && isFinite(ey)) eyEl.value = Math.ceil(ey);
-            }
-            if (settings.initial_progress !== undefined && isFinite(settings.initial_progress)) {
-              const ipEl = document.getElementById("initial_progress");
-              if (ipEl) ipEl.value = settings.initial_progress;
-            }
-          } catch (e) {
-            console.warn("Failed to apply simulation settings", e);
-          }
-
-          // Recompute once with the fully applied state
-          computeModel();
-        } catch (e) {
-          showError("Failed to apply settings: " + (e?.message || e));
-        }
-      }
-
       function initializeParameterControls() {
         // Comprehensive initialization of all parameter controls from config
         if (!parameterConfig) {
@@ -3727,7 +3448,10 @@
           
           // Initialize blacksite sliders
           const blacksiteParams = [
+            'plan_a_start_time',
             'blacksite_start_time',
+            'main_project_training_compute_growth_rate',
+            'main_project_software_progress_rate',
             'blacksite_initial_years_behind',
             'blacksite_training_compute_penalty_ooms',
             'blacksite_training_compute_growth_rate',

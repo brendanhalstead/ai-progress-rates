@@ -155,6 +155,7 @@ PARAMETER_BOUNDS = {
     'optimal_ces_grid_size': (256, 16384),
     # coding labor mode (categorical; bounds unused by UI collector)
     'coding_labor_mode': (0, 1),
+    'plan_a_start_time': (2025.0, 2040.0),
     'blacksite_initial_years_behind': (0.0, 10.0),
     'blacksite_training_compute_penalty_ooms': (0.0, 10.0),
     'blacksite_training_compute_growth_rate': (0.0, 5.0),
@@ -262,6 +263,10 @@ DEFAULT_PARAMETERS = {
     'plan_a_mode': False,
     'is_blacksite': False,
     'show_blacksite': False,
+    'sw_leaks_to_blacksite': True,
+    'plan_a_start_time': 2030.0,
+    'main_project_training_compute_growth_rate': 0.8,
+    'main_project_software_progress_rate': 0.5,
     'blacksite_initial_years_behind': 0.0,
     'blacksite_training_compute_penalty_ooms': 2,
     'blacksite_training_compute_growth_rate': 0,

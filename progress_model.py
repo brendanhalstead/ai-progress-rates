@@ -590,8 +590,13 @@ class Parameters:
     
     # Plan A mode
     plan_a_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['plan_a_mode'])
+    plan_a_start_time: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['plan_a_start_time'])
     show_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['show_blacksite'])
+    sw_leaks_to_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['sw_leaks_to_blacksite'])
     is_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['is_blacksite'])
+    main_site: Any = field(default_factory=lambda: None)
+    main_project_training_compute_growth_rate: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['main_project_training_compute_growth_rate'])
+    main_project_software_progress_rate: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['main_project_software_progress_rate'])
     blacksite_initial_years_behind: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_initial_years_behind'])
     blacksite_initial_model_progress: float = field(default_factory=lambda: None)
     blacksite_training_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_penalty_ooms'])
@@ -2091,6 +2096,13 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             logger.warning(f"Invalid software progress rate: {software_progress_rate}")
             return [0.0, 0.0]
         
+        if params.plan_a_mode:
+            if params.is_blacksite and params.sw_leaks_to_blacksite:
+                software_progress_rate = max(software_progress_rate, np.interp(t, params.main_site.results['times'], params.main_site.results['software_progress_rates']))
+            elif t >= params.plan_a_start_time:
+                software_progress_rate = params.main_project_software_progress_rate
+                overall_rate = params.main_project_training_compute_growth_rate
+
         # Compute overall progress rate (dP/dt)
         overall_rate = compute_overall_progress_rate(
             software_progress_rate, training_compute_growth_rate
@@ -2109,6 +2121,9 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         logger.debug(f"t={t:.2f}, progress={cumulative_progress:.3f}, research_stock={research_stock:.3f}, "
                     f"automation={automation_fraction:.3f}, dP/dt={overall_rate:.3f}, dRS/dt={research_effort:.3f}")
         
+        if params.is_blacksite and params.sw_leaks_to_blacksite:
+            research_effort = max(research_effort, np.interp(t, params.main_site.results['times'], params.main_site.results['research_efforts']))
+
         return [overall_rate, research_effort]
         
     except Exception as e:
@@ -2374,6 +2389,68 @@ class ProgressModel:
         logger.info(f"  Inference compute: {freeze_inference_compute:.6f}")
         logger.info(f"  Training compute growth rate: {freeze_training_compute_growth_rate:.6f} -> 0.0")
         logger.info(f"  Inserted freeze point at time {freeze_time_after:.6f}")
+    
+    def initiate_fab_foom(self, foom_time: float):
+        """
+        Initiate fab foom.
+        
+        Args:
+            foom_time: Time at which to initiate fab foom (decimal year)
+        """
+        foom_human_labor = _log_interp(foom_time, self.data.time, self.data.L_HUMAN)
+        foom_experiment_compute = _log_interp(foom_time, self.data.time, self.data.experiment_compute)
+        foom_inference_compute = _log_interp(foom_time, self.data.time, self.data.inference_compute)
+        
+        # Get the target growth rate from parameters
+        growth_rate = self.params.main_project_training_compute_growth_rate
+
+        insertion_idx = np.searchsorted(self.data.time, foom_time)
+
+        time_with_foom = np.insert(self.data.time, insertion_idx, foom_time)
+        human_labor_with_foom = np.insert(self.data.L_HUMAN, insertion_idx, foom_human_labor)
+        experiment_compute_with_foom = np.insert(self.data.experiment_compute, insertion_idx, foom_experiment_compute)
+        inference_compute_with_foom = np.insert(self.data.inference_compute, insertion_idx, foom_inference_compute)
+        training_compute_growth_rate_with_foom = np.insert(self.data.training_compute_growth_rate, insertion_idx, growth_rate)
+
+        # Find where to insert the foom_time point
+        # Insert foom_time + epsilon to ensure proper ordering and transition
+        epsilon = 1e-6  # Small epsilon to ensure foom_time + epsilon comes after foom_time
+        foom_time_after = foom_time + epsilon
+
+        # Find the insertion point (first index where time > foom_time)
+        new_insertion_idx = insertion_idx + 1
+
+        # Create new arrays with the foom point inserted
+        new_time = np.insert(time_with_foom, new_insertion_idx, foom_time_after)
+        new_L_HUMAN = np.insert(human_labor_with_foom, new_insertion_idx, foom_human_labor)
+        new_experiment_compute = np.insert(experiment_compute_with_foom, new_insertion_idx, foom_experiment_compute)
+        new_inference_compute = np.insert(inference_compute_with_foom, new_insertion_idx, foom_inference_compute)
+        new_training_compute_growth_rate = np.insert(training_compute_growth_rate_with_foom, new_insertion_idx, growth_rate)
+
+        # Find indices where time >= foom_time (including both inserted points and all future points)
+        foom_mask = new_time >= foom_time
+        
+        # Make experiment compute, inference compute, and training compute grow at growth_rate (in OOMs/year)
+        # For times >= foom_time, values grow as: value(t) = value_0 * 10^(growth_rate * (t - foom_time))
+        time_delta = new_time[foom_mask] - foom_time
+        new_experiment_compute[foom_mask] = foom_experiment_compute * (10 ** (growth_rate * time_delta))
+        new_inference_compute[foom_mask] = foom_inference_compute * (10 ** (growth_rate * time_delta))
+        new_training_compute_growth_rate[foom_mask] = growth_rate
+
+        # Create new TimeSeriesData object
+        self.data = TimeSeriesData(
+            time=new_time,
+            L_HUMAN=new_L_HUMAN,
+            inference_compute=new_inference_compute,
+            experiment_compute=new_experiment_compute,
+            training_compute_growth_rate=new_training_compute_growth_rate
+        )
+
+        logger.info(f"Initiated fab foom at time {foom_time}:")
+        logger.info(f"  Human labor: {foom_human_labor:.6f}")
+        logger.info(f"  Experiment compute: {foom_experiment_compute:.6f} (growing at {growth_rate:.6f} OOMs/year from foom_time)")
+        logger.info(f"  Inference compute: {foom_inference_compute:.6f} (growing at {growth_rate:.6f} OOMs/year from foom_time)")
+        logger.info(f"  Training compute growth rate: {growth_rate:.6f} OOMs/year from foom_time")
     
     def estimate_horizon_trajectory(self, human_only_times: np.ndarray, human_only_progress: np.ndarray, anchor_progress_rate: float):
         """
@@ -3117,7 +3194,11 @@ class ProgressModel:
         if self.params.doubling_difficulty_growth_factor == 1.0:
             logger.info(f"doubling_difficulty_growth_factor is 1.0 (decay_rate = 0), setting to exponential")
             self.params.horizon_extrapolation_type = "exponential"
-
+        
+        # NVDA to the moon
+        if self.params.plan_a_mode:
+            self.initiate_fab_foom(self.params.plan_a_start_time)
+        
         # next compute human-only trajectory
         # Need to do this for various reasons, e.g. to auto-fit the METR trajectory you need to the (effective compute, horizon) pairs (we assume no automation)
         # Also if we want to specify current doubling time or gap size in years rather than progress units, need to know how much EC was increased in present day
@@ -3390,6 +3471,8 @@ class ProgressModel:
                     rs, current_research_effort, 
                     self.params.r_software
                 )
+                if self.params.plan_a_mode and t >= self.params.plan_a_start_time:
+                    software_rate = self.params.main_project_software_progress_rate
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 software_rate_present_resources = compute_software_progress_rate(
                     present_day_research_stock, research_effort_present_resources, 
@@ -4046,11 +4129,8 @@ class BlacksiteProgressModel(ProgressModel):
         self.initial_software_efficiency = np.interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['software_efficiency'])
         self.initial_training_compute = np.interp(start_time, self.main_model.results['times'], self.main_model.results['training_compute']) - self.params.blacksite_training_compute_penalty_ooms
         self.initial_progress = np.interp(start_time, self.main_model.results['times'], self.main_model.results['progress']) - self.params.blacksite_training_compute_penalty_ooms
-        # take CES params from main model (actually, this is redundant since the params are already deepcopied)
-        self.params.rho_experiment_capacity = self.main_model.params.rho_experiment_capacity
-        self.params.alpha_experiment_capacity = self.main_model.params.alpha_experiment_capacity
-        self.params.experiment_compute_exponent = self.main_model.params.experiment_compute_exponent
-
+        
+        self.params.main_site = self.main_model
         # take human-only results from main model
         self.human_only_results = self.main_model.human_only_results
 
@@ -4123,7 +4203,7 @@ class BlacksiteProgressModel(ProgressModel):
         
         # SIE MODE
         takeoff_start_human_only_stats = None
-        assert self.params.sos_mode is False
+        # assert self.params.sos_mode is False
         
         # Calculate all metrics in a single pass to avoid redundancy
         progress_rates = []
@@ -4245,15 +4325,17 @@ class BlacksiteProgressModel(ProgressModel):
                     )
 
                 # SOFTWARE PROGRESS RATE
-                assert current_research_effort == compute_research_effort(
-                    experiment_compute, serial_coding_labor, 
-                    self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
-                )
+                # assert current_research_effort == compute_research_effort(
+                #     experiment_compute, serial_coding_labor, 
+                #     self.params.alpha_experiment_capacity, self.params.rho_experiment_capacity, self.params.experiment_compute_exponent, aggregate_research_taste
+                # )
                 current_research_effort = research_efforts[i]
                 software_rate = compute_software_progress_rate(
                     rs, current_research_effort, 
                     self.params.r_software
                 )
+                if self.params.sw_leaks_to_blacksite:
+                    software_rate = max(software_rate, np.interp(t, self.params.main_site.results['times'], self.params.main_site.results['software_progress_rates']))
                 software_progress_rates.append(software_rate if np.isfinite(software_rate) else 0.0)
                 software_rate_present_resources = compute_software_progress_rate(
                     present_day_research_stock, research_effort_present_resources,
@@ -4502,7 +4584,7 @@ class BlacksiteProgressModel(ProgressModel):
         except Exception as e:
             logger.warning(f"Failed computing top taste metrics: {e}")
         
-        logger.info(f"BLACKSITE::: training_compute: {training_compute}")
+        logger.info(f"BLACKSITE::: training_compute: {software_efficiency}")
         # Store comprehensive results
         self.results = {
             'times': times,
