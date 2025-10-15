@@ -590,8 +590,10 @@ class Parameters:
     
     # Plan A mode
     plan_a_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['plan_a_mode'])
+    show_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['show_blacksite'])
     is_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['is_blacksite'])
     blacksite_initial_years_behind: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_initial_years_behind'])
+    blacksite_initial_model_progress: float = field(default_factory=lambda: None)
     blacksite_training_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_penalty_ooms'])
     blacksite_training_compute_growth_rate: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_growth_rate'])
     blacksite_human_labor_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_human_labor_penalty_ooms'])
@@ -1977,7 +1979,11 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
         return [0.0, 0.0]
     
     cumulative_progress, research_stock = state
+
+    model_progress = cumulative_progress
     
+    if params.is_blacksite:
+        model_progress = max(cumulative_progress, params.blacksite_initial_model_progress)
     if not np.isfinite(cumulative_progress):
         logger.warning(f"Invalid cumulative progress: {cumulative_progress}")
         cumulative_progress = 0.0
@@ -2031,13 +2037,13 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
             coding_labor = compute_coding_labor(None, inference_compute, L_HUMAN, params.rho_coding_labor, params.parallel_penalty, params.coding_labor_normalization, human_only=True)  
         else:
             # Compute automation fraction from cumulative progress
-            automation_fraction = compute_automation_fraction(cumulative_progress, params)
+            automation_fraction = compute_automation_fraction(model_progress, params)
             if not (0 <= automation_fraction <= 1):
                 logger.warning(f"Invalid automation fraction {automation_fraction} at progress {cumulative_progress}")
                 automation_fraction = np.clip(automation_fraction, 0.0, 1.0)
             
             # Compute AI research taste and aggregate research taste
-            ai_research_taste = compute_ai_research_taste(cumulative_progress, params)
+            ai_research_taste = compute_ai_research_taste(model_progress, params)
             aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste, median_to_top_gap=params.median_to_top_taste_multiplier)
             
             # Compute cognitive output with validation
@@ -2045,7 +2051,7 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
                 # Map model quantities to H, C, E (E is effective compute)
                 H = float(L_HUMAN)
                 C = float(inference_compute)
-                logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * cumulative_progress)
+                logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * model_progress)
                 try:
                     # Build or reuse AutomationModel for frontier (uses current anchors)
                     automation_model = params.automation_model
@@ -3720,7 +3726,7 @@ class ProgressModel:
             self.blacksite_model = BlacksiteProgressModel(blacksite_params, blacksite_data, self)
             self.blacksite_model.compute_progress_trajectory([self.params.blacksite_start_time, self.data.time[-1]])
             self.blacksite_results = self.blacksite_model.results
-        if self.params.is_blacksite:
+        if self.params.show_blacksite:
             self.results = self.blacksite_model.results
         return times, progress_values, research_stock_values
     
@@ -4034,12 +4040,12 @@ class BlacksiteProgressModel(ProgressModel):
         start_time = self.data.time[0]
         assert start_time == params.blacksite_start_time
         initial_years_behind = params.blacksite_initial_years_behind
-        self.initial_progress = self.main_model.get_progress_at_time(start_time - initial_years_behind)
+        self.initial_model_progress = self.main_model.get_progress_at_time(start_time - initial_years_behind)
+        self.params.blacksite_initial_model_progress = self.initial_model_progress
         self.initial_research_stock = _log_interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['research_stock'])
         self.initial_software_efficiency = np.interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['software_efficiency'])
-        self.initial_training_compute = np.interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['training_compute'])
-        # TODO: make this make sense with blacksite_training_compute_penalty_ooms
-
+        self.initial_training_compute = np.interp(start_time, self.main_model.results['times'], self.main_model.results['training_compute']) - self.params.blacksite_training_compute_penalty_ooms
+        self.initial_progress = np.interp(start_time, self.main_model.results['times'], self.main_model.results['progress']) - self.params.blacksite_training_compute_penalty_ooms
         # take CES params from main model (actually, this is redundant since the params are already deepcopied)
         self.params.rho_experiment_capacity = self.main_model.params.rho_experiment_capacity
         self.params.alpha_experiment_capacity = self.main_model.params.alpha_experiment_capacity
@@ -4057,11 +4063,12 @@ class BlacksiteProgressModel(ProgressModel):
         """
         assert self.params.blacksite_start_time in data.time
         start_time_idx = np.argmin(np.abs(data.time - self.params.blacksite_start_time))
-        
+
+        # TODO: maybe make this constant after start time
         time = data.time[start_time_idx:]
-        L_HUMAN = data.L_HUMAN[start_time_idx:] / (10**self.params.blacksite_human_labor_penalty_ooms)
-        inference_compute = data.inference_compute[start_time_idx:] / (10**self.params.blacksite_inference_compute_penalty_ooms)
-        experiment_compute = data.experiment_compute[start_time_idx:] / (10**self.params.blacksite_experiment_compute_penalty_ooms)
+        L_HUMAN = np.full(len(data.L_HUMAN[start_time_idx:]), data.L_HUMAN[start_time_idx]/(10**self.params.blacksite_human_labor_penalty_ooms))
+        inference_compute = np.full(len(data.inference_compute[start_time_idx:]), data.inference_compute[start_time_idx]/(10**self.params.blacksite_inference_compute_penalty_ooms))
+        experiment_compute = np.full(len(data.experiment_compute[start_time_idx:]), data.experiment_compute[start_time_idx]/(10**self.params.blacksite_experiment_compute_penalty_ooms))
         
         training_compute_growth_rate = data.training_compute_growth_rate[start_time_idx:]
         if self.params.blacksite_can_stack_training_compute:
@@ -4158,6 +4165,7 @@ class BlacksiteProgressModel(ProgressModel):
                 rates = progress_rate_at_time(t, state, self.data, self.params)
                 progress_rates.append(rates[0])
                 research_efforts.append(rates[1])
+                model_progress = max(progress, self.initial_model_progress)
 
                 # INPUT TIME SERIES
                 L_HUMAN = _log_interp(t, self.data.time, self.data.L_HUMAN)
@@ -4170,11 +4178,11 @@ class BlacksiteProgressModel(ProgressModel):
                 
                 
                 # AUTOMATION FRACTION
-                automation_fraction = compute_automation_fraction(progress, self.params)
+                automation_fraction = compute_automation_fraction(model_progress, self.params)
                 automation_fractions.append(automation_fraction)
                 
                 # RESEARCH TASTE
-                ai_research_taste = compute_ai_research_taste(progress, self.params)
+                ai_research_taste = compute_ai_research_taste(model_progress, self.params)
                 ai_research_taste_sd = self.taste_distribution.get_sd_of_taste(ai_research_taste)
                 ai_research_taste_quantile = self.taste_distribution.get_quantile_of_taste(ai_research_taste)
                 aggregate_research_taste = compute_aggregate_research_taste(ai_research_taste, median_to_top_gap=self.params.median_to_top_taste_multiplier)
@@ -4187,7 +4195,7 @@ class BlacksiteProgressModel(ProgressModel):
                 if getattr(self.params, 'coding_labor_mode', 'simple_ces') == 'optimal_ces':
                     H = float(L_HUMAN)
                     C = float(inference_compute)
-                    logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * progress)
+                    logE = float(np.log(cfg.BASE_FOR_SOFTWARE_LOM) * model_progress)
                     try:
                         automation_model = self.params.automation_model
                         L_opt = automation_model.coding_labor_optimal_ces(H, C, logE, self.params)
@@ -4286,7 +4294,7 @@ class BlacksiteProgressModel(ProgressModel):
                 horizon_length = 0.0  # Default fallback
                 if self.horizon_trajectory is not None:
                     try:
-                        horizon_length = self.horizon_trajectory(progress)
+                        horizon_length = self.horizon_trajectory(model_progress)
                         if not np.isfinite(horizon_length) or horizon_length < 0:
                             horizon_length = 0.0
                     except Exception as horizon_e:

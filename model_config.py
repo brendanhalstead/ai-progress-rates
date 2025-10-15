@@ -261,16 +261,17 @@ DEFAULT_PARAMETERS = {
     'sos_mode': False,
     'plan_a_mode': False,
     'is_blacksite': False,
+    'show_blacksite': False,
     'blacksite_initial_years_behind': 0.0,
-    'blacksite_training_compute_penalty_ooms': 1,
+    'blacksite_training_compute_penalty_ooms': 2,
     'blacksite_training_compute_growth_rate': 0,
-    'blacksite_human_labor_penalty_ooms': 1,
-    'blacksite_experiment_compute_penalty_ooms': 1,
-    'blacksite_inference_compute_penalty_ooms': 1,
-    'blacksite_human_taste_penalty': 1,
+    'blacksite_human_labor_penalty_ooms': 2,
+    'blacksite_experiment_compute_penalty_ooms': 2,
+    'blacksite_inference_compute_penalty_ooms': 2,
+    'blacksite_human_taste_penalty': 2,
     'blacksite_can_stack_training_compute': False,
     'blacksite_can_stack_software_progress': True,
-    'blacksite_start_time': 2028.0
+    'blacksite_start_time': 2030.0
 }
 
 # =============================================================================
