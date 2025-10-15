@@ -155,13 +155,14 @@ PARAMETER_BOUNDS = {
     'optimal_ces_grid_size': (256, 16384),
     # coding labor mode (categorical; bounds unused by UI collector)
     'coding_labor_mode': (0, 1),
-    'blacksite_sw_years_behind': (0.0, 10.0),
+    'blacksite_initial_years_behind': (0.0, 10.0),
     'blacksite_training_compute_penalty_ooms': (0.0, 10.0),
     'blacksite_training_compute_growth_rate': (0.0, 5.0),
     'blacksite_human_labor_penalty_ooms': (0.0, 10.0),
     'blacksite_experiment_compute_penalty_ooms': (0.0, 10.0),
     'blacksite_inference_compute_penalty_ooms': (0.0, 10.0),
     'blacksite_human_taste_penalty': (0.0, 100.0),
+    'blacksite_start_time': (2025.0, 2040.0),
 }
 
 # Validation thresholds for parameter combinations
@@ -260,7 +261,7 @@ DEFAULT_PARAMETERS = {
     'sos_mode': False,
     'plan_a_mode': False,
     'is_blacksite': False,
-    'blacksite_sw_years_behind': 0.0,
+    'blacksite_initial_years_behind': 0.0,
     'blacksite_training_compute_penalty_ooms': 1,
     'blacksite_training_compute_growth_rate': 0,
     'blacksite_human_labor_penalty_ooms': 1,

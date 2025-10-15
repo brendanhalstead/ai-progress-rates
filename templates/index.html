@@ -973,6 +973,21 @@
                   </div>
                   <div class="collapse" id="planAParams">
                     <div class="mb-3">
+                      <label class="param-label"
+                        >Blacksite Start Time:
+                        <span id="blacksite_start_time_val">Loading...</span></label
+                      >
+                      <input
+                        type="range"
+                        class="range-input form-range"
+                        id="blacksite_start_time"
+                        step="1"
+                      />
+                      <small class="text-muted"
+                        >Year when the blacksite project begins</small
+                      >
+                    </div>
+                    <div class="mb-3">
                       <div class="form-check form-switch">
                         <input
                           class="form-check-input"
@@ -987,17 +1002,17 @@
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
-                        >Black Site SW Years Behind:
-                        <span id="blacksite_sw_years_behind_val">Loading...</span></label
+                        >Black Site Starting Years Behind:
+                        <span id="blacksite_initial_years_behind_val">Loading...</span></label
                       >
                       <input
                         type="range"
                         class="range-input form-range"
-                        id="blacksite_sw_years_behind"
+                        id="blacksite_initial_years_behind"
                         step="0.1"
                       />
                       <small class="text-muted"
-                        >How many years behind the black site is in software efficiency</small
+                        >The black site starts with a model equaling the SOTA as of this many years ago. They also start with equal algorithmic knowledge to OpenBrain this many years ago.</small
                       >
                     </div>
                     <div class="mb-3">
@@ -1012,12 +1027,12 @@
                         step="0.1"
                       />
                       <small class="text-muted"
-                        >Training compute penalty in OOMs</small
+                        >Determines the initial gap in OOMs between the largest model the blacksite can train and the training compute of the model they start with.</small
                       >
                     </div>
                     <div class="mb-3">
                       <label class="param-label"
-                        >Training Compute Growth Rate:
+                        >Blacksite Training Compute Growth Rate:
                         <span id="blacksite_training_compute_growth_rate_val">Loading...</span></label
                       >
                       <input
@@ -1027,7 +1042,7 @@
                         step="0.01"
                       />
                       <small class="text-muted"
-                        >Blacksite training compute growth rate (OOMs per year)</small
+                        >How quickly the max achievable training run compute grows (OOMs per year)</small
                       >
                     </div>
                     <div class="mb-3">
@@ -1102,7 +1117,7 @@
                           Can Stack Software Progress
                         </label>
                       </div>
-                      <small class="text-muted">Allow blacksite to benefit from frontier software progress.</small>
+                      <small class="text-muted">Allows blacksite to add software OOMs directly to their initial model</small>
                       <div class="alert alert-warning mt-2" id="blacksite_software_progress_warning" style="display: none;">
                         <small><strong>Warning:</strong> Disabling software progress stacking is currently unsupported and may produce incorrect results.</small>
                       </div>
@@ -1119,7 +1134,7 @@
                           Can Stack Training Compute
                         </label>
                       </div>
-                      <small class="text-muted">Allow blacksite to benefit from frontier training compute.</small>
+                      <small class="text-muted">Allow blacksite to add hardware OOMs directly to their initial model.</small>
                     </div>
                   </div>
                 </div>
@@ -1451,7 +1466,8 @@
         "plan_a_mode",
         // Plan A settings
         "is_blacksite",
-        "blacksite_sw_years_behind",
+        "blacksite_start_time",
+        "blacksite_initial_years_behind",
         "blacksite_training_compute_penalty_ooms",
         "blacksite_human_labor_penalty_ooms",
         "blacksite_experiment_compute_penalty_ooms",
@@ -1662,7 +1678,7 @@
         });
 
         // Add event listeners for Plan A Settings parameters
-        $("#is_blacksite, #blacksite_sw_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_training_compute_growth_rate, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty, #blacksite_can_stack_software_progress, #blacksite_can_stack_training_compute").on("change input", function () {
+        $("#is_blacksite, #blacksite_start_time, #blacksite_initial_years_behind, #blacksite_training_compute_penalty_ooms, #blacksite_training_compute_growth_rate, #blacksite_human_labor_penalty_ooms, #blacksite_experiment_compute_penalty_ooms, #blacksite_inference_compute_penalty_ooms, #blacksite_human_taste_penalty, #blacksite_can_stack_software_progress, #blacksite_can_stack_training_compute").on("change input", function () {
           if (this.type === "range") {
             updateDisplayValue(this);
           }
@@ -3384,7 +3400,8 @@
           
           // Initialize blacksite sliders
           const blacksiteParams = [
-            'blacksite_sw_years_behind',
+            'blacksite_start_time',
+            'blacksite_initial_years_behind',
             'blacksite_training_compute_penalty_ooms',
             'blacksite_training_compute_growth_rate',
             'blacksite_human_labor_penalty_ooms',

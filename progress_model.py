@@ -591,7 +591,7 @@ class Parameters:
     # Plan A mode
     plan_a_mode: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['plan_a_mode'])
     is_blacksite: bool = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['is_blacksite'])
-    blacksite_sw_years_behind: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_sw_years_behind'])
+    blacksite_initial_years_behind: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_initial_years_behind'])
     blacksite_training_compute_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_penalty_ooms'])
     blacksite_training_compute_growth_rate: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_training_compute_growth_rate'])
     blacksite_human_labor_penalty_ooms: float = field(default_factory=lambda: cfg.DEFAULT_PARAMETERS['blacksite_human_labor_penalty_ooms'])
@@ -3715,8 +3715,9 @@ class ProgressModel:
         # logger.info(f"Automation: {automation_fractions[0]:.3f} -> {automation_fractions[-1]:.3f}")
         if self.params.plan_a_mode:
             blacksite_params = copy.deepcopy(self.params)
+            blacksite_data = copy.deepcopy(self.data)
             blacksite_params.is_blacksite = True
-            self.blacksite_model = BlacksiteProgressModel(blacksite_params, self.data, self)
+            self.blacksite_model = BlacksiteProgressModel(blacksite_params, blacksite_data, self)
             self.blacksite_model.compute_progress_trajectory([self.params.blacksite_start_time, self.data.time[-1]])
             self.blacksite_results = self.blacksite_model.results
         if self.params.is_blacksite:
@@ -4032,7 +4033,7 @@ class BlacksiteProgressModel(ProgressModel):
         logger.info(f"BLACKSITE::: data.time[0]: {data.time[0]}")
         start_time = self.data.time[0]
         assert start_time == params.blacksite_start_time
-        initial_years_behind = params.blacksite_sw_years_behind
+        initial_years_behind = params.blacksite_initial_years_behind
         self.initial_progress = self.main_model.get_progress_at_time(start_time - initial_years_behind)
         self.initial_research_stock = _log_interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['research_stock'])
         self.initial_software_efficiency = np.interp(start_time - initial_years_behind, self.main_model.results['times'], self.main_model.results['software_efficiency'])
