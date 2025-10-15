@@ -2101,7 +2101,6 @@ def progress_rate_at_time(t: float, state: List[float], time_series_data: TimeSe
                 software_progress_rate = max(software_progress_rate, np.interp(t, params.main_site.results['times'], params.main_site.results['software_progress_rates']))
             elif t >= params.plan_a_start_time:
                 software_progress_rate = params.main_project_software_progress_rate
-                overall_rate = params.main_project_training_compute_growth_rate
 
         # Compute overall progress rate (dP/dt)
         overall_rate = compute_overall_progress_rate(
