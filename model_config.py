@@ -137,7 +137,6 @@ PARAMETER_BOUNDS = {
     'doubling_difficulty_growth_factor': (0.5, 1.5),  # difficulty growth rate (1 - decay rate)
     # Baseline Annual Compute Multiplier bounds
     'baseline_annual_compute_multiplier': (1.0, 20.0),
-    # coding_labor_exponent deprecated in favor of parallel_penalty
     # exp capacity pseudoparameters
     'inf_labor_asymptote': (0, 100000),
     'inf_compute_asymptote': (0, 100000),
@@ -244,7 +243,7 @@ DEFAULT_PARAMETERS = {
     'compute_anchor_exp_cap': None,
     'inv_compute_anchor_exp_cap': 3.33,
     # penalty on parallel coding labor contribution in exp capacity
-    'parallel_penalty': 0.52,
+    'parallel_penalty': 0.5,
     # Gap mode
     'include_gap': 'no gap',
     'gap_years': 1.5,
